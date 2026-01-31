@@ -1,0 +1,25 @@
+# Docker volumes (data persisted locally)
+# Not ignored - we use named volumes in docker-compose
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Composer
+/vendor/
+
+# Node (if we add build tools later)
+/node_modules/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
