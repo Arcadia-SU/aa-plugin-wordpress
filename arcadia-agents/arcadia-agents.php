@@ -25,6 +25,23 @@ define( 'ARCADIA_AGENTS_VERSION', '0.1.0' );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// Load Composer autoloader.
+$autoloader = ARCADIA_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';
+if ( file_exists( $autoloader ) ) {
+	require_once $autoloader;
+} else {
+	// Show admin notice if Composer dependencies are missing.
+	add_action(
+		'admin_notices',
+		function () {
+			echo '<div class="notice notice-error"><p>';
+			echo esc_html__( 'Arcadia Agents: Composer dependencies are missing. Please run "composer install" in the plugin directory.', 'arcadia-agents' );
+			echo '</p></div>';
+		}
+	);
+	return; // Stop loading plugin without dependencies.
+}
+
 /**
  * Main plugin class.
  */
@@ -61,10 +78,10 @@ class Arcadia_Agents {
 	 * Load required files.
 	 */
 	private function load_dependencies() {
-		// Core classes will be loaded here.
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
+		// Core classes.
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
 		if ( is_admin() ) {
@@ -97,6 +114,10 @@ class Arcadia_Agents {
 				'permission_callback' => '__return_true',
 			)
 		);
+
+		// Register all authenticated endpoints.
+		$api = Arcadia_API::get_instance();
+		$api->register_routes();
 	}
 
 	/**

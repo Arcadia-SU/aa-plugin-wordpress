@@ -35,8 +35,9 @@
 
 ### Fichiers de base
 - [x] `arcadia-agents.php` - Point d'entrée + métadonnées
-- [ ] `includes/class-api.php` - Enregistrement endpoints REST
-- [ ] `includes/class-auth.php` - Validation JWT
+- [x] `includes/class-api.php` - Enregistrement endpoints REST
+- [x] `includes/class-auth.php` - Validation JWT
+- [x] `includes/class-blocks.php` - Génération blocs Gutenberg/ACF
 - [x] `admin/settings.php` - Page admin WP (structure de base)
 
 ---
@@ -50,60 +51,60 @@
 - [x] Bouton "Test connection"
 
 ### Backend auth
-- [ ] Implémenter validation JWT (RS256)
-- [ ] Stocker public key dans options WP
-- [ ] Implémenter vérification des scopes
-- [ ] Implémenter réponses d'erreur structurées
-- [ ] Implémenter handshake avec ArcadiaAgents
-- [ ] Sauvegarder les scopes sélectionnés
+- [x] Implémenter validation JWT (RS256)
+- [x] Stocker public key dans options WP
+- [x] Implémenter vérification des scopes
+- [x] Implémenter réponses d'erreur structurées
+- [x] Implémenter handshake avec ArcadiaAgents
+- [x] Sauvegarder les scopes sélectionnés
 
 ---
 
 ## Phase 3 : Endpoints REST
 
 ### Articles
-- [ ] `POST /arcadia/v1/posts` - Créer article
-- [ ] `GET /arcadia/v1/posts` - Lister articles
-- [ ] `PUT /arcadia/v1/posts/{id}` - Modifier article
-- [ ] `DELETE /arcadia/v1/posts/{id}` - Supprimer article
+- [x] `POST /arcadia/v1/posts` - Créer article
+- [x] `GET /arcadia/v1/posts` - Lister articles
+- [x] `PUT /arcadia/v1/posts/{id}` - Modifier article
+- [x] `DELETE /arcadia/v1/posts/{id}` - Supprimer article
 
 ### Pages
-- [ ] `GET /arcadia/v1/pages` - Lister pages
-- [ ] `PUT /arcadia/v1/pages/{id}` - Modifier page
+- [x] `GET /arcadia/v1/pages` - Lister pages
+- [x] `PUT /arcadia/v1/pages/{id}` - Modifier page
 
 ### Médias
-- [ ] `POST /arcadia/v1/media` - Upload via URL (sideload)
-- [ ] `PUT /arcadia/v1/posts/{id}/featured-image` - Définir image à la une
+- [x] `POST /arcadia/v1/media` - Upload via URL (sideload)
+- [x] `PUT /arcadia/v1/posts/{id}/featured-image` - Définir image à la une
 
 ### Taxonomies
-- [ ] `GET /arcadia/v1/categories` - Lister catégories
-- [ ] `GET /arcadia/v1/tags` - Lister tags
-- [ ] `POST /arcadia/v1/categories` - Créer catégorie
+- [x] `GET /arcadia/v1/categories` - Lister catégories
+- [x] `GET /arcadia/v1/tags` - Lister tags
+- [x] `POST /arcadia/v1/categories` - Créer catégorie
 
 ### Site
 - [x] `GET /arcadia/v1/health` - Health check (sans auth)
-- [ ] `GET /arcadia/v1/site-info` - Infos site
+- [x] `GET /arcadia/v1/site-info` - Infos site
 
 ---
 
 ## Phase 4 : Génération de blocs
 
 ### Infrastructure
-- [ ] Créer interface `BlockAdapter`
-- [ ] Implémenter détection automatique du mode (ACF vs Gutenberg)
-- [ ] Implémenter parsing markdown → HTML (liens)
+- [x] Créer interface `BlockAdapter`
+- [x] Implémenter détection automatique du mode (ACF vs Gutenberg)
+- [x] Implémenter parsing markdown → HTML (liens)
 
 ### Gutenberg Adapter (MVP)
-- [ ] Mapper `heading` → `wp:heading`
-- [ ] Mapper `paragraph` → `wp:paragraph`
-- [ ] Mapper `image` → `wp:image`
-- [ ] Mapper `list` → `wp:list`
+- [x] Mapper `heading` → `wp:heading`
+- [x] Mapper `paragraph` → `wp:paragraph`
+- [x] Mapper `image` → `wp:image`
+- [x] Mapper `list` → `wp:list`
 
 ### ACF Adapter (MVP)
-- [ ] Mapper `heading` → `acf/title`
-- [ ] Mapper `paragraph` → `acf/text`
-- [ ] Mapper `image` → `acf/image`
-- [ ] Mapper `list` → `acf/text` (avec ul/ol)
+- [x] Mapper `heading` → `acf/title`
+- [x] Mapper `paragraph` → `acf/text`
+- [x] Mapper `image` → `acf/image`
+- [x] Mapper `list` → `acf/text` (avec ul/ol)
 
 ---
 

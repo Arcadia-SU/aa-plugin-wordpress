@@ -22,31 +22,113 @@ function arcadia_agents_settings_page() {
 	// Get saved options.
 	$connection_key = get_option( 'arcadia_agents_connection_key', '' );
 	$is_connected   = get_option( 'arcadia_agents_connected', false );
+	$connected_at   = get_option( 'arcadia_agents_connected_at', '' );
 	$last_activity  = get_option( 'arcadia_agents_last_activity', '' );
+
+	// Default scopes (all enabled).
+	$all_scopes = array(
+		'posts:read',
+		'posts:write',
+		'posts:delete',
+		'media:read',
+		'media:write',
+		'taxonomies:read',
+		'taxonomies:write',
+		'site:read',
+	);
+
+	$notice        = '';
+	$notice_type   = '';
 
 	// Handle form submission.
 	if ( isset( $_POST['arcadia_agents_save'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
-		$connection_key = sanitize_text_field( wp_unslash( $_POST['arcadia_agents_connection_key'] ?? '' ) );
-		update_option( 'arcadia_agents_connection_key', $connection_key );
+		// Save connection key.
+		$new_connection_key = sanitize_text_field( wp_unslash( $_POST['arcadia_agents_connection_key'] ?? '' ) );
+		update_option( 'arcadia_agents_connection_key', $new_connection_key );
+		$connection_key = $new_connection_key;
 
-		// TODO: Trigger handshake with ArcadiaAgents to validate key and get public key.
-		// For now, just save the key.
+		// Save scopes.
+		$selected_scopes = isset( $_POST['arcadia_agents_scopes'] ) ? array_map( 'sanitize_text_field', $_POST['arcadia_agents_scopes'] ) : array();
+		// Validate scopes.
+		$selected_scopes = array_intersect( $selected_scopes, $all_scopes );
+		update_option( 'arcadia_agents_scopes', $selected_scopes );
+
+		$notice      = __( 'Settings saved.', 'arcadia-agents' );
+		$notice_type = 'success';
 	}
+
+	// Handle handshake request.
+	if ( isset( $_POST['arcadia_agents_handshake'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
+		$connection_key = get_option( 'arcadia_agents_connection_key', '' );
+
+		if ( empty( $connection_key ) ) {
+			$notice      = __( 'Please enter a Connection Key first.', 'arcadia-agents' );
+			$notice_type = 'error';
+		} else {
+			$auth   = Arcadia_Auth::get_instance();
+			$result = $auth->handshake( $connection_key );
+
+			if ( is_wp_error( $result ) ) {
+				$notice      = $result->get_error_message();
+				$notice_type = 'error';
+			} else {
+				$is_connected = true;
+				$connected_at = get_option( 'arcadia_agents_connected_at', '' );
+				$notice       = __( 'Successfully connected to Arcadia Agents!', 'arcadia-agents' );
+				$notice_type  = 'success';
+			}
+		}
+	}
+
+	// Handle disconnect.
+	if ( isset( $_POST['arcadia_agents_disconnect'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
+		$auth = Arcadia_Auth::get_instance();
+		$auth->disconnect();
+		$is_connected = false;
+		$connected_at = '';
+		$notice       = __( 'Disconnected from Arcadia Agents.', 'arcadia-agents' );
+		$notice_type  = 'info';
+	}
+
+	// Get current scopes.
+	$enabled_scopes = get_option( 'arcadia_agents_scopes', $all_scopes );
+
+	// Scope labels.
+	$scope_labels = array(
+		'posts:read'       => __( 'Read posts', 'arcadia-agents' ),
+		'posts:write'      => __( 'Create/edit posts', 'arcadia-agents' ),
+		'posts:delete'     => __( 'Delete posts', 'arcadia-agents' ),
+		'media:read'       => __( 'Read media library', 'arcadia-agents' ),
+		'media:write'      => __( 'Upload media', 'arcadia-agents' ),
+		'taxonomies:read'  => __( 'Read categories/tags', 'arcadia-agents' ),
+		'taxonomies:write' => __( 'Create categories/tags', 'arcadia-agents' ),
+		'site:read'        => __( 'Read site info & pages', 'arcadia-agents' ),
+	);
 
 	?>
 	<div class="wrap">
 		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 
+		<?php if ( $notice ) : ?>
+			<div class="notice notice-<?php echo esc_attr( $notice_type ); ?> is-dismissible">
+				<p><?php echo esc_html( $notice ); ?></p>
+			</div>
+		<?php endif; ?>
+
 		<!-- Connection Status -->
-		<div class="arcadia-status" style="margin: 20px 0; padding: 15px; background: #fff; border-left: 4px solid <?php echo $is_connected ? '#00a32a' : '#d63638'; ?>;">
+		<div class="arcadia-status" style="margin: 20px 0; padding: 15px; background: #fff; border-left: 4px solid <?php echo $is_connected ? '#00a32a' : '#d63638'; ?>; box-shadow: 0 1px 1px rgba(0,0,0,.04);">
 			<strong><?php esc_html_e( 'Connection Status:', 'arcadia-agents' ); ?></strong>
 			<?php if ( $is_connected ) : ?>
 				<span style="color: #00a32a;">● <?php esc_html_e( 'Connected', 'arcadia-agents' ); ?></span>
+				<?php if ( $connected_at ) : ?>
+					<br><small><?php echo esc_html( sprintf( __( 'Connected since: %s', 'arcadia-agents' ), $connected_at ) ); ?></small>
+				<?php endif; ?>
 				<?php if ( $last_activity ) : ?>
 					<br><small><?php echo esc_html( sprintf( __( 'Last activity: %s', 'arcadia-agents' ), $last_activity ) ); ?></small>
 				<?php endif; ?>
 			<?php else : ?>
 				<span style="color: #d63638;">● <?php esc_html_e( 'Not connected', 'arcadia-agents' ); ?></span>
+				<br><small><?php esc_html_e( 'Enter your Connection Key and click "Connect" to get started.', 'arcadia-agents' ); ?></small>
 			<?php endif; ?>
 		</div>
 
@@ -65,35 +147,40 @@ function arcadia_agents_settings_page() {
 							value="<?php echo esc_attr( $connection_key ); ?>"
 							class="regular-text"
 							placeholder="aa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							<?php echo $is_connected ? 'readonly' : ''; ?>
 						/>
-						<p class="description">
-							<?php esc_html_e( 'Enter the Connection Key from your Arcadia Agents dashboard.', 'arcadia-agents' ); ?>
-						</p>
+						<?php if ( $is_connected ) : ?>
+							<p class="description" style="color: #00a32a;">
+								<?php esc_html_e( 'Connected. To change the key, disconnect first.', 'arcadia-agents' ); ?>
+							</p>
+						<?php else : ?>
+							<p class="description">
+								<?php esc_html_e( 'Enter the Connection Key from your Arcadia Agents dashboard.', 'arcadia-agents' ); ?>
+							</p>
+						<?php endif; ?>
 					</td>
 				</tr>
 			</table>
 
+			<?php if ( ! $is_connected ) : ?>
+				<p>
+					<?php submit_button( __( 'Connect to Arcadia Agents', 'arcadia-agents' ), 'primary', 'arcadia_agents_handshake', false ); ?>
+					<?php submit_button( __( 'Save Settings', 'arcadia-agents' ), 'secondary', 'arcadia_agents_save', false, array( 'style' => 'margin-left: 10px;' ) ); ?>
+				</p>
+			<?php else : ?>
+				<p>
+					<?php submit_button( __( 'Disconnect', 'arcadia-agents' ), 'secondary', 'arcadia_agents_disconnect', false ); ?>
+				</p>
+			<?php endif; ?>
+
+			<hr style="margin: 30px 0;">
+
 			<h2><?php esc_html_e( 'Permissions', 'arcadia-agents' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Control what Arcadia Agents can do on your site.', 'arcadia-agents' ); ?></p>
+			<p class="description"><?php esc_html_e( 'Control what Arcadia Agents can do on your site. Changes are saved automatically when you save settings.', 'arcadia-agents' ); ?></p>
 
 			<table class="form-table">
-				<?php
-				$scopes = array(
-					'posts:read'       => __( 'Read posts', 'arcadia-agents' ),
-					'posts:write'      => __( 'Create/edit posts', 'arcadia-agents' ),
-					'posts:delete'     => __( 'Delete posts', 'arcadia-agents' ),
-					'media:read'       => __( 'Read media library', 'arcadia-agents' ),
-					'media:write'      => __( 'Upload media', 'arcadia-agents' ),
-					'taxonomies:read'  => __( 'Read categories/tags', 'arcadia-agents' ),
-					'taxonomies:write' => __( 'Create categories/tags', 'arcadia-agents' ),
-					'site:read'        => __( 'Read site info & pages', 'arcadia-agents' ),
-				);
-
-				$enabled_scopes = get_option( 'arcadia_agents_scopes', array_keys( $scopes ) );
-
-				foreach ( $scopes as $scope => $label ) :
-					$checked = in_array( $scope, $enabled_scopes, true );
-					?>
+				<?php foreach ( $scope_labels as $scope => $label ) : ?>
+					<?php $checked = in_array( $scope, $enabled_scopes, true ); ?>
 					<tr>
 						<th scope="row"><?php echo esc_html( $label ); ?></th>
 						<td>
@@ -110,15 +197,16 @@ function arcadia_agents_settings_page() {
 				<?php endforeach; ?>
 			</table>
 
-			<?php submit_button( __( 'Save Settings', 'arcadia-agents' ), 'primary', 'arcadia_agents_save' ); ?>
+			<?php submit_button( __( 'Save Permissions', 'arcadia-agents' ), 'primary', 'arcadia_agents_save' ); ?>
 		</form>
 
+		<hr style="margin: 30px 0;">
+
 		<!-- Test Connection Button -->
-		<hr>
 		<h2><?php esc_html_e( 'Test Connection', 'arcadia-agents' ); ?></h2>
 		<p>
 			<button type="button" class="button" id="arcadia-test-connection">
-				<?php esc_html_e( 'Test Connection', 'arcadia-agents' ); ?>
+				<?php esc_html_e( 'Test Health Endpoint', 'arcadia-agents' ); ?>
 			</button>
 			<span id="arcadia-test-result" style="margin-left: 10px;"></span>
 		</p>
@@ -135,10 +223,45 @@ function arcadia_agents_settings_page() {
 			?>
 		</p>
 
+		<hr style="margin: 30px 0;">
+
+		<!-- Debug Info -->
+		<h2><?php esc_html_e( 'Debug Information', 'arcadia-agents' ); ?></h2>
+		<table class="widefat" style="max-width: 600px;">
+			<tbody>
+				<tr>
+					<td><strong><?php esc_html_e( 'Plugin Version', 'arcadia-agents' ); ?></strong></td>
+					<td><code><?php echo esc_html( ARCADIA_AGENTS_VERSION ); ?></code></td>
+				</tr>
+				<tr>
+					<td><strong><?php esc_html_e( 'WordPress Version', 'arcadia-agents' ); ?></strong></td>
+					<td><code><?php echo esc_html( get_bloginfo( 'version' ) ); ?></code></td>
+				</tr>
+				<tr>
+					<td><strong><?php esc_html_e( 'PHP Version', 'arcadia-agents' ); ?></strong></td>
+					<td><code><?php echo esc_html( PHP_VERSION ); ?></code></td>
+				</tr>
+				<tr>
+					<td><strong><?php esc_html_e( 'Block Adapter', 'arcadia-agents' ); ?></strong></td>
+					<td>
+						<code><?php echo esc_html( Arcadia_Blocks::get_instance()->get_adapter_name() ); ?></code>
+						<?php if ( Arcadia_Blocks::is_acf_available() ) : ?>
+							<span style="color: #00a32a;">(<?php esc_html_e( 'ACF detected', 'arcadia-agents' ); ?>)</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<td><strong><?php esc_html_e( 'REST API Base', 'arcadia-agents' ); ?></strong></td>
+					<td><code><?php echo esc_url( rest_url( 'arcadia/v1/' ) ); ?></code></td>
+				</tr>
+			</tbody>
+		</table>
+
 		<script>
 		document.getElementById('arcadia-test-connection').addEventListener('click', function() {
 			var resultEl = document.getElementById('arcadia-test-result');
 			resultEl.textContent = '<?php esc_html_e( 'Testing...', 'arcadia-agents' ); ?>';
+			resultEl.style.color = '#666';
 
 			fetch('<?php echo esc_url( rest_url( 'arcadia/v1/health' ) ); ?>')
 				.then(response => response.json())
