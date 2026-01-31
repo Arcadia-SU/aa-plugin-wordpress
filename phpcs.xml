@@ -1,0 +1,48 @@
+<?xml version="1.0"?>
+<ruleset name="Arcadia Agents WordPress Plugin">
+	<description>WordPress Coding Standards for Arcadia Agents plugin</description>
+
+	<!-- Scan these files -->
+	<file>./arcadia-agents</file>
+
+	<!-- Exclude vendor and test directories -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/test/*</exclude-pattern>
+
+	<!-- Show progress -->
+	<arg value="ps"/>
+	<arg name="colors"/>
+
+	<!-- Use WordPress Coding Standards -->
+	<rule ref="WordPress">
+		<!-- Allow short array syntax -->
+		<exclude name="Generic.Arrays.DisallowShortArraySyntax"/>
+	</rule>
+
+	<!-- Use WordPress-Extra for additional best practices -->
+	<rule ref="WordPress-Extra"/>
+
+	<!-- Check for PHP cross-version compatibility -->
+	<config name="testVersion" value="8.0-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- WordPress text domain -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="arcadia-agents"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Minimum WordPress version -->
+	<config name="minimum_wp_version" value="6.0"/>
+
+	<!-- Allow . in hook names -->
+	<rule ref="WordPress.NamingConventions.ValidHookName">
+		<properties>
+			<property name="additionalWordDelimiters" value="."/>
+		</properties>
+	</rule>
+</ruleset>

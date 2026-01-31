@@ -27,11 +27,11 @@
 ## Phase 1 : Structure du plugin
 
 ### Setup repo
-- [ ] Créer repo GitHub `arcadia-wordpress-plugin`
+- [x] Créer repo GitHub (`Arcadia-SU/aa-plugin-wordpress`)
 - [x] Créer structure de fichiers de base
-- [ ] Setup composer.json
-- [ ] Setup phpcs.xml (WordPress Coding Standards)
-- [ ] Créer readme.txt (format WP.org)
+- [x] Setup composer.json
+- [x] Setup phpcs.xml (WordPress Coding Standards)
+- [x] Créer readme.txt (format WP.org)
 
 ### Fichiers de base
 - [x] `arcadia-agents.php` - Point d'entrée + métadonnées
@@ -115,16 +115,16 @@
 - [ ] Tests unitaires : parsing JSON → blocs
 - [ ] Tests unitaires : markdown → HTML
 - [ ] Tests intégration : endpoints REST
-- [ ] Test manuel : créer article complet via API
+- [x] Test manuel : créer article complet via API
 - [ ] Test manuel : site client (ACF Pro)
 
 ---
 
 ## Phase 6 : CI/CD
 
-- [ ] GitHub Action : lint (PHPCS)
-- [ ] GitHub Action : tests (PHPUnit)
-- [ ] GitHub Action : deploy WP.org (10up/action-wordpress-plugin-deploy)
+- [x] GitHub Action : lint (PHPCS)
+- [x] GitHub Action : tests (PHPUnit) - placeholder, tests à implémenter
+- [x] GitHub Action : deploy WP.org (10up/action-wordpress-plugin-deploy)
 
 ---
 
