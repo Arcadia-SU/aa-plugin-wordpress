@@ -176,26 +176,22 @@ function arcadia_agents_settings_page() {
 			<hr style="margin: 30px 0;">
 
 			<h2><?php esc_html_e( 'Permissions', 'arcadia-agents' ); ?></h2>
-			<p class="description"><?php esc_html_e( 'Control what Arcadia Agents can do on your site. Changes are saved automatically when you save settings.', 'arcadia-agents' ); ?></p>
+			<p class="description" style="margin-bottom: 15px;"><?php esc_html_e( 'Control what Arcadia Agents can do on your site.', 'arcadia-agents' ); ?></p>
 
-			<table class="form-table">
+			<div class="arcadia-permissions" style="background: #fff; padding: 15px 20px; border: 1px solid #c3c4c7; max-width: 500px;">
 				<?php foreach ( $scope_labels as $scope => $label ) : ?>
 					<?php $checked = in_array( $scope, $enabled_scopes, true ); ?>
-					<tr>
-						<th scope="row"><?php echo esc_html( $label ); ?></th>
-						<td>
-							<label>
-								<input type="checkbox"
-									name="arcadia_agents_scopes[]"
-									value="<?php echo esc_attr( $scope ); ?>"
-									<?php checked( $checked ); ?>
-								/>
-								<code><?php echo esc_html( $scope ); ?></code>
-							</label>
-						</td>
-					</tr>
+					<label style="display: flex; align-items: center; padding: 6px 0; gap: 10px; cursor: pointer;">
+						<input type="checkbox"
+							name="arcadia_agents_scopes[]"
+							value="<?php echo esc_attr( $scope ); ?>"
+							<?php checked( $checked ); ?>
+						/>
+						<span style="min-width: 140px;"><?php echo esc_html( $label ); ?></span>
+						<code style="font-size: 12px; color: #666;"><?php echo esc_html( $scope ); ?></code>
+					</label>
 				<?php endforeach; ?>
-			</table>
+			</div>
 
 			<?php submit_button( __( 'Save Permissions', 'arcadia-agents' ), 'primary', 'arcadia_agents_save' ); ?>
 		</form>
