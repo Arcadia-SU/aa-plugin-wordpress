@@ -1,6 +1,7 @@
 # Plugin WordPress - Specifications
 
-**Status:** Brainstorming en cours
+**Status:** MVP développé ✅
+**Repo:** [github.com/Arcadia-SU/aa-plugin-wordpress](https://github.com/Arcadia-SU/aa-plugin-wordpress)
 **Lié à:** [PRD Agent SEO](./prd.md)
 
 ---
@@ -78,6 +79,55 @@
 - **Expiration** : JWT courte durée (15-30 min)
 
 **MVP sans frontend AA :** La Connection Key peut être générée manuellement (CLI/DB) pour le premier client.
+
+### API Contract : Handshake Endpoint (côté serveur ArcadiaAgents)
+
+**Endpoint :** `POST https://api.arcadiaagents.com/v1/wordpress/handshake`
+
+**Request :**
+```json
+{
+  "connection_key": "aa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+  "site_url": "https://example.com",
+  "site_name": "Mon Site WordPress",
+  "plugin_version": "0.1.0"
+}
+```
+
+**Response (succès 200) :**
+```json
+{
+  "public_key": "-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY-----"
+}
+```
+
+**Response (erreur 4xx/5xx) :**
+```json
+{
+  "message": "Connection key invalide ou expirée"
+}
+```
+
+**Comportement attendu du serveur :**
+1. Valider que `connection_key` existe et n'est pas déjà utilisée
+2. Associer le site (`site_url`) à l'account qui a généré la key
+3. Retourner la public key RSA (format PEM) pour validation JWT
+4. Marquer la key comme "utilisée" (one-time use)
+
+**Génération des JWT (pour les requêtes API) :**
+- Algorithme : RS256
+- Signé avec la private key correspondante
+- Payload requis :
+  ```json
+  {
+    "iss": "arcadia-agents",
+    "sub": "site_id",
+    "iat": 1234567890,
+    "exp": 1234568790,
+    "scopes": ["posts:read", "posts:write", ...]
+  }
+  ```
+- Durée : 15-30 min recommandé
 
 - **Scopes (permissions granulaires):** ✅ Par ressource+action
   - Rationale : Granulaire mais pas explosif (~8 scopes), standard industrie (GitHub, Slack, Google)
@@ -312,7 +362,7 @@ Agent JSON → Plugin ├→ [Gutenberg Adapter] → Blocs natifs (wp:paragraph,
 - Mapping : JSON → blocs `acf/*`
 - Effort : ✅ Fait
 
-**Gutenberg natif (V1.1)**
+**Gutenberg natif (MVP)**
 - Détection : absence d'ACF ou config explicite
 - Mapping direct, blocs plus simples :
   | JSON | Bloc natif |
@@ -474,7 +524,7 @@ Le plugin détecte le mode au démarrage :
 ### Repo dédié
 
 ```
-github.com/ArcadiaAgents/arcadia-wordpress-plugin
+github.com/Arcadia-SU/aa-plugin-wordpress
 ├── arcadia-agents/              ← Le plugin lui-même
 │   ├── arcadia-agents.php       ← Point d'entrée (métadonnées + hooks)
 │   ├── includes/
@@ -599,7 +649,7 @@ Phase 3 : Maintenance
 7. ~~Résoudre Q1 : Format JSON hiérarchique~~ ✅
 8. ~~Résoudre Q2-Q7 : ACF Blocks mapping~~ ✅
 9. ~~Documenter workflow dev & publication~~ ✅
-10. Créer le repo GitHub + structure du plugin
-11. Développer le plugin MVP
+10. ~~Créer le repo GitHub + structure du plugin~~ ✅
+11. ~~Développer le plugin MVP~~ ✅
 12. Tester avec WP local + site client
 13. Soumettre à WP.org
