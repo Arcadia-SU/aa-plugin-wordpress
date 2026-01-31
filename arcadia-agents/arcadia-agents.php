@@ -61,10 +61,10 @@ class Arcadia_Agents {
 	 * Load required files.
 	 */
 	private function load_dependencies() {
-		// Core classes will be loaded here.
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
-		// require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
+		// Core classes.
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
 		if ( is_admin() ) {
@@ -97,6 +97,10 @@ class Arcadia_Agents {
 				'permission_callback' => '__return_true',
 			)
 		);
+
+		// Register all authenticated endpoints.
+		$api = Arcadia_API::get_instance();
+		$api->register_routes();
 	}
 
 	/**
