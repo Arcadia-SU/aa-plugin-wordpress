@@ -10,6 +10,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
+use Firebase\JWT\ExpiredException;
+use Firebase\JWT\BeforeValidException;
+use Firebase\JWT\SignatureInvalidException;
+
 /**
  * Class Arcadia_Auth
  *
@@ -65,7 +71,7 @@ class Arcadia_Auth {
 			);
 		}
 
-		$site_url = get_site_url();
+		$site_url  = get_site_url();
 		$site_name = get_bloginfo( 'name' );
 
 		$response = wp_remote_post(
@@ -131,7 +137,7 @@ class Arcadia_Auth {
 	}
 
 	/**
-	 * Validate a JWT token.
+	 * Validate a JWT token using firebase/php-jwt.
 	 *
 	 * @param string $token The JWT token to validate.
 	 * @return array|WP_Error Decoded payload or WP_Error.
@@ -147,83 +153,52 @@ class Arcadia_Auth {
 			);
 		}
 
-		// Split the token.
-		$parts = explode( '.', $token );
-		if ( 3 !== count( $parts ) ) {
-			return $this->error_response(
-				'invalid_token',
-				__( 'Invalid token format.', 'arcadia-agents' ),
-				401
-			);
-		}
+		try {
+			$decoded = JWT::decode( $token, new Key( $public_key, 'RS256' ) );
 
-		list( $header_b64, $payload_b64, $signature_b64 ) = $parts;
+			// Convert stdClass to array for consistent return type.
+			$payload = json_decode( wp_json_encode( $decoded ), true );
 
-		// Decode header.
-		$header = json_decode( $this->base64url_decode( $header_b64 ), true );
-		if ( ! $header || ! isset( $header['alg'] ) || 'RS256' !== $header['alg'] ) {
-			return $this->error_response(
-				'invalid_algorithm',
-				__( 'Invalid or unsupported algorithm. Only RS256 is supported.', 'arcadia-agents' ),
-				401
-			);
-		}
+			// Update last activity.
+			update_option( 'arcadia_agents_last_activity', current_time( 'mysql' ) );
 
-		// Decode payload.
-		$payload = json_decode( $this->base64url_decode( $payload_b64 ), true );
-		if ( ! $payload ) {
-			return $this->error_response(
-				'invalid_payload',
-				__( 'Invalid token payload.', 'arcadia-agents' ),
-				401
-			);
-		}
+			return $payload;
 
-		// Verify signature.
-		$signature = $this->base64url_decode( $signature_b64 );
-		$data      = $header_b64 . '.' . $payload_b64;
-
-		$public_key_resource = openssl_pkey_get_public( $public_key );
-		if ( false === $public_key_resource ) {
-			return $this->error_response(
-				'invalid_public_key',
-				__( 'Invalid public key configuration.', 'arcadia-agents' ),
-				500
-			);
-		}
-
-		$verify_result = openssl_verify( $data, $signature, $public_key_resource, OPENSSL_ALGO_SHA256 );
-
-		if ( 1 !== $verify_result ) {
-			return $this->error_response(
-				'invalid_signature',
-				__( 'Token signature verification failed.', 'arcadia-agents' ),
-				401
-			);
-		}
-
-		// Check expiration.
-		if ( isset( $payload['exp'] ) && $payload['exp'] < time() ) {
+		} catch ( ExpiredException $e ) {
 			return $this->error_response(
 				'token_expired',
 				__( 'Token has expired.', 'arcadia-agents' ),
 				401
 			);
-		}
-
-		// Check not before.
-		if ( isset( $payload['nbf'] ) && $payload['nbf'] > time() ) {
+		} catch ( BeforeValidException $e ) {
 			return $this->error_response(
 				'token_not_valid_yet',
 				__( 'Token is not valid yet.', 'arcadia-agents' ),
 				401
 			);
+		} catch ( SignatureInvalidException $e ) {
+			return $this->error_response(
+				'invalid_signature',
+				__( 'Token signature verification failed.', 'arcadia-agents' ),
+				401
+			);
+		} catch ( \UnexpectedValueException $e ) {
+			return $this->error_response(
+				'invalid_token',
+				__( 'Invalid token format or algorithm.', 'arcadia-agents' ),
+				401
+			);
+		} catch ( \Exception $e ) {
+			return $this->error_response(
+				'jwt_error',
+				sprintf(
+					/* translators: %s: error message */
+					__( 'JWT validation error: %s', 'arcadia-agents' ),
+					$e->getMessage()
+				),
+				401
+			);
 		}
-
-		// Update last activity.
-		update_option( 'arcadia_agents_last_activity', current_time( 'mysql' ) );
-
-		return $payload;
 	}
 
 	/**
@@ -354,20 +329,6 @@ class Arcadia_Auth {
 			$message,
 			array( 'status' => $status )
 		);
-	}
-
-	/**
-	 * Base64url decode.
-	 *
-	 * @param string $data Base64url encoded data.
-	 * @return string Decoded data.
-	 */
-	private function base64url_decode( $data ) {
-		$remainder = strlen( $data ) % 4;
-		if ( $remainder ) {
-			$data .= str_repeat( '=', 4 - $remainder );
-		}
-		return base64_decode( strtr( $data, '-_', '+/' ) );
 	}
 
 	/**

@@ -25,6 +25,23 @@ define( 'ARCADIA_AGENTS_VERSION', '0.1.0' );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
+// Load Composer autoloader.
+$autoloader = ARCADIA_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';
+if ( file_exists( $autoloader ) ) {
+	require_once $autoloader;
+} else {
+	// Show admin notice if Composer dependencies are missing.
+	add_action(
+		'admin_notices',
+		function () {
+			echo '<div class="notice notice-error"><p>';
+			echo esc_html__( 'Arcadia Agents: Composer dependencies are missing. Please run "composer install" in the plugin directory.', 'arcadia-agents' );
+			echo '</p></div>';
+		}
+	);
+	return; // Stop loading plugin without dependencies.
+}
+
 /**
  * Main plugin class.
  */
