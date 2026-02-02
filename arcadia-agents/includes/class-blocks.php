@@ -1,8 +1,12 @@
 <?php
 /**
- * Block generation handlers.
+ * Block generation and adapter management.
+ *
+ * This class converts semantic JSON content (ADR-013 unified block model)
+ * to WordPress block content using pluggable adapters.
  *
  * @package ArcadiaAgents
+ * @since   0.1.0
  */
 
 // Prevent direct access.
@@ -10,289 +14,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-/**
- * Interface Arcadia_Block_Adapter
- *
- * Defines the contract for block adapters.
- */
-interface Arcadia_Block_Adapter {
-
-	/**
-	 * Convert a heading to block format.
-	 *
-	 * @param string $text  The heading text.
-	 * @param int    $level The heading level (2 or 3).
-	 * @return string Block markup.
-	 */
-	public function heading( $text, $level = 2 );
-
-	/**
-	 * Convert a paragraph to block format.
-	 *
-	 * @param string $text The paragraph text (may contain markdown links).
-	 * @return string Block markup.
-	 */
-	public function paragraph( $text );
-
-	/**
-	 * Convert an image to block format.
-	 *
-	 * @param string $url     The image URL.
-	 * @param string $alt     The alt text.
-	 * @param string $caption The caption (optional).
-	 * @return string Block markup.
-	 */
-	public function image( $url, $alt = '', $caption = '' );
-
-	/**
-	 * Convert a list to block format.
-	 *
-	 * @param array $items   The list items.
-	 * @param bool  $ordered Whether the list is ordered.
-	 * @return string Block markup.
-	 */
-	public function listing( $items, $ordered = false );
-
-	/**
-	 * Get the adapter name.
-	 *
-	 * @return string
-	 */
-	public function get_name();
-}
-
-/**
- * Class Arcadia_Gutenberg_Adapter
- *
- * Generates native Gutenberg blocks.
- */
-class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
-
-	/**
-	 * Get the adapter name.
-	 *
-	 * @return string
-	 */
-	public function get_name() {
-		return 'gutenberg';
-	}
-
-	/**
-	 * Convert a heading to Gutenberg block format.
-	 *
-	 * @param string $text  The heading text.
-	 * @param int    $level The heading level (2 or 3).
-	 * @return string Block markup.
-	 */
-	public function heading( $text, $level = 2 ) {
-		$text = Arcadia_Blocks::parse_markdown( $text );
-		$text = esc_html( $text );
-
-		return sprintf(
-			'<!-- wp:heading {"level":%d} -->' . "\n" .
-			'<h%d class="wp-block-heading">%s</h%d>' . "\n" .
-			'<!-- /wp:heading -->' . "\n\n",
-			$level,
-			$level,
-			$text,
-			$level
-		);
-	}
-
-	/**
-	 * Convert a paragraph to Gutenberg block format.
-	 *
-	 * @param string $text The paragraph text.
-	 * @return string Block markup.
-	 */
-	public function paragraph( $text ) {
-		$text = Arcadia_Blocks::parse_markdown( $text );
-
-		return sprintf(
-			'<!-- wp:paragraph -->' . "\n" .
-			'<p>%s</p>' . "\n" .
-			'<!-- /wp:paragraph -->' . "\n\n",
-			$text
-		);
-	}
-
-	/**
-	 * Convert an image to Gutenberg block format.
-	 *
-	 * @param string $url     The image URL.
-	 * @param string $alt     The alt text.
-	 * @param string $caption The caption (optional).
-	 * @return string Block markup.
-	 */
-	public function image( $url, $alt = '', $caption = '' ) {
-		$url = esc_url( $url );
-		$alt = esc_attr( $alt );
-
-		$content = sprintf(
-			'<!-- wp:image -->' . "\n" .
-			'<figure class="wp-block-image"><img src="%s" alt="%s"/>' .
-			( $caption ? '<figcaption class="wp-element-caption">' . esc_html( $caption ) . '</figcaption>' : '' ) .
-			'</figure>' . "\n" .
-			'<!-- /wp:image -->' . "\n\n",
-			$url,
-			$alt
-		);
-
-		return $content;
-	}
-
-	/**
-	 * Convert a list to Gutenberg block format.
-	 *
-	 * @param array $items   The list items.
-	 * @param bool  $ordered Whether the list is ordered.
-	 * @return string Block markup.
-	 */
-	public function listing( $items, $ordered = false ) {
-		$tag = $ordered ? 'ol' : 'ul';
-
-		$list_items = '';
-		foreach ( $items as $item ) {
-			$item        = Arcadia_Blocks::parse_markdown( $item );
-			$list_items .= '<li>' . $item . '</li>';
-		}
-
-		$attrs = $ordered ? '{"ordered":true}' : '{}';
-
-		return sprintf(
-			'<!-- wp:list %s -->' . "\n" .
-			'<%s>%s</%s>' . "\n" .
-			'<!-- /wp:list -->' . "\n\n",
-			$attrs,
-			$tag,
-			$list_items,
-			$tag
-		);
-	}
-}
-
-/**
- * Class Arcadia_ACF_Adapter
- *
- * Generates ACF blocks.
- */
-class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
-
-	/**
-	 * Get the adapter name.
-	 *
-	 * @return string
-	 */
-	public function get_name() {
-		return 'acf';
-	}
-
-	/**
-	 * Convert a heading to ACF block format.
-	 *
-	 * @param string $text  The heading text.
-	 * @param int    $level The heading level (2 or 3).
-	 * @return string Block markup.
-	 */
-	public function heading( $text, $level = 2 ) {
-		$text = Arcadia_Blocks::parse_markdown( $text );
-		$text = esc_html( $text );
-
-		$data = array(
-			'title' => sprintf( '<h%d>%s</h%d>', $level, $text, $level ),
-			'level' => $level,
-		);
-
-		return $this->acf_block( 'acf/title', $data );
-	}
-
-	/**
-	 * Convert a paragraph to ACF block format.
-	 *
-	 * @param string $text The paragraph text.
-	 * @return string Block markup.
-	 */
-	public function paragraph( $text ) {
-		$text = Arcadia_Blocks::parse_markdown( $text );
-
-		$data = array(
-			'text' => '<p>' . $text . '</p>',
-		);
-
-		return $this->acf_block( 'acf/text', $data );
-	}
-
-	/**
-	 * Convert an image to ACF block format.
-	 *
-	 * @param string $url     The image URL.
-	 * @param string $alt     The alt text.
-	 * @param string $caption The caption (optional).
-	 * @return string Block markup.
-	 */
-	public function image( $url, $alt = '', $caption = '' ) {
-		$data = array(
-			'image'   => array(
-				'url' => esc_url( $url ),
-				'alt' => esc_attr( $alt ),
-			),
-			'caption' => esc_html( $caption ),
-		);
-
-		return $this->acf_block( 'acf/image', $data );
-	}
-
-	/**
-	 * Convert a list to ACF block format.
-	 *
-	 * @param array $items   The list items.
-	 * @param bool  $ordered Whether the list is ordered.
-	 * @return string Block markup.
-	 */
-	public function listing( $items, $ordered = false ) {
-		$tag = $ordered ? 'ol' : 'ul';
-
-		$list_items = '';
-		foreach ( $items as $item ) {
-			$item        = Arcadia_Blocks::parse_markdown( $item );
-			$list_items .= '<li>' . $item . '</li>';
-		}
-
-		$html = sprintf( '<%s>%s</%s>', $tag, $list_items, $tag );
-
-		$data = array(
-			'text' => $html,
-		);
-
-		return $this->acf_block( 'acf/text', $data );
-	}
-
-	/**
-	 * Generate an ACF block comment.
-	 *
-	 * @param string $name Block name (e.g., 'acf/text').
-	 * @param array  $data Block data.
-	 * @return string Block markup.
-	 */
-	private function acf_block( $name, $data ) {
-		$block = array(
-			'name' => $name,
-			'data' => $data,
-			'mode' => 'preview',
-		);
-
-		return sprintf(
-			'<!-- wp:%s %s /-->' . "\n\n",
-			$name,
-			wp_json_encode( $block, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
-		);
-	}
-}
+// Load adapter interface and implementations.
+require_once __DIR__ . '/adapters/interface-block-adapter.php';
+require_once __DIR__ . '/adapters/class-adapter-gutenberg.php';
+require_once __DIR__ . '/adapters/class-adapter-acf.php';
 
 /**
  * Class Arcadia_Blocks
  *
  * Main class for block generation and adapter management.
+ * Processes ADR-013 unified block model (recursive children structure)
+ * and delegates rendering to the appropriate adapter.
  */
 class Arcadia_Blocks {
 
@@ -330,7 +62,12 @@ class Arcadia_Blocks {
 	}
 
 	/**
-	 * Detect which adapter to use based on installed plugins.
+	 * Detect which adapter to use based on installed plugins and settings.
+	 *
+	 * Priority:
+	 * 1. User override via option 'arcadia_agents_block_adapter'
+	 * 2. Auto-detect: ACF Pro if active and has registered blocks
+	 * 3. Default: Gutenberg native
 	 *
 	 * @return Arcadia_Block_Adapter
 	 */
@@ -345,7 +82,7 @@ class Arcadia_Blocks {
 		}
 
 		// Auto-detect: ACF Pro active and has registered blocks.
-		if ( class_exists( 'ACF' ) && function_exists( 'acf_get_block_types' ) ) {
+		if ( self::is_acf_available() ) {
 			$acf_blocks = acf_get_block_types();
 			if ( ! empty( $acf_blocks ) ) {
 				return new Arcadia_ACF_Adapter();
@@ -368,6 +105,8 @@ class Arcadia_Blocks {
 	/**
 	 * Set a specific adapter.
 	 *
+	 * Useful for testing or forcing a specific adapter.
+	 *
 	 * @param Arcadia_Block_Adapter $adapter The adapter to use.
 	 */
 	public function set_adapter( Arcadia_Block_Adapter $adapter ) {
@@ -382,6 +121,10 @@ class Arcadia_Blocks {
 	public function get_adapter_name() {
 		return $this->adapter->get_name();
 	}
+
+	// =========================================================================
+	// JSON to Blocks Conversion (ADR-013)
+	// =========================================================================
 
 	/**
 	 * Convert JSON content structure to block content.
@@ -461,7 +204,7 @@ class Arcadia_Blocks {
 	}
 
 	/**
-	 * Process a section block (H2 or H3).
+	 * Process a section block (container with heading).
 	 *
 	 * @param array $block The section block.
 	 * @return string Block content.
@@ -533,16 +276,26 @@ class Arcadia_Blocks {
 		return $items;
 	}
 
+	// =========================================================================
+	// Markdown Parsing
+	// =========================================================================
+
 	/**
 	 * Parse inline markdown and convert to HTML.
 	 *
 	 * Supports: **bold**, *italic*, `code`, [link](url)
 	 *
+	 * Order matters:
+	 * 1. Code (protect content from further parsing)
+	 * 2. Bold (before italic to avoid ** matching as two *)
+	 * 3. Italic
+	 * 4. Links (last so link text can contain formatted content)
+	 *
 	 * @param string $text Text containing markdown.
 	 * @return string Text with HTML formatting.
 	 */
 	public static function parse_markdown( $text ) {
-		// 1. Code inline: `code` → <code>code</code>
+		// 1. Code inline: `code` -> <code>code</code>
 		// Process first to protect content inside backticks from further parsing.
 		$text = preg_replace_callback(
 			'/`([^`]+)`/',
@@ -552,7 +305,7 @@ class Arcadia_Blocks {
 			$text
 		);
 
-		// 2. Bold: **text** → <strong>text</strong>
+		// 2. Bold: **text** -> <strong>text</strong>
 		// Must be before italic to avoid matching ** as two *
 		$text = preg_replace(
 			'/\*\*([^*]+)\*\*/',
@@ -560,7 +313,7 @@ class Arcadia_Blocks {
 			$text
 		);
 
-		// 3. Italic: *text* → <em>text</em>
+		// 3. Italic: *text* -> <em>text</em>
 		// Only match single * not preceded/followed by another *
 		$text = preg_replace(
 			'/(?<!\*)\*([^*]+)\*(?!\*)/',
@@ -568,7 +321,7 @@ class Arcadia_Blocks {
 			$text
 		);
 
-		// 4. Links: [text](url) → <a href="url">text</a>
+		// 4. Links: [text](url) -> <a href="url">text</a>
 		// Process last so link text can contain <strong>, <em>, etc.
 		$text = preg_replace_callback(
 			'/\[([^\]]+)\]\(([^)]+)\)/',
@@ -596,8 +349,12 @@ class Arcadia_Blocks {
 		return $text;
 	}
 
+	// =========================================================================
+	// Utility Methods
+	// =========================================================================
+
 	/**
-	 * Check if ACF Pro is available.
+	 * Check if ACF Pro is available with block support.
 	 *
 	 * @return bool
 	 */
