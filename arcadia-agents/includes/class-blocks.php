@@ -85,7 +85,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function heading( $text, $level = 2 ) {
-		$text = Arcadia_Blocks::parse_markdown_links( $text );
+		$text = Arcadia_Blocks::parse_markdown( $text );
 		$text = esc_html( $text );
 
 		return sprintf(
@@ -106,7 +106,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function paragraph( $text ) {
-		$text = Arcadia_Blocks::parse_markdown_links( $text );
+		$text = Arcadia_Blocks::parse_markdown( $text );
 
 		return sprintf(
 			'<!-- wp:paragraph -->' . "\n" .
@@ -153,7 +153,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 
 		$list_items = '';
 		foreach ( $items as $item ) {
-			$item        = Arcadia_Blocks::parse_markdown_links( $item );
+			$item        = Arcadia_Blocks::parse_markdown( $item );
 			$list_items .= '<li>' . $item . '</li>';
 		}
 
@@ -195,7 +195,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function heading( $text, $level = 2 ) {
-		$text = Arcadia_Blocks::parse_markdown_links( $text );
+		$text = Arcadia_Blocks::parse_markdown( $text );
 		$text = esc_html( $text );
 
 		$data = array(
@@ -213,7 +213,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function paragraph( $text ) {
-		$text = Arcadia_Blocks::parse_markdown_links( $text );
+		$text = Arcadia_Blocks::parse_markdown( $text );
 
 		$data = array(
 			'text' => '<p>' . $text . '</p>',
@@ -254,7 +254,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 
 		$list_items = '';
 		foreach ( $items as $item ) {
-			$item        = Arcadia_Blocks::parse_markdown_links( $item );
+			$item        = Arcadia_Blocks::parse_markdown( $item );
 			$list_items .= '<li>' . $item . '</li>';
 		}
 
@@ -386,6 +386,11 @@ class Arcadia_Blocks {
 	/**
 	 * Convert JSON content structure to block content.
 	 *
+	 * Supports ADR-013 unified block model:
+	 * - Everything is a block with `type`
+	 * - Container blocks use `children` for nesting
+	 * - Leaf blocks use `content` for text
+	 *
 	 * @param array $json The JSON content structure from the agent.
 	 * @return string Block content for post_content.
 	 */
@@ -397,10 +402,10 @@ class Arcadia_Blocks {
 			$content .= $this->adapter->heading( $json['h1'], 1 );
 		}
 
-		// Process sections.
-		if ( ! empty( $json['sections'] ) && is_array( $json['sections'] ) ) {
-			foreach ( $json['sections'] as $section ) {
-				$content .= $this->process_section( $section );
+		// Process children (ADR-013 unified block model).
+		if ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) {
+			foreach ( $json['children'] as $block ) {
+				$content .= $this->process_block( $block );
 			}
 		}
 
@@ -408,130 +413,167 @@ class Arcadia_Blocks {
 	}
 
 	/**
-	 * Process a section (H2 level).
+	 * Process a block recursively (ADR-013 unified model).
 	 *
-	 * @param array $section The section data.
+	 * @param array $block The block data.
 	 * @return string Block content.
 	 */
-	private function process_section( $section ) {
-		$content = '';
-
-		// Section heading (H2).
-		if ( ! empty( $section['heading'] ) ) {
-			$content .= $this->adapter->heading( $section['heading'], 2 );
-		}
-
-		// Direct content in section.
-		if ( ! empty( $section['content'] ) && is_array( $section['content'] ) ) {
-			$content .= $this->process_content_array( $section['content'] );
-		}
-
-		// Subsections (H3 level).
-		if ( ! empty( $section['subsections'] ) && is_array( $section['subsections'] ) ) {
-			foreach ( $section['subsections'] as $subsection ) {
-				$content .= $this->process_subsection( $subsection );
-			}
-		}
-
-		return $content;
-	}
-
-	/**
-	 * Process a subsection (H3 level).
-	 *
-	 * @param array $subsection The subsection data.
-	 * @return string Block content.
-	 */
-	private function process_subsection( $subsection ) {
-		$content = '';
-
-		// Subsection heading (H3).
-		if ( ! empty( $subsection['heading'] ) ) {
-			$content .= $this->adapter->heading( $subsection['heading'], 3 );
-		}
-
-		// Content.
-		if ( ! empty( $subsection['content'] ) && is_array( $subsection['content'] ) ) {
-			$content .= $this->process_content_array( $subsection['content'] );
-		}
-
-		return $content;
-	}
-
-	/**
-	 * Process an array of content items.
-	 *
-	 * @param array $content_array Array of content items.
-	 * @return string Block content.
-	 */
-	private function process_content_array( $content_array ) {
-		$content = '';
-
-		foreach ( $content_array as $item ) {
-			$content .= $this->process_content_item( $item );
-		}
-
-		return $content;
-	}
-
-	/**
-	 * Process a single content item.
-	 *
-	 * @param array $item The content item.
-	 * @return string Block content.
-	 */
-	private function process_content_item( $item ) {
-		if ( ! is_array( $item ) || ! isset( $item['type'] ) ) {
+	private function process_block( $block ) {
+		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
 			return '';
 		}
 
-		switch ( $item['type'] ) {
+		switch ( $block['type'] ) {
+			case 'section':
+				return $this->process_section_block( $block );
+
 			case 'paragraph':
-				return $this->adapter->paragraph( $item['text'] ?? '' );
+				return $this->adapter->paragraph( $block['content'] ?? '' );
+
+			case 'text':
+				// Text blocks are typically used in lists, but can appear standalone.
+				return $this->adapter->paragraph( $block['content'] ?? '' );
 
 			case 'image':
 				return $this->adapter->image(
-					$item['url'] ?? '',
-					$item['alt'] ?? '',
-					$item['caption'] ?? ''
+					$block['url'] ?? '',
+					$block['alt'] ?? '',
+					$block['caption'] ?? ''
 				);
 
 			case 'list':
-				return $this->adapter->listing(
-					$item['items'] ?? array(),
-					$item['ordered'] ?? false
-				);
+				return $this->process_list_block( $block );
 
 			case 'heading':
-				// In-content headings (rare, but support them).
+				// Standalone heading blocks.
 				return $this->adapter->heading(
-					$item['text'] ?? '',
-					$item['level'] ?? 2
+					$block['content'] ?? $block['text'] ?? '',
+					$block['level'] ?? 2
 				);
 
 			default:
-				// Fallback: treat unknown types as paragraphs if they have text.
-				if ( ! empty( $item['text'] ) ) {
-					return $this->adapter->paragraph( $item['text'] );
+				// Fallback: treat unknown types as paragraphs if they have content.
+				if ( ! empty( $block['content'] ) ) {
+					return $this->adapter->paragraph( $block['content'] );
 				}
 				return '';
 		}
 	}
 
 	/**
-	 * Parse markdown links in text and convert to HTML.
+	 * Process a section block (H2 or H3).
 	 *
-	 * @param string $text Text containing markdown links.
-	 * @return string Text with HTML links.
+	 * @param array $block The section block.
+	 * @return string Block content.
 	 */
-	public static function parse_markdown_links( $text ) {
-		// Pattern: [link text](url)
-		$pattern = '/\[([^\]]+)\]\(([^)]+)\)/';
+	private function process_section_block( $block ) {
+		$content = '';
+		$level   = $block['level'] ?? 2;
 
-		return preg_replace_callback(
-			$pattern,
+		// Section heading if present.
+		if ( ! empty( $block['heading'] ) ) {
+			$content .= $this->adapter->heading( $block['heading'], $level );
+		}
+
+		// Process children recursively.
+		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
+			foreach ( $block['children'] as $child ) {
+				$content .= $this->process_block( $child );
+			}
+		}
+
+		return $content;
+	}
+
+	/**
+	 * Process a list block.
+	 *
+	 * ADR-013: list items are `text` blocks in `children` array.
+	 *
+	 * @param array $block The list block.
+	 * @return string Block content.
+	 */
+	private function process_list_block( $block ) {
+		$ordered = $block['ordered'] ?? false;
+		$items   = array();
+
+		// Extract text content from children (ADR-013 format).
+		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
+			foreach ( $block['children'] as $child ) {
+				if ( isset( $child['type'] ) && 'text' === $child['type'] ) {
+					$items[] = $child['content'] ?? '';
+				} elseif ( isset( $child['type'] ) && 'list' === $child['type'] ) {
+					// Nested list - for now, flatten it.
+					$nested_items = $this->extract_list_items( $child );
+					$items        = array_merge( $items, $nested_items );
+				}
+			}
+		}
+
+		return $this->adapter->listing( $items, $ordered );
+	}
+
+	/**
+	 * Extract text items from a list block recursively.
+	 *
+	 * @param array $block The list block.
+	 * @return array List of text items.
+	 */
+	private function extract_list_items( $block ) {
+		$items = array();
+
+		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
+			foreach ( $block['children'] as $child ) {
+				if ( isset( $child['type'] ) && 'text' === $child['type'] ) {
+					$items[] = $child['content'] ?? '';
+				}
+			}
+		}
+
+		return $items;
+	}
+
+	/**
+	 * Parse inline markdown and convert to HTML.
+	 *
+	 * Supports: **bold**, *italic*, `code`, [link](url)
+	 *
+	 * @param string $text Text containing markdown.
+	 * @return string Text with HTML formatting.
+	 */
+	public static function parse_markdown( $text ) {
+		// 1. Code inline: `code` → <code>code</code>
+		// Process first to protect content inside backticks from further parsing.
+		$text = preg_replace_callback(
+			'/`([^`]+)`/',
 			function ( $matches ) {
-				$link_text = esc_html( $matches[1] );
+				return '<code>' . esc_html( $matches[1] ) . '</code>';
+			},
+			$text
+		);
+
+		// 2. Bold: **text** → <strong>text</strong>
+		// Must be before italic to avoid matching ** as two *
+		$text = preg_replace(
+			'/\*\*([^*]+)\*\*/',
+			'<strong>$1</strong>',
+			$text
+		);
+
+		// 3. Italic: *text* → <em>text</em>
+		// Only match single * not preceded/followed by another *
+		$text = preg_replace(
+			'/(?<!\*)\*([^*]+)\*(?!\*)/',
+			'<em>$1</em>',
+			$text
+		);
+
+		// 4. Links: [text](url) → <a href="url">text</a>
+		// Process last so link text can contain <strong>, <em>, etc.
+		$text = preg_replace_callback(
+			'/\[([^\]]+)\]\(([^)]+)\)/',
+			function ( $matches ) {
+				$link_text = $matches[1]; // Already may contain HTML from bold/italic.
 				$url       = esc_url( $matches[2] );
 
 				// Check if external link.
@@ -550,6 +592,8 @@ class Arcadia_Blocks {
 			},
 			$text
 		);
+
+		return $text;
 	}
 
 	/**

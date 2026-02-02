@@ -211,7 +211,13 @@
 
 L'agent génère un JSON structuré, le plugin mappe vers ACF Blocks.
 
-**Schema JSON validé :**
+**Schema JSON (ADR-013 - Unified Block Model) :**
+
+Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
+- Tout est un **block** avec `type`
+- Nesting via **`children`** (pas `items`, `content`, `subsections`)
+- Pas de strings nus - même les items de liste sont des blocks `text`
+
 ```json
 {
   "meta": {
@@ -219,25 +225,40 @@ L'agent génère un JSON structuré, le plugin mappe vers ACF Blocks.
     "slug": "mon-article-seo",
     "description": "Meta description pour SEO...",
     "featured_image_url": "https://storage.arcadiaagents.com/...",
+    "featured_image_alt": "Description de l'image...",
     "categories": ["SEO"],
     "tags": ["wordpress"]
   },
   "h1": "Titre visible H1 de l'article",
-  "sections": [
+  "children": [
     {
-      "content": [
-        {"type": "paragraph", "text": "Paragraphes avant le premier H2 (intro)..."}
+      "type": "section",
+      "heading": null,
+      "children": [
+        {"type": "paragraph", "content": "Paragraphe d'intro avant le premier H2..."}
       ]
     },
     {
+      "type": "section",
       "heading": "Titre H2",
-      "subsections": [
+      "level": 2,
+      "children": [
+        {"type": "paragraph", "content": "Texte avec [lien externe](https://example.com)..."},
         {
-          "heading": "Sous-titre H3 (optionnel)",
-          "content": [
-            {"type": "paragraph", "text": "Texte avec [lien externe](https://example.com)..."},
-            {"type": "image", "url": "...", "alt": "...", "caption": "..."},
-            {"type": "list", "ordered": false, "items": ["item 1", "item 2"]}
+          "type": "list",
+          "ordered": false,
+          "children": [
+            {"type": "text", "content": "Item 1"},
+            {"type": "text", "content": "Item 2"}
+          ]
+        },
+        {
+          "type": "section",
+          "heading": "Sous-titre H3",
+          "level": 3,
+          "children": [
+            {"type": "paragraph", "content": "Contenu du H3..."},
+            {"type": "image", "url": "https://...", "alt": "Description image"}
           ]
         }
       ]
@@ -246,18 +267,53 @@ L'agent génère un JSON structuré, le plugin mappe vers ACF Blocks.
 }
 ```
 
+**Types de blocks (MVP) :**
+| Type | Champs | Description |
+|------|--------|-------------|
+| `paragraph` | `content: string` | Paragraphe de texte |
+| `text` | `content: string` | Noeud texte (pour items de liste) |
+| `list` | `ordered: bool`, `children: block[]` | Liste (ordonnée ou non) |
+| `image` | `url: string`, `alt: string` | Image |
+| `section` | `heading: string?`, `level: 2\|3?`, `children: block[]` | Section H2/H3 |
+
+**Types de blocks (post-MVP) :**
+| Type | Champs | Description |
+|------|--------|-------------|
+| `quote` | `content: string` | Citation |
+| `faq` | `items: [{q, a}, ...]` | Questions/réponses |
+| `cta` | `text: string`, `url: string` | Call-to-action |
+| `table` | `headers: []`, `rows: [[]]` | Tableau |
+
 **Principes :**
 - Pas d'`intro`/`conclusion` spéciaux - juste des sections avec `heading: null`
-- Contenu avant premier H2 = section sans heading
-- Structure uniforme, le moins opinionated possible
-- **Niveau des headings déduit par position :**
-  - `sections[].heading` → H2
-  - `sections[].subsections[].heading` → H3
-  - Pas de H4+ (profondeur max = H3)
+- **Tout dans `children`** - sections H3 sont des blocks dans les children de H2
+- Profondeur max : **H3** (pas de H4, enforced par le domain model)
+- Structure uniforme et extensible (ajout futur de `image`, `table`, `cta`...)
 
-**Links inline (markdown) :**
-- Format : `[texte du lien](url)` dans le texte des paragraphes
-- Plugin parse le markdown et convertit en `<a href="...">...</a>`
+**Formatage inline (markdown) :**
+
+Le champ `content` des blocks texte accepte un subset de markdown :
+
+| Syntaxe | Rendu |
+|---------|-------|
+| `**bold**` | **gras** |
+| `*italic*` | *italique* |
+| `[texte](url)` | lien hypertexte |
+| `` `code` `` | code inline |
+
+**Exemple :**
+```json
+{"type": "paragraph", "content": "Pour les **freelances** et [indépendants](https://...), la priorité est simple."}
+```
+
+**Pourquoi markdown et pas des nodes structurés ?**
+
+Notion/Slate/ProseMirror fragmentent le texte en nodes avec marks (voir ADR-013). Ce pattern est conçu pour les **éditeurs interactifs** (sélection + clic "Bold"). Notre pipeline est différent :
+- Le LLM génère naturellement du markdown
+- On n'édite pas interactivement le texte
+- WordPress convertit markdown → HTML avec des libs standard
+
+→ Le plugin parse le markdown et génère le HTML approprié (`<strong>`, `<a href>`, etc.)
 
 ---
 
@@ -266,11 +322,12 @@ L'agent génère un JSON structuré, le plugin mappe vers ACF Blocks.
 **Mapping MVP :**
 | Type JSON | → ACF Block | Champ ACF |
 |-----------|-------------|-----------|
-| `heading` (section) | `acf/title` | `title` (wysiwyg) |
-| `heading` (subsection) | `acf/title` | `title` (wysiwyg) |
+| `section` (level: 2) | `acf/title` | `title` (H2) |
+| `section` (level: 3) | `acf/title` | `title` (H3) |
 | `paragraph` | `acf/text` | `text` (wysiwyg) |
-| `image` | `acf/image` | `image` (image field) |
+| `text` (dans list) | N/A | Converti en `<li>` |
 | `list` | `acf/text` | `text` (wysiwyg avec `<ul>`/`<ol>`) |
+| `image` | `acf/image` | `image` (image field) |
 
 **Mapping post-MVP :**
 | Type JSON | → ACF Block |
@@ -471,6 +528,17 @@ Le plugin détecte le mode au démarrage :
     - Standard (markdown)
     - Plugin contrôle la conversion (sécurité vs HTML brut)
     - Alternatives rejetées : HTML brut (mélange formats, XSS théorique), structured positions (verbeux, fragile)
+
+- **2026-02-02 | Formatage inline = markdown (pas nodes structurés)**
+  - Quoi : `content` accepte markdown inline (`**bold**`, `*italic*`, `[link](url)`, `` `code` ``)
+  - Alternative rejetée : nodes fragmentés avec marks (style Notion/Slate/ProseMirror)
+  - Pourquoi :
+    - Le pattern nodes+marks est conçu pour les **éditeurs interactifs** (sélection + clic "Bold")
+    - Notre use case est un **pipeline de génération** : LLM génère → JSON stocke → WordPress affiche
+    - Le LLM génère naturellement du markdown, pas des structures fragmentées
+    - Complexité inutile : parser markdown → nodes → HTML vs simple markdown → HTML
+    - JSON 10x plus compact et lisible
+  - Voir ADR-013 pour le détail du rationale
 
 - **2026-01-30 | Découverte ACF Blocks (Q2-Q7)**
   - Quoi : Le client utilise ACF Pro avec ACF Blocks, pas Gutenberg natif

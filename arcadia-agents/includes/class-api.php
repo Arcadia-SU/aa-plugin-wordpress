@@ -380,9 +380,33 @@ class Arcadia_API {
 		}
 
 		// Content: convert JSON structure to blocks if present.
-		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) ) {
-			$post_data['post_content'] = $this->blocks->json_to_blocks( $body );
-		} elseif ( ! empty( $body['content'] ) ) {
+		// Support both top-level structure and nested in 'content' key.
+		$content_data = $body;
+		if ( isset( $body['content'] ) && is_array( $body['content'] ) ) {
+			// Content is nested in 'content' key (API wrapper format).
+			$content_data = $body['content'];
+
+			// Also extract meta from nested content if not already at top level.
+			if ( empty( $meta ) && ! empty( $content_data['meta'] ) ) {
+				$meta = $content_data['meta'];
+
+				// Apply meta values that weren't set yet.
+				if ( empty( $post_data['post_title'] ) && ! empty( $meta['title'] ) ) {
+					$post_data['post_title'] = sanitize_text_field( $meta['title'] );
+				}
+				if ( empty( $post_data['post_name'] ) && ! empty( $meta['slug'] ) ) {
+					$post_data['post_name'] = sanitize_title( $meta['slug'] );
+				}
+				if ( empty( $post_data['post_excerpt'] ) && ! empty( $meta['description'] ) ) {
+					$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
+				}
+			}
+		}
+
+		// Check for structured content (h1 + sections/children).
+		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
+			$post_data['post_content'] = $this->blocks->json_to_blocks( $content_data );
+		} elseif ( ! empty( $body['content'] ) && is_string( $body['content'] ) ) {
 			// Direct content (HTML or plain text).
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}
