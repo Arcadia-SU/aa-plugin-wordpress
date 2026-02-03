@@ -221,4 +221,77 @@ trait Arcadia_API_Media_Handler {
 
 		return $attachment_id;
 	}
+
+	/**
+	 * Get media library items.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_media( $request ) {
+		$per_page  = (int) $request->get_param( 'per_page' ) ?: 20;
+		$page      = (int) $request->get_param( 'page' ) ?: 1;
+		$search    = $request->get_param( 'search' );
+		$mime_type = $request->get_param( 'mime_type' );
+
+		// Validate per_page bounds.
+		$per_page = max( 1, min( 100, $per_page ) );
+
+		$args = array(
+			'post_type'      => 'attachment',
+			'post_status'    => 'inherit',
+			'posts_per_page' => $per_page,
+			'paged'          => $page,
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+		);
+
+		// Search in title and alt text.
+		if ( $search ) {
+			$args['s'] = sanitize_text_field( $search );
+		}
+
+		// Filter by MIME type.
+		if ( $mime_type ) {
+			$args['post_mime_type'] = sanitize_mime_type( $mime_type );
+		}
+
+		$query = new WP_Query( $args );
+
+		$media = array();
+		foreach ( $query->posts as $attachment ) {
+			$media[] = $this->format_media( $attachment );
+		}
+
+		return new WP_REST_Response(
+			array(
+				'media'       => $media,
+				'total'       => (int) $query->found_posts,
+				'total_pages' => (int) $query->max_num_pages,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Format a media attachment for API response.
+	 *
+	 * @param WP_Post $attachment The attachment post object.
+	 * @return array Formatted media data.
+	 */
+	private function format_media( $attachment ) {
+		$metadata = wp_get_attachment_metadata( $attachment->ID );
+
+		return array(
+			'id'        => $attachment->ID,
+			'title'     => $attachment->post_title,
+			'url'       => wp_get_attachment_url( $attachment->ID ),
+			'alt'       => get_post_meta( $attachment->ID, '_wp_attachment_image_alt', true ),
+			'caption'   => $attachment->post_excerpt,
+			'mime_type' => $attachment->post_mime_type,
+			'width'     => isset( $metadata['width'] ) ? (int) $metadata['width'] : null,
+			'height'    => isset( $metadata['height'] ) ? (int) $metadata['height'] : null,
+			'date'      => $attachment->post_date,
+		);
+	}
 }

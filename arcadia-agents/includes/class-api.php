@@ -153,14 +153,21 @@ class Arcadia_API {
 			)
 		);
 
-		// Media endpoint.
+		// Media endpoints.
 		register_rest_route(
 			$this->namespace,
 			'/media',
 			array(
-				'methods'             => 'POST',
-				'callback'            => array( $this, 'upload_media' ),
-				'permission_callback' => array( $this, 'check_media_write_permission' ),
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_media' ),
+					'permission_callback' => array( $this, 'check_media_read_permission' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'upload_media' ),
+					'permission_callback' => array( $this, 'check_media_write_permission' ),
+				),
 			)
 		);
 
@@ -244,6 +251,20 @@ class Arcadia_API {
 	 */
 	public function check_posts_delete_permission( $request ) {
 		$result = $this->auth->authenticate_request( $request, 'posts:delete' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check media:read permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_media_read_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'media:read' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
