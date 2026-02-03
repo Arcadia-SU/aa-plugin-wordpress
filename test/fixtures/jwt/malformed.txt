@@ -1,0 +1,4 @@
+# Malformed JWT examples for testing
+not.a.valid.jwt
+eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.invalid_payload.invalid_signature
+just_random_string_12345

@@ -1,0 +1,29 @@
+{
+    "title": "XSS Test Post",
+    "status": "draft",
+    "content": {
+        "blocks": [
+            {
+                "type": "paragraph",
+                "content": "Normal text <script>alert('XSS')</script> more text"
+            },
+            {
+                "type": "paragraph",
+                "content": "Text with <img src=x onerror=alert('XSS')> image"
+            },
+            {
+                "type": "paragraph",
+                "content": "Click <a href=\"javascript:alert('XSS')\">here</a>"
+            },
+            {
+                "type": "paragraph",
+                "content": "<div onclick=\"alert('XSS')\">Click me</div>"
+            },
+            {
+                "type": "heading",
+                "level": 2,
+                "content": "Heading <script>evil()</script>"
+            }
+        ]
+    }
+}

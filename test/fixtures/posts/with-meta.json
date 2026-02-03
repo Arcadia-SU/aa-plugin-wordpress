@@ -1,0 +1,20 @@
+{
+    "title": "Post With Meta",
+    "status": "draft",
+    "slug": "post-with-meta",
+    "excerpt": "This is a custom excerpt for the post.",
+    "categories": [],
+    "tags": [],
+    "meta": {
+        "_custom_field_1": "Custom value 1",
+        "_custom_field_2": "Custom value 2"
+    },
+    "content": {
+        "blocks": [
+            {
+                "type": "paragraph",
+                "content": "This post has custom meta fields attached."
+            }
+        ]
+    }
+}

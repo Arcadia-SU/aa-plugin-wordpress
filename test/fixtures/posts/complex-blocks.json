@@ -1,0 +1,57 @@
+{
+    "title": "Complex Blocks Post",
+    "status": "draft",
+    "content": {
+        "blocks": [
+            {
+                "type": "paragraph",
+                "content": "Introduction paragraph with **bold** and *italic* text."
+            },
+            {
+                "type": "heading",
+                "level": 2,
+                "content": "First Section"
+            },
+            {
+                "type": "paragraph",
+                "content": "Content for the first section with a [link](https://example.com)."
+            },
+            {
+                "type": "list",
+                "ordered": false,
+                "items": [
+                    "Bullet point one",
+                    "Bullet point two",
+                    "Bullet point three"
+                ]
+            },
+            {
+                "type": "heading",
+                "level": 2,
+                "content": "Second Section"
+            },
+            {
+                "type": "paragraph",
+                "content": "Another paragraph with `inline code` example."
+            },
+            {
+                "type": "list",
+                "ordered": true,
+                "items": [
+                    "Step one",
+                    "Step two",
+                    "Step three"
+                ]
+            },
+            {
+                "type": "heading",
+                "level": 3,
+                "content": "Subsection"
+            },
+            {
+                "type": "paragraph",
+                "content": "Final paragraph of the post."
+            }
+        ]
+    }
+}
