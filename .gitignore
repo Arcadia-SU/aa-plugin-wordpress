@@ -18,7 +18,17 @@ arcadia-agents/vendor/
 # Test artifacts (sensitive)
 arcadia-agents/test/*.pem
 arcadia-agents/test/*.txt
-/test/
+
+# Integration test config (contains local credentials)
+test/config.sh
+
+# Test results
+test/results/*.log
+test/results/*.txt
+
+# PHPUnit cache
+.phpunit.cache/
+arcadia-agents/.phpunit.cache/
 
 # Node (if we add build tools later)
 /node_modules/

@@ -60,6 +60,20 @@ Pour la validation JWT, utiliser `firebase/php-jwt` :
 ```bash
 composer require firebase/php-jwt
 ```
+
+## Tests
+
+```bash
+# PHPUnit (dans le container)
+docker compose exec wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents && ./vendor/bin/phpunit --testdox"
+
+# Setup JWT pour tests manuels
+docker compose exec wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents/test && php mock-setup.php && php generate-jwt.php private_key.pem 'posts:read'"
+```
+
+- **Unit tests** : `arcadia-agents/tests/unit/` (PHPUnit, mocks WP)
+- **Integration tests** : `test/integration/` (shell scripts + curl)
+- Config integration : `cp test/config.example.sh test/config.sh`
 ## Contexte
 
 ### Projet
@@ -90,3 +104,21 @@ Site WordPress du client
 - **JSON sémantique** - L'agent envoie du JSON structuré, le plugin le mappe vers les blocs WP
 - **Multi-builders** - Adaptateurs pour ACF Blocks (MVP) + Gutenberg natif (MVP)
 - **Sécurité JWT** - ArcadiaAgents signe, le plugin vérifie avec la public key
+
+## Guiding Principle: Structure Over Brevity
+
+**Oscar's explicit preference:** "More structure is better for me, even if experienced developers might call it over-engineering. I tend to easily forget things, structure forces me to remember."
+
+**Why:**
+- **Guardrails**: Structure prevents mistakes (like TypeScript for JavaScript)
+- **Navigation**: Always know where to look and where to put things
+- **Confidence**: Less doubt = less paralysis = more productivity
+- **Learning**: Structure teaches best practices by example
+
+**Accepted trade-offs:**
+- More files to create per feature (boilerplate)
+- More jumps between files when debugging (indirection)
+- Some conceptual duplication (domain + infrastructure versions)
+- Heavier refactoring when changing decisions
+
+**This is intentional.** When in doubt, add more structure, not less.
