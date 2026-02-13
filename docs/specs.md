@@ -226,6 +226,8 @@ Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
     "title": "Titre SEO (balise <title>)",
     "slug": "mon-article-seo",
     "description": "Meta description pour SEO...",
+    "author": "email@example.com",
+    "post_type": "article",
     "featured_image_url": "https://storage.arcadiaagents.com/...",
     "featured_image_alt": "Description de l'image...",
     "categories": ["SEO"],
@@ -684,6 +686,20 @@ Le plugin détecte le mode au démarrage :
 - **2026-01-31 | Edit pages**
   - Quoi : Ajout endpoint `PUT /pages/{id}` pour modifier les pages existantes
   - Pourquoi : Nécessaire pour l'internal linking et l'optimisation des pages commerciales
+
+- **2026-02-13 | Authors**
+  - Quoi : `meta.author` (email ou login WP) dans `POST /posts` + liste `authors` dans `GET /site-info`
+  - `GET /site-info` retourne `authors: [{email, name, role}]` (admins, editors, authors)
+  - `POST /posts` : `meta.author` résolu via email/login → user ID. Fallback : premier admin
+  - Pourquoi : L'agent découvre les auteurs disponibles puis assigne le bon à chaque article
+
+- **2026-02-13 | Custom post types**
+  - Quoi : Support des custom post types (certains thèmes utilisent `article` au lieu de `post`)
+  - `GET /site-info` retourne `post_types: [{name, label, hierarchical, count: {publish, draft, total}}]`
+  - L'agent identifie le bon type via le count (ex: `article` = 104 publiés vs `post` = 0)
+  - `GET /posts` accepte `?post_type=article` (défaut: `post`)
+  - `POST /posts` accepte `meta.post_type` (défaut: `post`)
+  - Pourquoi : Le thème iSelection utilise un CPT `article`, pas le type natif `post`
 
 - **2026-02-13 | Custom blocks (Q8)**
   - Quoi : Support des blocs custom via découverte dynamique (`GET /blocks`)

@@ -80,6 +80,24 @@ function arcadia_agents_settings_page() {
 		}
 	}
 
+	// Handle manual setup (dev/testing).
+	if ( isset( $_POST['arcadia_agents_manual_setup'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
+		$public_key = sanitize_textarea_field( wp_unslash( $_POST['arcadia_agents_public_key'] ?? '' ) );
+
+		if ( empty( $public_key ) || false === strpos( $public_key, '-----BEGIN PUBLIC KEY-----' ) ) {
+			$notice      = __( 'Invalid public key. Must be a PEM-encoded RSA public key.', 'arcadia-agents' );
+			$notice_type = 'error';
+		} else {
+			update_option( 'arcadia_agents_public_key', $public_key );
+			update_option( 'arcadia_agents_connected', true );
+			update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ) );
+			$is_connected = true;
+			$connected_at = current_time( 'mysql' );
+			$notice       = __( 'Manual setup complete. Public key saved.', 'arcadia-agents' );
+			$notice_type  = 'success';
+		}
+	}
+
 	// Handle disconnect.
 	if ( isset( $_POST['arcadia_agents_disconnect'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
 		$auth = Arcadia_Auth::get_instance();
@@ -107,7 +125,10 @@ function arcadia_agents_settings_page() {
 
 	?>
 	<div class="wrap">
-		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
+		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo.jpg' ); ?>" alt="Arcadia Agents" style="width: 36px; height: 36px; border-radius: 6px;" />
+			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo-text-black.png' ); ?>" alt="Arcadia" style="height: 24px; width: auto;" />
+		</div>
 
 		<?php if ( $notice ) : ?>
 			<div class="notice notice-<?php echo esc_attr( $notice_type ); ?> is-dismissible">
@@ -166,6 +187,32 @@ function arcadia_agents_settings_page() {
 				<p>
 					<?php submit_button( __( 'Connect to Arcadia Agents', 'arcadia-agents' ), 'primary', 'arcadia_agents_handshake', false ); ?>
 					<?php submit_button( __( 'Save Settings', 'arcadia-agents' ), 'secondary', 'arcadia_agents_save', false, array( 'style' => 'margin-left: 10px;' ) ); ?>
+				</p>
+
+				<hr style="margin: 30px 0;">
+
+				<h2><?php esc_html_e( 'Manual Setup (Development)', 'arcadia-agents' ); ?></h2>
+				<p class="description" style="margin-bottom: 15px;"><?php esc_html_e( 'For testing: paste an RSA public key directly to bypass the handshake.', 'arcadia-agents' ); ?></p>
+
+				<table class="form-table">
+					<tr>
+						<th scope="row">
+							<label for="arcadia_agents_public_key"><?php esc_html_e( 'RSA Public Key (PEM)', 'arcadia-agents' ); ?></label>
+						</th>
+						<td>
+							<textarea
+								id="arcadia_agents_public_key"
+								name="arcadia_agents_public_key"
+								rows="8"
+								class="large-text code"
+								placeholder="-----BEGIN PUBLIC KEY-----&#10;...&#10;-----END PUBLIC KEY-----"
+							></textarea>
+						</td>
+					</tr>
+				</table>
+
+				<p>
+					<?php submit_button( __( 'Save Public Key', 'arcadia-agents' ), 'secondary', 'arcadia_agents_manual_setup', false ); ?>
 				</p>
 			<?php else : ?>
 				<p>

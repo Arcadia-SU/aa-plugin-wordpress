@@ -28,8 +28,10 @@ trait Arcadia_API_Posts_Handler {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_posts( $request ) {
+		$post_type = $request->get_param( 'post_type' ) ?? 'post';
+
 		$args = array(
-			'post_type'      => 'post',
+			'post_type'      => sanitize_text_field( $post_type ),
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
 			'posts_per_page' => $request->get_param( 'per_page' ) ?? 20,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
@@ -84,10 +86,17 @@ trait Arcadia_API_Posts_Handler {
 		// Extract meta.
 		$meta = isset( $body['meta'] ) ? $body['meta'] : array();
 
+		// Resolve author: meta.author (email or login) with first-admin fallback.
+		$post_author = $this->resolve_author( $meta );
+
+		// Resolve post type: meta.post_type with 'post' fallback.
+		$post_type = ! empty( $meta['post_type'] ) ? sanitize_text_field( $meta['post_type'] ) : 'post';
+
 		// Build post data.
 		$post_data = array(
-			'post_type'   => 'post',
+			'post_type'   => $post_type,
 			'post_status' => isset( $body['status'] ) ? sanitize_text_field( $body['status'] ) : 'draft',
+			'post_author' => $post_author,
 		);
 
 		// Title from meta or direct.
@@ -142,6 +151,15 @@ trait Arcadia_API_Posts_Handler {
 			// Direct content (HTML or plain text).
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}
+
+		// Set current user so wp_insert_post() grants unfiltered_html capability.
+		// Without this, wp_filter_post_kses encodes block comments containing HTML.
+		wp_set_current_user( $post_author );
+
+		// Slash data for wp_insert_post() which internally calls wp_unslash().
+		// Without this, backslashes in JSON block data (e.g. escaped quotes in
+		// href attributes) are stripped, breaking the block JSON structure.
+		$post_data = wp_slash( $post_data );
 
 		// Create the post.
 		$post_id = wp_insert_post( $post_data, true );
@@ -241,6 +259,15 @@ trait Arcadia_API_Posts_Handler {
 		} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}
+
+		// Set current user so wp_update_post() grants unfiltered_html capability.
+		$post = get_post( $post_id );
+		if ( $post ) {
+			wp_set_current_user( $post->post_author );
+		}
+
+		// Slash data for wp_update_post() which internally calls wp_unslash().
+		$post_data = wp_slash( $post_data );
 
 		$result = wp_update_post( $post_data, true );
 
@@ -408,6 +435,15 @@ trait Arcadia_API_Posts_Handler {
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}
 
+		// Set current user so wp_update_post() grants unfiltered_html capability.
+		$page = get_post( $page_id );
+		if ( $page ) {
+			wp_set_current_user( $page->post_author );
+		}
+
+		// Slash data for wp_update_post() which internally calls wp_unslash().
+		$post_data = wp_slash( $post_data );
+
 		$result = wp_update_post( $post_data, true );
 
 		if ( is_wp_error( $result ) ) {
@@ -431,5 +467,45 @@ trait Arcadia_API_Posts_Handler {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Resolve the post author from meta.author (email or login).
+	 *
+	 * Falls back to the first administrator on the site if meta.author
+	 * is absent or doesn't match a valid WordPress user.
+	 *
+	 * @param array $meta The post meta from the request.
+	 * @return int User ID.
+	 */
+	private function resolve_author( $meta ) {
+		if ( ! empty( $meta['author'] ) ) {
+			$author_value = sanitize_text_field( $meta['author'] );
+
+			// Try email first.
+			$user = get_user_by( 'email', $author_value );
+
+			// Then try login.
+			if ( ! $user ) {
+				$user = get_user_by( 'login', $author_value );
+			}
+
+			if ( $user ) {
+				return (int) $user->ID;
+			}
+		}
+
+		// Fallback: first administrator.
+		$admins = get_users(
+			array(
+				'role'    => 'administrator',
+				'orderby' => 'ID',
+				'order'   => 'ASC',
+				'number'  => 1,
+				'fields'  => 'ID',
+			)
+		);
+
+		return ! empty( $admins ) ? (int) $admins[0] : 1;
 	}
 }

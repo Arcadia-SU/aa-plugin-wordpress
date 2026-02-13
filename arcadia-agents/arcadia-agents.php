@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name: Arcadia Agents
- * Plugin URI: https://arcadiaagents.com
+ * Plugin URI: https://arcadia-agents.com
  * Description: Connect your WordPress site to Arcadia Agents for autonomous SEO content management.
  * Version: 0.1.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
- * Author: Arcadia Agents
- * Author URI: https://arcadiaagents.com
+ * Author: Arcadia
+ * Author URI: https://arcadia-agents.com
  * License: GPL v2 or later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain: arcadia-agents
@@ -24,6 +24,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'ARCADIA_AGENTS_VERSION', '0.1.0' );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+
+// Check for Composer dependency conflicts before loading autoloader.
+if ( class_exists( 'Firebase\JWT\JWT' ) ) {
+	add_action(
+		'admin_notices',
+		function () {
+			echo '<div class="notice notice-warning"><p>';
+			echo esc_html__( 'Arcadia Agents: Firebase JWT library is already loaded by another plugin. This may cause version conflicts. If you experience authentication errors, check for conflicting plugins.', 'arcadia-agents' );
+			echo '</p></div>';
+		}
+	);
+}
 
 // Load Composer autoloader.
 $autoloader = ARCADIA_AGENTS_PLUGIN_DIR . 'vendor/autoload.php';

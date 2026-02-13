@@ -4,13 +4,14 @@ Plugin WordPress pour connecter un site WP à ArcadiaAgents.
 
 ## Guide des tâches
 
-**Suivre `checklist.md`** pour savoir quelles tâches faire et dans quel ordre.
+**Suivre `docs/checklist.md`** pour savoir quelles tâches faire et dans quel ordre.
 Cocher les cases au fur et à mesure de l'avancement.
 
 ## Documentation
 
 - `docs/specs.md` - Spécifications techniques (copie locale)
-- `checklist.md` - Liste des tâches à faire
+- `docs/checklist.md` - Liste des tâches à faire
+- `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
 
 ### Source de vérité des specs
 
