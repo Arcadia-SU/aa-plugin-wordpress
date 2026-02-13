@@ -14,7 +14,7 @@
 - **Protocole:** ✅ REST API exposée par le plugin WordPress
   - Rationale : WP déjà sur internet, standard WP (écosystème, debugging), stateless. Sécurité gérée via endpoints custom + auth robuste.
 
-- **Capacités requises:** ✅ 13 endpoints validés
+- **Capacités requises:** ✅ 14 endpoints validés
   - Articles :
     - `POST /posts` - create_post(title, content, status, meta) → post_id
     - `GET /posts` - get_posts(filters?) → list
@@ -32,6 +32,8 @@
     - `POST /categories` - create_category(name, parent?) → cat_id
   - Structure site :
     - `GET /site-info` - get_site_info() → url, name, theme, etc.
+  - Blocs :
+    - `GET /blocks` - get_blocks() → available block types + fields schema
 
 ---
 
@@ -390,6 +392,108 @@ Notion/Slate/ProseMirror fragmentent le texte en nodes avec marks (voir ADR-013)
 
 ---
 
+### Q8. Custom Blocks ✅
+
+**Contexte :** Le plugin doit supporter des blocs custom (CTA, FAQ, etc.) au-delà des blocs MVP, en s'adaptant dynamiquement au thème WordPress du client. Ref: [client-services.md](../article-gen/client-services.md)
+
+**Décisions validées (2026-02-13) :**
+
+#### Endpoint de découverte : `GET /arcadia/v1/blocks`
+
+Le plugin expose les blocs disponibles sur le site via introspection dynamique. Scope requis : `site:read`.
+
+**Response :**
+```json
+{
+  "adapter": "acf",
+  "blocks": {
+    "builtin": [
+      {"type": "paragraph", "description": "Text block"},
+      {"type": "heading", "description": "H2/H3 heading"},
+      {"type": "image", "description": "Single image"},
+      {"type": "list", "description": "Ordered/unordered list"}
+    ],
+    "custom": [
+      {
+        "type": "bouton",
+        "title": "Bouton CTA",
+        "fields": [
+          {"name": "bouton_label", "type": "text", "required": true, "label": "Label du bouton"},
+          {"name": "bouton_lien", "type": "url", "required": true, "label": "Lien"},
+          {"name": "bouton_style", "type": "select", "required": false, "choices": ["primary", "secondary"]}
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Sources d'introspection selon le mode :**
+- **ACF :** `acf_get_block_types()` + `acf_get_fields()` sur les field groups associés au bloc
+- **Gutenberg :** `WP_Block_Type_Registry` → attributs déclarés dans `register_block_type()`
+
+#### Convention properties
+
+Les `properties` d'un bloc custom correspondent **directement** aux noms de champs/attributs du bloc cible :
+- Mode ACF → noms des champs ACF (ex: `bouton_label`, `bouton_lien`)
+- Mode Gutenberg → noms des attributs du bloc (ex: `author`, `rating`)
+
+Pas de couche de traduction dans le plugin. Les noms exposés par `GET /blocks` sont les noms à utiliser dans `properties`.
+
+#### Format JSON d'un bloc custom dans un article
+
+```json
+{
+  "type": "bouton",
+  "properties": {
+    "bouton_label": "Contactez-nous",
+    "bouton_lien": "https://example.com/contact",
+    "bouton_style": "primary"
+  }
+}
+```
+
+Le bloc s'insère dans `children` au même niveau que les blocs MVP.
+
+#### Gestion des erreurs : fail fast (HTTP 422)
+
+Si un bloc custom est envoyé dans un `POST /posts` ou `PUT /posts/{id}` et que :
+- Le type n'existe pas sur le site → HTTP 422
+- Un champ requis est manquant → HTTP 422
+
+```json
+{
+  "error": "unknown_block_type",
+  "block_type": "bloc-inconnu",
+  "message": "Block type 'bloc-inconnu' is not registered.",
+  "available_custom_blocks": ["bouton", "faq", "citation"]
+}
+```
+
+La requête entière est rejetée. Aucun contenu n'est créé ni modifié.
+
+#### Transformations de types de champs ACF
+
+Certains types de champs ACF nécessitent une transformation côté plugin avant insertion :
+
+| Type ACF | Property reçue | Transformation plugin |
+|----------|---------------|----------------------|
+| `text`, `textarea`, `wysiwyg`, `url` | String | Aucune (passthrough) |
+| `select`, `radio` | String | Validation contre `choices` |
+| `image` | URL string | Sideload → attachment ID |
+| `repeater` | Array d'objets | Aplatissement ACF (`field_0_subfield`, `field_1_subfield`...) |
+
+#### Blocs supportés
+
+| Type de bloc | Supporté | Notes |
+|-------------|----------|-------|
+| Blocs MVP (paragraph, heading, image, list) | ✅ | Adapters existants |
+| Blocs ACF custom | ✅ | Introspection dynamique |
+| Blocs Gutenberg dynamiques custom (server-rendered) | ✅ | Attributs via Registry, self-closing |
+| Blocs Gutenberg statiques custom (saved HTML) | ❌ Différé | Nécessite la structure HTML interne, non exposée côté serveur |
+
+---
+
 ## 6. Compatibilité multi-builders
 
 ### Architecture à adaptateurs
@@ -581,6 +685,13 @@ Le plugin détecte le mode au démarrage :
   - Quoi : Ajout endpoint `PUT /pages/{id}` pour modifier les pages existantes
   - Pourquoi : Nécessaire pour l'internal linking et l'optimisation des pages commerciales
 
+- **2026-02-13 | Custom blocks (Q8)**
+  - Quoi : Support des blocs custom via découverte dynamique (`GET /blocks`)
+  - Properties = noms de champs ACF / attributs Gutenberg directement (pas de mapping custom)
+  - Erreurs : fail fast HTTP 422, requête rejetée si bloc inconnu ou champ requis manquant
+  - Blocs Gutenberg statiques custom : différé (pas de use case actuel)
+  - Pourquoi : Permet au plugin de s'adapter dynamiquement au thème du client sans mise à jour du code
+
 ---
 
 ## 8. Développement & Publication du Plugin
@@ -721,3 +832,5 @@ Phase 3 : Maintenance
 11. ~~Développer le plugin MVP~~ ✅
 12. Tester avec WP local + site client
 13. Soumettre à WP.org
+14. ~~Spécifier custom blocks (Q8)~~ ✅
+15. Implémenter Q8 : block registry + endpoint `GET /blocks` + custom_block() adapters + fail fast validation

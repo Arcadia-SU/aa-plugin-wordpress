@@ -1,21 +1,22 @@
 #!/bin/bash
-# Test: Unknown block type handling (fail fast with 422)
+# Test: POST /posts with unknown custom block type returns 422
 
 generate_jwt "posts:write"
 
 body='{
-    "title": "Unknown Block Test",
+    "title": "Unknown Custom Block Test",
     "status": "draft",
     "h1": "Test Article",
     "children": [
         {"type": "paragraph", "content": "Normal paragraph."},
-        {"type": "unknown_widget_xyz", "properties": {"data": "some data"}},
+        {"type": "bloc-inconnu", "properties": {"foo": "bar"}},
         {"type": "paragraph", "content": "Another paragraph."}
     ]
 }'
 response=$(api_post "/posts" "$body")
 status=$(get_status)
 
-# Should fail with 422 - unknown block type rejected
-assert_status "422" "$status" "Create post with unknown block returns 422"
+# Should fail with 422 - unknown block type
+assert_status "422" "$status" "Create post with unknown block type returns 422"
 assert_contains "unknown_block_type" "$response" "Error code is unknown_block_type"
+assert_contains "bloc-inconnu" "$response" "Error mentions the unknown block type"

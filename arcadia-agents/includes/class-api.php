@@ -20,6 +20,7 @@ require_once __DIR__ . '/api/trait-api-formatters.php';
 require_once __DIR__ . '/api/trait-api-posts.php';
 require_once __DIR__ . '/api/trait-api-media.php';
 require_once __DIR__ . '/api/trait-api-taxonomies.php';
+require_once __DIR__ . '/api/trait-api-blocks.php';
 
 /**
  * Class Arcadia_API
@@ -33,6 +34,7 @@ class Arcadia_API {
 	use Arcadia_API_Posts_Handler;
 	use Arcadia_API_Media_Handler;
 	use Arcadia_API_Taxonomies_Handler;
+	use Arcadia_API_Blocks_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -54,6 +56,13 @@ class Arcadia_API {
 	 * @var Arcadia_Blocks
 	 */
 	private $blocks;
+
+	/**
+	 * Block registry.
+	 *
+	 * @var Arcadia_Block_Registry
+	 */
+	private $registry;
 
 	/**
 	 * REST namespace.
@@ -78,8 +87,9 @@ class Arcadia_API {
 	 * Constructor.
 	 */
 	private function __construct() {
-		$this->auth   = Arcadia_Auth::get_instance();
-		$this->blocks = Arcadia_Blocks::get_instance();
+		$this->auth     = Arcadia_Auth::get_instance();
+		$this->blocks   = Arcadia_Blocks::get_instance();
+		$this->registry = Arcadia_Block_Registry::get_instance();
 	}
 
 	/**
@@ -206,6 +216,17 @@ class Arcadia_API {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_site_info' ),
+				'permission_callback' => array( $this, 'check_site_read_permission' ),
+			)
+		);
+
+		// Blocks discovery endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/blocks',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_blocks' ),
 				'permission_callback' => array( $this, 'check_site_read_permission' ),
 			)
 		);

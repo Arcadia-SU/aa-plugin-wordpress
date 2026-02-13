@@ -81,6 +81,7 @@ class Arcadia_Agents {
 		// Core classes.
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.

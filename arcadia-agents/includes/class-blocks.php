@@ -43,6 +43,13 @@ class Arcadia_Blocks {
 	private $adapter;
 
 	/**
+	 * The block registry.
+	 *
+	 * @var Arcadia_Block_Registry
+	 */
+	private $registry;
+
+	/**
 	 * Get single instance of the class.
 	 *
 	 * @return Arcadia_Blocks
@@ -58,7 +65,8 @@ class Arcadia_Blocks {
 	 * Constructor.
 	 */
 	private function __construct() {
-		$this->adapter = $this->detect_adapter();
+		$this->adapter  = $this->detect_adapter();
+		$this->registry = Arcadia_Block_Registry::get_instance();
 	}
 
 	/**
@@ -134,10 +142,19 @@ class Arcadia_Blocks {
 	 * - Container blocks use `children` for nesting
 	 * - Leaf blocks use `content` for text
 	 *
+	 * Validates all blocks before rendering. Returns WP_Error (422)
+	 * if an unknown block type or missing required field is detected.
+	 *
 	 * @param array $json The JSON content structure from the agent.
-	 * @return string Block content for post_content.
+	 * @return string|WP_Error Block content for post_content, or WP_Error on validation failure.
 	 */
 	public function json_to_blocks( $json ) {
+		// Validate all blocks before rendering (fail fast).
+		$validation = $this->validate_blocks( $json );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
+		}
+
 		$content = '';
 
 		// Process H1 if present.
@@ -153,6 +170,78 @@ class Arcadia_Blocks {
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Validate all blocks recursively before rendering.
+	 *
+	 * Checks that every block type is registered and that custom blocks
+	 * have all required fields present.
+	 *
+	 * @param array $json The JSON content structure.
+	 * @return true|WP_Error True if valid, WP_Error if not.
+	 */
+	private function validate_blocks( $json ) {
+		if ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) {
+			foreach ( $json['children'] as $block ) {
+				$result = $this->validate_block_recursive( $block );
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Validate a single block and its children recursively.
+	 *
+	 * @param array $block The block data.
+	 * @return true|WP_Error True if valid, WP_Error if not.
+	 */
+	private function validate_block_recursive( $block ) {
+		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
+			return true;
+		}
+
+		$type = $block['type'];
+
+		// Check if the block type is registered.
+		if ( ! $this->registry->is_registered( $type ) ) {
+			return new WP_Error(
+				'unknown_block_type',
+				sprintf(
+					/* translators: %s: block type name */
+					__( "Block type '%s' is not registered.", 'arcadia-agents' ),
+					$type
+				),
+				array(
+					'status'                  => 422,
+					'block_type'              => $type,
+					'available_custom_blocks' => $this->registry->get_custom_block_names(),
+				)
+			);
+		}
+
+		// Validate properties for custom blocks.
+		if ( ! empty( $block['properties'] ) && is_array( $block['properties'] ) ) {
+			$validation = $this->registry->validate_properties( $type, $block['properties'] );
+			if ( is_wp_error( $validation ) ) {
+				return $validation;
+			}
+		}
+
+		// Recurse into children.
+		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
+			foreach ( $block['children'] as $child ) {
+				$result = $this->validate_block_recursive( $child );
+				if ( is_wp_error( $result ) ) {
+					return $result;
+				}
+			}
+		}
+
+		return true;
 	}
 
 	/**
@@ -195,6 +284,10 @@ class Arcadia_Blocks {
 				);
 
 			default:
+				// Check if this is a registered custom block.
+				if ( $this->registry->is_registered( $block['type'] ) && ! empty( $block['properties'] ) ) {
+					return $this->render_custom_block( $block );
+				}
 				// Fallback: treat unknown types as paragraphs if they have content.
 				if ( ! empty( $block['content'] ) ) {
 					return $this->adapter->paragraph( $block['content'] );
@@ -274,6 +367,28 @@ class Arcadia_Blocks {
 		}
 
 		return $items;
+	}
+
+	/**
+	 * Render a custom block via the adapter.
+	 *
+	 * Determines the full block name based on adapter type:
+	 * - ACF adapter: prefixes with "acf/" if not already prefixed
+	 * - Gutenberg adapter: uses the type as-is (should be namespace/name)
+	 *
+	 * @param array $block The block data with 'type' and 'properties'.
+	 * @return string Block markup.
+	 */
+	private function render_custom_block( $block ) {
+		$type       = $block['type'];
+		$properties = $block['properties'];
+
+		// For ACF adapter, prefix with "acf/" if not already.
+		if ( $this->adapter instanceof Arcadia_ACF_Adapter && ! str_contains( $type, '/' ) ) {
+			$type = 'acf/' . $type;
+		}
+
+		return $this->adapter->custom_block( $type, $properties );
 	}
 
 	// =========================================================================

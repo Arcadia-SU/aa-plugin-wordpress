@@ -133,7 +133,11 @@ trait Arcadia_API_Posts_Handler {
 
 		// Check for structured content (h1 + sections/children).
 		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
-			$post_data['post_content'] = $this->blocks->json_to_blocks( $content_data );
+			$content = $this->blocks->json_to_blocks( $content_data );
+			if ( is_wp_error( $content ) ) {
+				return $content;
+			}
+			$post_data['post_content'] = $content;
 		} elseif ( ! empty( $body['content'] ) && is_string( $body['content'] ) ) {
 			// Direct content (HTML or plain text).
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
@@ -229,7 +233,11 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update content.
 		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-			$post_data['post_content'] = $this->blocks->json_to_blocks( $body );
+			$content = $this->blocks->json_to_blocks( $body );
+			if ( is_wp_error( $content ) ) {
+				return $content;
+			}
+			$post_data['post_content'] = $content;
 		} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}
@@ -391,7 +399,11 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update content.
 		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-			$post_data['post_content'] = $this->blocks->json_to_blocks( $body );
+			$content = $this->blocks->json_to_blocks( $body );
+			if ( is_wp_error( $content ) ) {
+				return $content;
+			}
+			$post_data['post_content'] = $content;
 		} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
 			$post_data['post_content'] = wp_kses_post( $body['content'] );
 		}

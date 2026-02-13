@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-01-31
+**Dernière mise à jour :** 2026-02-03
 
 ---
 
@@ -106,15 +106,25 @@
 - [x] Mapper `image` → `acf/image`
 - [x] Mapper `list` → `acf/text` (avec ul/ol)
 
+### Custom Blocks (Q8)
+- [x] Créer Block Registry (centraliser blocs MVP + introspection ACF/Gutenberg)
+- [x] Endpoint `GET /arcadia/v1/blocks` (scope `site:read`)
+- [x] Méthode `custom_block()` sur les adapters (ACF + Gutenberg)
+- [x] Validation fail fast : 422 si type inconnu ou champ requis manquant
+- [x] Gestion types ACF : sideload image → attachment ID
+- [x] Gestion types ACF : aplatissement repeater
+- [x] Tests unitaires custom blocks
+- [x] Tests intégration endpoint `GET /blocks`
+
 ---
 
 ## Phase 5 : Tests
 
-- [ ] Setup PHPUnit
-- [ ] Tests unitaires : validation JWT
-- [ ] Tests unitaires : parsing JSON → blocs
-- [ ] Tests unitaires : markdown → HTML
-- [ ] Tests intégration : endpoints REST
+- [x] Setup PHPUnit
+- [x] Tests unitaires : validation JWT
+- [x] Tests unitaires : parsing JSON → blocs
+- [x] Tests unitaires : markdown → HTML
+- [x] Tests intégration : endpoints REST
 - [x] Test manuel : créer article complet via API
 - [ ] Test manuel : site client (ACF Pro)
 

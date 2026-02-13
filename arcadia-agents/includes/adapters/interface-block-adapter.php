@@ -61,6 +61,15 @@ interface Arcadia_Block_Adapter {
 	public function listing( $items, $ordered = false );
 
 	/**
+	 * Convert a custom block to block format.
+	 *
+	 * @param string $block_name The full block name (e.g., 'acf/bouton' or 'my-plugin/rating').
+	 * @param array  $properties The block properties (field values or attributes).
+	 * @return string Block markup.
+	 */
+	public function custom_block( $block_name, $properties );
+
+	/**
 	 * Get the adapter name.
 	 *
 	 * Used for logging, debugging, and API responses.

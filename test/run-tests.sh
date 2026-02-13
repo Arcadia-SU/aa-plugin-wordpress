@@ -78,6 +78,7 @@ declare -A SUITE_DIRS=(
     ["pages"]="06-pages"
     ["blocks"]="07-blocks"
     ["site-info"]="08-site-info"
+    ["blocks-custom"]="09-blocks-custom"
 )
 
 # Header

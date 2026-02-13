@@ -101,6 +101,28 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	}
 
 	/**
+	 * Convert a custom block to Gutenberg block format.
+	 *
+	 * Generates a self-closing dynamic block comment.
+	 * Properties are passed directly as block attributes.
+	 *
+	 * @param string $block_name The full block name (e.g., 'my-plugin/rating').
+	 * @param array  $properties The block attributes.
+	 * @return string Block markup.
+	 */
+	public function custom_block( $block_name, $properties ) {
+		$attrs = ! empty( $properties )
+			? ' ' . wp_json_encode( $properties, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
+			: '';
+
+		return sprintf(
+			'<!-- wp:%s%s /-->' . "\n\n",
+			$block_name,
+			$attrs
+		);
+	}
+
+	/**
 	 * Convert a list to Gutenberg block format.
 	 *
 	 * @param array $items   The list items.
