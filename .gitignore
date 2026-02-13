@@ -18,6 +18,7 @@ arcadia-agents/vendor/
 # Test artifacts (sensitive)
 arcadia-agents/test/*.pem
 arcadia-agents/test/*.txt
+test/*.pem
 
 # Integration test config (contains local credentials)
 test/config.sh
