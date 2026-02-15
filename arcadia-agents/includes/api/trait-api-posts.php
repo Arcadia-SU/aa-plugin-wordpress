@@ -214,7 +214,7 @@ trait Arcadia_API_Posts_Handler {
 		$post_id = (int) $request->get_param( 'id' );
 		$post    = get_post( $post_id );
 
-		if ( ! $post || 'post' !== $post->post_type ) {
+		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
 			return new WP_Error(
 				'post_not_found',
 				__( 'Post not found.', 'arcadia-agents' ),
@@ -320,7 +320,7 @@ trait Arcadia_API_Posts_Handler {
 		$post_id = (int) $request->get_param( 'id' );
 		$post    = get_post( $post_id );
 
-		if ( ! $post || 'post' !== $post->post_type ) {
+		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
 			return new WP_Error(
 				'post_not_found',
 				__( 'Post not found.', 'arcadia-agents' ),
@@ -507,5 +507,24 @@ trait Arcadia_API_Posts_Handler {
 		);
 
 		return ! empty( $admins ) ? (int) $admins[0] : 1;
+	}
+
+	/**
+	 * Check if a post type is allowed for post operations.
+	 *
+	 * Allows public, non-hierarchical post types (posts, articles, etc.)
+	 * but excludes pages (hierarchical) and attachments.
+	 *
+	 * @param string $post_type The post type to check.
+	 * @return bool
+	 */
+	private function is_allowed_post_type( $post_type ) {
+		$post_type_obj = get_post_type_object( $post_type );
+
+		if ( ! $post_type_obj ) {
+			return false;
+		}
+
+		return $post_type_obj->public && ! $post_type_obj->hierarchical;
 	}
 }
