@@ -47,9 +47,9 @@ Yes. The plugin uses asymmetric JWT authentication (RS256) which means only Arca
 
 = What permissions are available? =
 
-* posts:read - Read articles
-* posts:write - Create/edit articles
-* posts:delete - Delete articles
+* articles:read - Read articles
+* articles:write - Create/edit articles
+* articles:delete - Delete articles
 * media:read - Read media library
 * media:write - Upload media
 * taxonomies:read - Read categories/tags

@@ -141,6 +141,8 @@
 
 ## Phase 7 : Publication
 
+*Note : Attendre le passage en prod de l'agent SEO*
+
 - [ ] Créer compte wordpress.org
 - [ ] Préparer assets (bannière, icône, screenshots)
 - [ ] Soumettre plugin pour review

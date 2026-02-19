@@ -6,7 +6,7 @@ JWT_TOKEN="eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhcmNhZGlhLWFnZW50cyIs
 export JWT_TOKEN
 
 # Make request
-response=$(api_get "/posts")
+response=$(api_get "/articles")
 status=$(get_status)
 
 # Assertions

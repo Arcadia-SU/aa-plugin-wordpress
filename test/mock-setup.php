@@ -59,9 +59,9 @@ update_option( 'arcadia_agents_connection_key', 'aa_mock_test_key_' . wp_generat
 
 // Enable all scopes.
 $all_scopes = array(
-	'posts:read',
-	'posts:write',
-	'posts:delete',
+	'articles:read',
+	'articles:write',
+	'articles:delete',
 	'media:read',
 	'media:write',
 	'taxonomies:read',
@@ -90,4 +90,4 @@ echo "=== Next Steps ===\n";
 echo "1. Generate a JWT using the private key:\n";
 echo "   php test/generate-jwt.php\n\n";
 echo "2. Test the API:\n";
-echo "   curl -H 'Authorization: Bearer <JWT>' http://localhost:8080/wp-json/arcadia/v1/posts\n\n";
+echo "   curl -H 'Authorization: Bearer <JWT>' http://localhost:8080/wp-json/arcadia/v1/articles\n\n";

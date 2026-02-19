@@ -21,7 +21,7 @@ setup_tests() {
     > "$RESULTS_DIR/failures.log"
 
     # Generate default JWT with all scopes for setup
-    generate_jwt "posts:read posts:write posts:delete media:read media:write taxonomies:read taxonomies:write site:read"
+    generate_jwt "articles:read articles:write articles:delete media:read media:write taxonomies:read taxonomies:write site:read"
 }
 
 # Create a test post and track it for cleanup
@@ -45,7 +45,7 @@ EOF
 )
 
     local response
-    response=$(api_post "/posts" "$body")
+    response=$(api_post "/articles" "$body")
     local post_id
     post_id=$(echo "$response" | jq -r '.id // .post_id // empty')
 
@@ -113,7 +113,7 @@ cleanup_test_data() {
     # Delete posts
     for post_id in "${CREATED_POSTS[@]}"; do
         if [[ -n "$post_id" ]]; then
-            api_delete "/posts/$post_id" > /dev/null 2>&1
+            api_delete "/articles/$post_id" > /dev/null 2>&1
         fi
     done
 

@@ -32,9 +32,9 @@ $payload = array(
 	'nbf'    => $now,
 	'exp'    => $now + 3600, // 1 hour
 	'scopes' => array(
-		'posts:read',
-		'posts:write',
-		'posts:delete',
+		'articles:read',
+		'articles:write',
+		'articles:delete',
 		'media:read',
 		'media:write',
 		'taxonomies:read',

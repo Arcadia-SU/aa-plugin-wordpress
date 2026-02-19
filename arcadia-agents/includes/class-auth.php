@@ -35,7 +35,7 @@ class Arcadia_Auth {
 	 *
 	 * @var string
 	 */
-	private $api_base_url = 'https://api.arcadiaagents.com';
+	private $api_base_url = 'https://api.arcadia-agents.com';
 
 	/**
 	 * Get single instance of the class.
@@ -211,9 +211,9 @@ class Arcadia_Auth {
 	public function check_scope( $required_scope, $token_scopes = array() ) {
 		// Get enabled scopes from WP settings.
 		$all_scopes = array(
-			'posts:read',
-			'posts:write',
-			'posts:delete',
+			'articles:read',
+			'articles:write',
+			'articles:delete',
 			'media:read',
 			'media:write',
 			'taxonomies:read',

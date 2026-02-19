@@ -62,6 +62,14 @@ Pour la validation JWT, utiliser `firebase/php-jwt` :
 composer require firebase/php-jwt
 ```
 
+## Build zip
+
+```bash
+cd arcadia-agents && composer install --no-dev && cd ..
+rm -f arcadia-agents.zip && zip -r arcadia-agents.zip arcadia-agents/ -x "arcadia-agents/tests/*" -x "arcadia-agents/test/*" -x "arcadia-agents/.phpunit*" -x "arcadia-agents/phpunit.xml" -x "arcadia-agents/composer.json" -x "arcadia-agents/composer.lock"
+composer install  # restaurer les dev dependencies après
+```
+
 ## Tests
 
 ```bash
@@ -69,7 +77,7 @@ composer require firebase/php-jwt
 docker compose exec wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents && ./vendor/bin/phpunit --testdox"
 
 # Setup JWT pour tests manuels
-docker compose exec wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents/test && php mock-setup.php && php generate-jwt.php private_key.pem 'posts:read'"
+docker compose exec wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents/test && php mock-setup.php && php generate-jwt.php private_key.pem 'articles:read'"
 ```
 
 - **Unit tests** : `arcadia-agents/tests/unit/` (PHPUnit, mocks WP)

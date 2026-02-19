@@ -96,37 +96,37 @@ class Arcadia_API {
 	 * Register all REST routes.
 	 */
 	public function register_routes() {
-		// Posts endpoints.
+		// Articles endpoints.
 		register_rest_route(
 			$this->namespace,
-			'/posts',
+			'/articles',
 			array(
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_posts' ),
-					'permission_callback' => array( $this, 'check_posts_read_permission' ),
+					'permission_callback' => array( $this, 'check_articles_read_permission' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'create_post' ),
-					'permission_callback' => array( $this, 'check_posts_write_permission' ),
+					'permission_callback' => array( $this, 'check_articles_write_permission' ),
 				),
 			)
 		);
 
 		register_rest_route(
 			$this->namespace,
-			'/posts/(?P<id>\d+)',
+			'/articles/(?P<id>\d+)',
 			array(
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_post' ),
-					'permission_callback' => array( $this, 'check_posts_write_permission' ),
+					'permission_callback' => array( $this, 'check_articles_write_permission' ),
 				),
 				array(
 					'methods'             => 'DELETE',
 					'callback'            => array( $this, 'delete_post' ),
-					'permission_callback' => array( $this, 'check_posts_delete_permission' ),
+					'permission_callback' => array( $this, 'check_articles_delete_permission' ),
 				),
 			)
 		);
@@ -134,7 +134,7 @@ class Arcadia_API {
 		// Featured image endpoint.
 		register_rest_route(
 			$this->namespace,
-			'/posts/(?P<id>\d+)/featured-image',
+			'/articles/(?P<id>\d+)/featured-image',
 			array(
 				'methods'             => 'PUT',
 				'callback'            => array( $this, 'set_featured_image' ),
@@ -159,7 +159,7 @@ class Arcadia_API {
 			array(
 				'methods'             => 'PUT',
 				'callback'            => array( $this, 'update_page' ),
-				'permission_callback' => array( $this, 'check_posts_write_permission' ),
+				'permission_callback' => array( $this, 'check_articles_write_permission' ),
 			)
 		);
 
@@ -237,13 +237,13 @@ class Arcadia_API {
 	// =========================================================================
 
 	/**
-	 * Check posts:read permission.
+	 * Check articles:read permission.
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return bool|WP_Error
 	 */
-	public function check_posts_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'posts:read' );
+	public function check_articles_read_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'articles:read' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -251,13 +251,13 @@ class Arcadia_API {
 	}
 
 	/**
-	 * Check posts:write permission.
+	 * Check articles:write permission.
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return bool|WP_Error
 	 */
-	public function check_posts_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'posts:write' );
+	public function check_articles_write_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'articles:write' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
@@ -265,13 +265,13 @@ class Arcadia_API {
 	}
 
 	/**
-	 * Check posts:delete permission.
+	 * Check articles:delete permission.
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return bool|WP_Error
 	 */
-	public function check_posts_delete_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'posts:delete' );
+	public function check_articles_delete_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'articles:delete' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

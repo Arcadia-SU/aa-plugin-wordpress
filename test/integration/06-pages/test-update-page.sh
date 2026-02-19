@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: Update page
 
-generate_jwt "site:read posts:write"
+generate_jwt "site:read articles:write"
 
 # Get list of pages first
 response=$(api_get "/pages")

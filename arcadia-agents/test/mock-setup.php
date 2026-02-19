@@ -59,9 +59,9 @@ update_option( 'arcadia_agents_connection_key', 'aa_mock_test_key_' . wp_generat
 
 // Enable all scopes.
 $all_scopes = array(
-	'posts:read',
-	'posts:write',
-	'posts:delete',
+	'articles:read',
+	'articles:write',
+	'articles:delete',
 	'media:read',
 	'media:write',
 	'taxonomies:read',

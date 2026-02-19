@@ -40,3 +40,6 @@ arcadia-agents/.phpunit.cache/
 # Environment files
 .env
 .env.local
+
+# Build artifacts
+arcadia-agents.zip

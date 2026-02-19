@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: Markdown inline formatting
 
-generate_jwt "posts:write"
+generate_jwt "articles:write"
 
 body='{
     "title": "Markdown Inline Test",
@@ -13,7 +13,7 @@ body='{
         ]
     }
 }'
-response=$(api_post "/posts" "$body")
+response=$(api_post "/articles" "$body")
 status=$(get_status)
 
 assert_status "201" "$status" "Create post with markdown inline returns 201"

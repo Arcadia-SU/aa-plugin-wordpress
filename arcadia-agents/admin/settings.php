@@ -27,9 +27,9 @@ function arcadia_agents_settings_page() {
 
 	// Default scopes (all enabled).
 	$all_scopes = array(
-		'posts:read',
-		'posts:write',
-		'posts:delete',
+		'articles:read',
+		'articles:write',
+		'articles:delete',
 		'media:read',
 		'media:write',
 		'taxonomies:read',
@@ -113,9 +113,9 @@ function arcadia_agents_settings_page() {
 
 	// Scope labels.
 	$scope_labels = array(
-		'posts:read'       => __( 'Read posts', 'arcadia-agents' ),
-		'posts:write'      => __( 'Create/edit posts', 'arcadia-agents' ),
-		'posts:delete'     => __( 'Delete posts', 'arcadia-agents' ),
+		'articles:read'    => __( 'Read articles', 'arcadia-agents' ),
+		'articles:write'   => __( 'Create/edit articles', 'arcadia-agents' ),
+		'articles:delete'  => __( 'Delete articles', 'arcadia-agents' ),
 		'media:read'       => __( 'Read media library', 'arcadia-agents' ),
 		'media:write'      => __( 'Upload media', 'arcadia-agents' ),
 		'taxonomies:read'  => __( 'Read categories/tags', 'arcadia-agents' ),

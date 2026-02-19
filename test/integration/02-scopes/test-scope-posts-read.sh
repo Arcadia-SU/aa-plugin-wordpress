@@ -1,14 +1,14 @@
 #!/bin/bash
-# Test: posts:read scope
+# Test: articles:read scope
 
 # With correct scope
-generate_jwt "posts:read"
-response=$(api_get "/posts")
+generate_jwt "articles:read"
+response=$(api_get "/articles")
 status=$(get_status)
-assert_status "200" "$status" "posts:read scope allows GET /posts"
+assert_status "200" "$status" "articles:read scope allows GET /articles"
 
 # Without scope
 generate_jwt "media:read"
-response=$(api_get "/posts")
+response=$(api_get "/articles")
 status=$(get_status)
-assert_status "403" "$status" "Without posts:read scope, GET /posts returns 403"
+assert_status "403" "$status" "Without articles:read scope, GET /articles returns 403"

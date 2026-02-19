@@ -16,16 +16,16 @@
 
 - **Capacités requises:** ✅ 14 endpoints validés
   - Articles :
-    - `POST /posts` - create_post(title, content, status, meta) → post_id
-    - `GET /posts` - get_posts(filters?) → list
-    - `PUT /posts/{id}` - update_post(post_id, fields) → success
-    - `DELETE /posts/{id}` - delete_post(post_id) → success
+    - `POST /articles` - create_article(title, content, status, meta) → article_id
+    - `GET /articles` - get_articles(?post_type, ?status, ?page, ?per_page) → paginated list
+    - `PUT /articles/{id}` - update_article(article_id, fields) → success
+    - `DELETE /articles/{id}` - delete_article(article_id) → success
   - Pages :
-    - `GET /pages` - get_pages() → list (pour internal linking)
+    - `GET /pages` - get_pages(?status, ?page, ?per_page) → paginated list
     - `PUT /pages/{id}` - update_page(page_id, fields) → success
   - Médias :
     - `POST /media` - upload_media(file, meta) → media_id
-    - `PUT /posts/{id}/featured-image` - set_featured_image(post_id, media_id) → success
+    - `PUT /articles/{id}/featured-image` - set_featured_image(article_id, media_id) → success
   - Taxonomies :
     - `GET /categories` - get_categories() → list
     - `GET /tags` - get_tags() → list
@@ -34,6 +34,30 @@
     - `GET /site-info` - get_site_info() → url, name, theme, etc.
   - Blocs :
     - `GET /blocks` - get_blocks() → available block types + fields schema
+
+  **Nommage `/articles` (2026-02-14) :** Le code agent (`WordPressSiteConnector`) utilise `/articles` comme path, pas `/posts`. Cohérent avec le vocabulaire CMS-agnostic du `SiteConnector` protocol. WordPress utilise "post" en interne, mais l'API Arcadia expose des "articles" — c'est le concept métier. Le plugin traduit `article` ↔ `wp_post` en interne.
+
+  **Paramètres de query — `GET /articles` et `GET /pages` (2026-02-14) :**
+
+  | Paramètre | Type | Défaut | Description |
+  |-----------|------|--------|-------------|
+  | `post_type` | string | `post` | Type de contenu WP (`GET /articles` uniquement). Ex: `article`, `post` |
+  | `status` | string | tous | Filtrer par statut CMS : `publish`, `draft`, `pending` |
+  | `page` | int | `1` | Page de résultats |
+  | `per_page` | int | `20` | Items par page (max: 100) |
+
+  Pourquoi : L'agent (`get_cms_content`) a besoin de filtrer par statut (vérifier ce qui est publié) et de paginer (sites avec beaucoup de contenu). Sans pagination, un site avec 500 articles saturerait la réponse.
+
+  **Champs modifiables — `PUT /articles/{id}` et `PUT /pages/{id}` (2026-02-14) :**
+
+  | Champ | Type | Description |
+  |-------|------|-------------|
+  | `content` | string (JSON blocks) | Contenu de l'article |
+  | `title` | string | Titre |
+  | `status` | string | Statut : `publish`, `draft`, `pending` |
+  | `meta` | object | Métadonnées (categories, tags, author, etc.) |
+
+  Tous les champs sont optionnels — seuls les champs fournis sont modifiés. Pourquoi documenter `status` explicitement : l'agent utilise `push_article_update(status="draft")` pour unpublish un article sans modifier son contenu. C'est un cas d'usage critique qui doit être garanti côté plugin.
 
 ---
 
@@ -84,7 +108,7 @@
 
 ### API Contract : Handshake Endpoint (côté serveur ArcadiaAgents)
 
-**Endpoint :** `POST https://api.arcadiaagents.com/v1/wordpress/handshake`
+**Endpoint :** `POST https://api.arcadia-agents.com/v1/wordpress/handshake`
 
 **Request :**
 ```json
@@ -126,7 +150,7 @@
     "sub": "site_id",
     "iat": 1234567890,
     "exp": 1234568790,
-    "scopes": ["posts:read", "posts:write", ...]
+    "scopes": ["articles:read", "articles:write", ...]
   }
   ```
 - Durée : 15-30 min recommandé
@@ -134,9 +158,9 @@
 - **Scopes (permissions granulaires):** ✅ Par ressource+action
   - Rationale : Granulaire mais pas explosif (~8 scopes), standard industrie (GitHub, Slack, Google)
   - Liste des scopes :
-    - `posts:read` - Lire les articles
-    - `posts:write` - Créer/modifier articles
-    - `posts:delete` - Supprimer articles
+    - `articles:read` - Lire les articles
+    - `articles:write` - Créer/modifier articles
+    - `articles:delete` - Supprimer articles
     - `media:read` - Lire la media library
     - `media:write` - Upload images
     - `taxonomies:read` - Lire catégories/tags
@@ -147,8 +171,8 @@
     ```json
     {
       "error": "scope_denied",
-      "required_scope": "posts:delete",
-      "message": "This action requires the 'posts:delete' scope which is not enabled in WordPress settings."
+      "required_scope": "articles:delete",
+      "message": "This action requires the 'articles:delete' scope which is not enabled in WordPress settings."
     }
     ```
   - L'agent interprète et explique à l'user en langage naturel
@@ -175,7 +199,7 @@
 - **Détails d'implémentation:** ✅ Via URL (sideload)
   - Format : L'agent upload l'image sur storage ArcadiaAgents, envoie l'URL au plugin
   - Plugin utilise `media_sideload_image()` pour importer dans WP media library
-  - Featured image : paramètre explicite dans `create_post()` ou via endpoint dédié
+  - Featured image : paramètre explicite dans `create_article()` ou via endpoint dédié
   - Rationale : Évite base64 (lourd) et multipart (complexe). URL = simple, standard, debuggable.
 
 ---
@@ -459,7 +483,7 @@ Le bloc s'insère dans `children` au même niveau que les blocs MVP.
 
 #### Gestion des erreurs : fail fast (HTTP 422)
 
-Si un bloc custom est envoyé dans un `POST /posts` ou `PUT /posts/{id}` et que :
+Si un bloc custom est envoyé dans un `POST /articles` ou `PUT /articles/{id}` et que :
 - Le type n'existe pas sur le site → HTTP 422
 - Un champ requis est manquant → HTTP 422
 
@@ -590,7 +614,7 @@ Le plugin détecte le mode au démarrage :
   - Pourquoi : Standard WP, stateless, debuggable. Sécurité via endpoints custom + auth
 
 - **2026-01-27 | Capacités**
-  - Quoi : 11 endpoints (CRUD posts, media, taxonomies, site info)
+  - Quoi : 14 endpoints (CRUD articles, pages, media, taxonomies, site info, blocks)
   - Pourquoi : Couvre tous les besoins agent : publish, update, images, linking, discovery
 
 - **2026-01-27 | Méthode d'auth**
@@ -598,7 +622,7 @@ Le plugin détecte le mode au démarrage :
   - Pourquoi : Sécurisé (crypto), expiration auto, supporte scopes. Simplifie la vie client (pas de rotation manuelle).
 
 - **2026-01-27 | Scopes**
-  - Quoi : 8 scopes par ressource+action (posts, media, taxonomies, site × read/write/delete)
+  - Quoi : 8 scopes par ressource+action (articles, media, taxonomies, site × read/write/delete)
   - Comment : Checkboxes dans WP admin, erreur JSON structurée si scope manquant
   - Pourquoi : Granulaire, standard industrie, permet à l'agent d'expliquer les erreurs à l'user
 
@@ -681,24 +705,24 @@ Le plugin détecte le mode au démarrage :
 - **2026-01-31 | Featured image dans meta**
   - Quoi : `meta.featured_image_url` dans le JSON schema
   - Plugin fait sideload de l'image et la définit comme featured image
-  - Pourquoi : Simplifie le flow (pas besoin d'appel séparé)
+  - Pourquoi : Simplifie le flow (pas besoin d'appel séparé via `PUT /articles/{id}/featured-image`)
 
 - **2026-01-31 | Edit pages**
   - Quoi : Ajout endpoint `PUT /pages/{id}` pour modifier les pages existantes
   - Pourquoi : Nécessaire pour l'internal linking et l'optimisation des pages commerciales
 
 - **2026-02-13 | Authors**
-  - Quoi : `meta.author` (email ou login WP) dans `POST /posts` + liste `authors` dans `GET /site-info`
+  - Quoi : `meta.author` (email ou login WP) dans `POST /articles` + liste `authors` dans `GET /site-info`
   - `GET /site-info` retourne `authors: [{email, name, role}]` (admins, editors, authors)
-  - `POST /posts` : `meta.author` résolu via email/login → user ID. Fallback : premier admin
+  - `POST /articles` : `meta.author` résolu via email/login → user ID. Fallback : premier admin
   - Pourquoi : L'agent découvre les auteurs disponibles puis assigne le bon à chaque article
 
 - **2026-02-13 | Custom post types**
   - Quoi : Support des custom post types (certains thèmes utilisent `article` au lieu de `post`)
   - `GET /site-info` retourne `post_types: [{name, label, hierarchical, count: {publish, draft, total}}]`
   - L'agent identifie le bon type via le count (ex: `article` = 104 publiés vs `post` = 0)
-  - `GET /posts` accepte `?post_type=article` (défaut: `post`)
-  - `POST /posts` accepte `meta.post_type` (défaut: `post`)
+  - `GET /articles` accepte `?post_type=article` (défaut: `post`)
+  - `POST /articles` accepte `meta.post_type` (défaut: `post`)
   - Pourquoi : Le thème iSelection utilise un CPT `article`, pas le type natif `post`
 
 - **2026-02-13 | Custom blocks (Q8)**
@@ -707,6 +731,19 @@ Le plugin détecte le mode au démarrage :
   - Erreurs : fail fast HTTP 422, requête rejetée si bloc inconnu ou champ requis manquant
   - Blocs Gutenberg statiques custom : différé (pas de use case actuel)
   - Pourquoi : Permet au plugin de s'adapter dynamiquement au thème du client sans mise à jour du code
+
+- **2026-02-14 | Nommage endpoints `/articles` (pas `/posts`)**
+  - Quoi : Tous les endpoints articles utilisent `/articles` comme path, pas `/posts`
+  - Scopes renommés : `articles:read`, `articles:write`, `articles:delete` (au lieu de `posts:*`)
+  - Pourquoi : Cohérence avec le vocabulaire CMS-agnostic du `SiteConnector` protocol côté agent. "Article" est le concept métier, "post" est l'implémentation WP. Le plugin traduit `article` ↔ `wp_post` en interne. Le code agent (`WordPressSiteConnector`) utilisait déjà `/articles`.
+
+- **2026-02-14 | Query parameters sur GET endpoints**
+  - Quoi : `GET /articles` et `GET /pages` acceptent `?status`, `?page`, `?per_page`. `GET /articles` accepte aussi `?post_type`.
+  - Pourquoi : L'agent (`get_cms_content`) doit filtrer par statut (vérifier ce qui est publié vs brouillon) et paginer (sites avec beaucoup de contenu). Sans pagination, un site avec 500+ articles saturerait la réponse et le contexte de l'agent.
+
+- **2026-02-14 | Status comme champ modifiable sur PUT**
+  - Quoi : `PUT /articles/{id}` et `PUT /pages/{id}` acceptent `status` comme champ optionnel (`publish`, `draft`, `pending`)
+  - Pourquoi : L'agent utilise `push_article_update(status="draft")` pour unpublish un article sans modifier son contenu. Le plugin doit pouvoir changer le statut indépendamment du contenu. Champs fournis = modifiés, champs omis = inchangés.
 
 ---
 

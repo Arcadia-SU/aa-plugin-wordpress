@@ -5,7 +5,7 @@
 generate_malformed_jwt
 
 # Make request
-response=$(api_get "/posts")
+response=$(api_get "/articles")
 status=$(get_status)
 
 # Assertions

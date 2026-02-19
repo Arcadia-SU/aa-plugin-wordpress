@@ -2,10 +2,10 @@
 # Test: Valid JWT authentication
 
 # Generate valid JWT
-generate_jwt "posts:read"
+generate_jwt "articles:read"
 
 # Make request
-response=$(api_get "/posts")
+response=$(api_get "/articles")
 status=$(get_status)
 
 # Assertions

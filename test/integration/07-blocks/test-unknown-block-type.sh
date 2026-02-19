@@ -1,7 +1,7 @@
 #!/bin/bash
 # Test: Unknown block type handling (fail fast with 422)
 
-generate_jwt "posts:write"
+generate_jwt "articles:write"
 
 body='{
     "title": "Unknown Block Test",
@@ -13,7 +13,7 @@ body='{
         {"type": "paragraph", "content": "Another paragraph."}
     ]
 }'
-response=$(api_post "/posts" "$body")
+response=$(api_post "/articles" "$body")
 status=$(get_status)
 
 # Should fail with 422 - unknown block type rejected

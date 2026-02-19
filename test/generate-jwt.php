@@ -32,9 +32,9 @@ $payload = array(
 	'nbf'    => $now,
 	'exp'    => $now + 3600, // 1 hour
 	'scopes' => array(
-		'posts:read',
-		'posts:write',
-		'posts:delete',
+		'articles:read',
+		'articles:write',
+		'articles:delete',
 		'media:read',
 		'media:write',
 		'taxonomies:read',
@@ -54,13 +54,13 @@ echo "=== Test Commands ===\n\n";
 echo "# Health check (no auth):\n";
 echo "curl -s http://localhost:8080/wp-json/arcadia/v1/health | jq .\n\n";
 
-echo "# List posts:\n";
-echo "curl -s -H 'Authorization: Bearer $jwt' http://localhost:8080/wp-json/arcadia/v1/posts | jq .\n\n";
+echo "# List articles:\n";
+echo "curl -s -H 'Authorization: Bearer $jwt' http://localhost:8080/wp-json/arcadia/v1/articles | jq .\n\n";
 
 echo "# Get site info:\n";
 echo "curl -s -H 'Authorization: Bearer $jwt' http://localhost:8080/wp-json/arcadia/v1/site-info | jq .\n\n";
 
-echo "# Create a test post:\n";
+echo "# Create a test article:\n";
 $test_post = json_encode( array(
 	'title'   => 'Test Article from API',
 	'content' => array(
@@ -108,7 +108,7 @@ echo "curl -s -X POST \\\n";
 echo "  -H 'Authorization: Bearer $jwt' \\\n";
 echo "  -H 'Content-Type: application/json' \\\n";
 echo "  -d '$test_post' \\\n";
-echo "  http://localhost:8080/wp-json/arcadia/v1/posts | jq .\n\n";
+echo "  http://localhost:8080/wp-json/arcadia/v1/articles | jq .\n\n";
 
 // Save JWT to file for convenience.
 $jwt_file = __DIR__ . '/test_jwt.txt';

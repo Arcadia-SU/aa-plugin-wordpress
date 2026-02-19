@@ -33,13 +33,13 @@ class AuthTest extends TestCase {
 
         // Enable all scopes.
         $_test_options['arcadia_agents_scopes'] = array(
-            'posts:read',
-            'posts:write',
+            'articles:read',
+            'articles:write',
             'media:read',
         );
 
         $auth   = \Arcadia_Auth::get_instance();
-        $result = $auth->check_scope( 'posts:read', array( 'posts:read' ) );
+        $result = $auth->check_scope( 'articles:read', array( 'articles:read' ) );
 
         $this->assertTrue( $result );
     }
@@ -50,11 +50,11 @@ class AuthTest extends TestCase {
     public function test_check_scope_disabled_in_wp(): void {
         global $_test_options;
 
-        // Only enable posts:read.
-        $_test_options['arcadia_agents_scopes'] = array( 'posts:read' );
+        // Only enable articles:read.
+        $_test_options['arcadia_agents_scopes'] = array( 'articles:read' );
 
         $auth   = \Arcadia_Auth::get_instance();
-        $result = $auth->check_scope( 'posts:write', array( 'posts:write' ) );
+        $result = $auth->check_scope( 'articles:write', array( 'articles:write' ) );
 
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'scope_denied', $result->get_error_code() );
@@ -68,14 +68,14 @@ class AuthTest extends TestCase {
 
         // Enable all scopes in WP.
         $_test_options['arcadia_agents_scopes'] = array(
-            'posts:read',
-            'posts:write',
+            'articles:read',
+            'articles:write',
             'media:read',
         );
 
         $auth = \Arcadia_Auth::get_instance();
-        // Token only has posts:read, but we need posts:write.
-        $result = $auth->check_scope( 'posts:write', array( 'posts:read' ) );
+        // Token only has articles:read, but we need articles:write.
+        $result = $auth->check_scope( 'articles:write', array( 'articles:read' ) );
 
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'scope_not_granted', $result->get_error_code() );
@@ -142,11 +142,11 @@ class AuthTest extends TestCase {
         global $_test_options;
 
         // Enable scope in WP.
-        $_test_options['arcadia_agents_scopes'] = array( 'posts:read' );
+        $_test_options['arcadia_agents_scopes'] = array( 'articles:read' );
 
         $auth = \Arcadia_Auth::get_instance();
         // Empty token scopes - should pass (WP scope is enabled, no token restriction).
-        $result = $auth->check_scope( 'posts:read', array() );
+        $result = $auth->check_scope( 'articles:read', array() );
 
         $this->assertTrue( $result );
     }
@@ -156,9 +156,9 @@ class AuthTest extends TestCase {
      */
     public function test_available_scopes(): void {
         $expected_scopes = array(
-            'posts:read',
-            'posts:write',
-            'posts:delete',
+            'articles:read',
+            'articles:write',
+            'articles:delete',
             'media:read',
             'media:write',
             'taxonomies:read',
@@ -168,9 +168,9 @@ class AuthTest extends TestCase {
 
         // These are the scopes the plugin should support.
         $this->assertCount( 8, $expected_scopes );
-        $this->assertContains( 'posts:read', $expected_scopes );
-        $this->assertContains( 'posts:write', $expected_scopes );
-        $this->assertContains( 'posts:delete', $expected_scopes );
+        $this->assertContains( 'articles:read', $expected_scopes );
+        $this->assertContains( 'articles:write', $expected_scopes );
+        $this->assertContains( 'articles:delete', $expected_scopes );
         $this->assertContains( 'media:read', $expected_scopes );
         $this->assertContains( 'media:write', $expected_scopes );
         $this->assertContains( 'taxonomies:read', $expected_scopes );

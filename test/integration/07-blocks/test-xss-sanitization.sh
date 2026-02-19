@@ -1,10 +1,10 @@
 #!/bin/bash
 # Test: XSS sanitization
 
-generate_jwt "posts:write"
+generate_jwt "articles:write"
 
 body=$(load_fixture "posts/xss-attempt.json")
-response=$(api_post "/posts" "$body")
+response=$(api_post "/articles" "$body")
 status=$(get_status)
 
 assert_status "201" "$status" "Create post with XSS attempt returns 201"

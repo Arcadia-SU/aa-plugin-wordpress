@@ -12,7 +12,7 @@ status=$(get_status)
 assert_status "200" "$status" "site:read scope allows GET /pages"
 
 # Without scope
-generate_jwt "posts:read"
+generate_jwt "articles:read"
 response=$(api_get "/site-info")
 status=$(get_status)
 assert_status "403" "$status" "Without site:read scope, GET /site-info returns 403"

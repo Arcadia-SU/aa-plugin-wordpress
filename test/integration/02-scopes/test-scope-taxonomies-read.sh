@@ -12,7 +12,7 @@ status=$(get_status)
 assert_status "200" "$status" "taxonomies:read scope allows GET /tags"
 
 # Without scope
-generate_jwt "posts:read"
+generate_jwt "articles:read"
 response=$(api_get "/categories")
 status=$(get_status)
 assert_status "403" "$status" "Without taxonomies:read scope, GET /categories returns 403"

@@ -20,7 +20,7 @@ generate_jwt() {
 
 # Generate expired JWT
 generate_expired_jwt() {
-    JWT_TOKEN=$(docker compose exec -T wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents/test && php generate-jwt.php private_key.pem 'posts:read' --expired 2>/dev/null | grep -E '^eyJ' | head -1")
+    JWT_TOKEN=$(docker compose exec -T wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents/test && php generate-jwt.php private_key.pem 'articles:read' --expired 2>/dev/null | grep -E '^eyJ' | head -1")
     export JWT_TOKEN
 }
 
