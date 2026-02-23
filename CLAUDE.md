@@ -64,11 +64,29 @@ composer require firebase/php-jwt
 
 ## Build zip
 
+**TOUJOURS utiliser le script de build.** Ne jamais builder manuellement.
+
 ```bash
-cd arcadia-agents && composer install --no-dev && cd ..
-rm -f arcadia-agents.zip && zip -r arcadia-agents.zip arcadia-agents/ -x "arcadia-agents/tests/*" -x "arcadia-agents/test/*" -x "arcadia-agents/.phpunit*" -x "arcadia-agents/phpunit.xml" -x "arcadia-agents/composer.json" -x "arcadia-agents/composer.lock"
-composer install  # restaurer les dev dependencies après
+./build.sh
 ```
+
+Le script exécute 11 checks avant de créer le zip :
+
+| # | Check | Bloquant |
+|---|-------|----------|
+| 1 | Docker running | Oui |
+| 2 | PHPUnit tests | Oui |
+| 3 | `composer install --no-dev` | Oui |
+| 4 | PHP lint (tous les .php) | Oui |
+| 5 | Autoloader audit (pas de phpunit/myclabs) | Oui |
+| 6 | Vendor completeness (firebase/php-jwt) | Oui |
+| 7 | Boot test (autoloader charge) | Oui |
+| 8 | Création du zip | Oui |
+| 9 | Zip content audit (pas de tests/dev deps) | Oui |
+| 10 | Zip size (warning si > 500KB) | Warning |
+| 11 | Restauration dev deps (trap EXIT) | - |
+
+Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
 
 ## Tests
 
