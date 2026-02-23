@@ -127,6 +127,33 @@ if ( ! function_exists( 'is_wp_error' ) ) {
     }
 }
 
+if ( ! class_exists( 'WP_REST_Request' ) ) {
+    /**
+     * Minimal WP_REST_Request stub for unit testing.
+     */
+    class WP_REST_Request {
+        private $headers = array();
+        private $params  = array();
+
+        public function set_header( $key, $value ) {
+            $this->headers[ strtolower( $key ) ] = $value;
+        }
+
+        public function get_header( $key ) {
+            $key = strtolower( $key );
+            return isset( $this->headers[ $key ] ) ? $this->headers[ $key ] : null;
+        }
+
+        public function set_param( $key, $value ) {
+            $this->params[ $key ] = $value;
+        }
+
+        public function get_param( $key ) {
+            return isset( $this->params[ $key ] ) ? $this->params[ $key ] : null;
+        }
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

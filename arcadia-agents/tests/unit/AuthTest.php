@@ -151,6 +151,92 @@ class AuthTest extends TestCase {
         $this->assertTrue( $result );
     }
 
+    // -------------------------------------------------------
+    // get_bearer_token() — X-AA-Token fallback tests
+    // -------------------------------------------------------
+
+    /**
+     * Test token extracted from standard Authorization header.
+     */
+    public function test_get_bearer_token_from_authorization(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+        $request->set_header( 'Authorization', 'Bearer my.jwt.token' );
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertEquals( 'my.jwt.token', $result );
+    }
+
+    /**
+     * Test token extracted from X-AA-Token when Authorization is absent.
+     */
+    public function test_get_bearer_token_fallback_xaa_token(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+        $request->set_header( 'X-AA-Token', 'Bearer fallback.jwt.token' );
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertEquals( 'fallback.jwt.token', $result );
+    }
+
+    /**
+     * Test X-AA-Token used when Authorization has Basic Auth (not Bearer).
+     */
+    public function test_get_bearer_token_xaa_when_authorization_is_basic(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+        $request->set_header( 'Authorization', 'Basic dXNlcjpwYXNz' );
+        $request->set_header( 'X-AA-Token', 'Bearer jwt.via.xaa' );
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertEquals( 'jwt.via.xaa', $result );
+    }
+
+    /**
+     * Test Authorization Bearer takes priority over X-AA-Token.
+     */
+    public function test_get_bearer_token_authorization_takes_priority(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+        $request->set_header( 'Authorization', 'Bearer priority.token' );
+        $request->set_header( 'X-AA-Token', 'Bearer fallback.token' );
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertEquals( 'priority.token', $result );
+    }
+
+    /**
+     * Test error when no valid Bearer token in any header.
+     */
+    public function test_get_bearer_token_error_when_no_headers(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'missing_authorization', $result->get_error_code() );
+    }
+
+    /**
+     * Test error when both headers present but neither has Bearer format.
+     */
+    public function test_get_bearer_token_error_when_no_bearer_format(): void {
+        $auth    = \Arcadia_Auth::get_instance();
+        $request = new \WP_REST_Request();
+        $request->set_header( 'Authorization', 'Basic dXNlcjpwYXNz' );
+        $request->set_header( 'X-AA-Token', 'InvalidFormat' );
+
+        $result = $auth->get_bearer_token( $request );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'missing_authorization', $result->get_error_code() );
+    }
+
     /**
      * Test available scopes list.
      */

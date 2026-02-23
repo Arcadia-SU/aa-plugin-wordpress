@@ -261,31 +261,36 @@ class Arcadia_Auth {
 	}
 
 	/**
-	 * Extract bearer token from Authorization header.
+	 * Extract bearer token from request headers.
+	 *
+	 * Checks two sources in order of priority:
+	 * 1. Authorization: Bearer <jwt> — standard method
+	 * 2. X-AA-Token: Bearer <jwt> — fallback for environments where
+	 *    the Authorization header is intercepted (Apache Basic Auth,
+	 *    shared hosting, CDN, WAF).
 	 *
 	 * @param WP_REST_Request $request The REST request.
 	 * @return string|WP_Error The token or WP_Error.
 	 */
 	public function get_bearer_token( $request ) {
+		// Priority 1: Standard Authorization header with Bearer token.
 		$auth_header = $request->get_header( 'Authorization' );
-
-		if ( empty( $auth_header ) ) {
-			return $this->error_response(
-				'missing_authorization',
-				__( 'Authorization header is required.', 'arcadia-agents' ),
-				401
-			);
+		if ( ! empty( $auth_header ) && preg_match( '/^Bearer\s+(.+)$/i', $auth_header, $matches ) ) {
+			return $matches[1];
 		}
 
-		if ( ! preg_match( '/^Bearer\s+(.+)$/i', $auth_header, $matches ) ) {
-			return $this->error_response(
-				'invalid_authorization',
-				__( 'Invalid Authorization header format. Expected: Bearer <token>', 'arcadia-agents' ),
-				401
-			);
+		// Priority 2: Fallback X-AA-Token header.
+		$aa_token_header = $request->get_header( 'X-AA-Token' );
+		if ( ! empty( $aa_token_header ) && preg_match( '/^Bearer\s+(.+)$/i', $aa_token_header, $matches ) ) {
+			return $matches[1];
 		}
 
-		return $matches[1];
+		// Neither header contained a valid Bearer token.
+		return $this->error_response(
+			'missing_authorization',
+			__( 'No valid Bearer token found. Send it via Authorization or X-AA-Token header.', 'arcadia-agents' ),
+			401
+		);
 	}
 
 	/**
