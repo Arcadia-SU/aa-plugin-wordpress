@@ -29,11 +29,13 @@ trait Arcadia_API_Posts_Handler {
 	 */
 	public function get_posts( $request ) {
 		$post_type = $request->get_param( 'post_type' ) ?? 'post';
+		$per_page  = (int) ( $request->get_param( 'per_page' ) ?? 20 );
+		$per_page  = max( 1, min( 100, $per_page ) );
 
 		$args = array(
 			'post_type'      => sanitize_text_field( $post_type ),
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
-			'posts_per_page' => $request->get_param( 'per_page' ) ?? 20,
+			'posts_per_page' => $per_page,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
 			'orderby'        => $request->get_param( 'orderby' ) ?? 'date',
 			'order'          => $request->get_param( 'order' ) ?? 'DESC',
@@ -92,10 +94,29 @@ trait Arcadia_API_Posts_Handler {
 		// Resolve post type: meta.post_type with 'post' fallback.
 		$post_type = ! empty( $meta['post_type'] ) ? sanitize_text_field( $meta['post_type'] ) : 'post';
 
+		if ( ! $this->is_allowed_post_type( $post_type ) ) {
+			return new WP_Error(
+				'invalid_post_type',
+				__( 'Post type is not allowed.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		// Validate post status.
+		$status           = isset( $body['status'] ) ? sanitize_text_field( $body['status'] ) : 'draft';
+		$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
+		if ( ! in_array( $status, $allowed_statuses, true ) ) {
+			return new WP_Error(
+				'invalid_status',
+				__( 'Invalid post status.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		// Build post data.
 		$post_data = array(
 			'post_type'   => $post_type,
-			'post_status' => isset( $body['status'] ) ? sanitize_text_field( $body['status'] ) : 'draft',
+			'post_status' => $status,
 			'post_author' => $post_author,
 		);
 
@@ -154,6 +175,7 @@ trait Arcadia_API_Posts_Handler {
 
 		// Set current user so wp_insert_post() grants unfiltered_html capability.
 		// Without this, wp_filter_post_kses encodes block comments containing HTML.
+		$original_user_id = get_current_user_id();
 		wp_set_current_user( $post_author );
 
 		// Slash data for wp_insert_post() which internally calls wp_unslash().
@@ -163,6 +185,8 @@ trait Arcadia_API_Posts_Handler {
 
 		// Create the post.
 		$post_id = wp_insert_post( $post_data, true );
+
+		wp_set_current_user( $original_user_id );
 
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
@@ -193,6 +217,14 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$post = get_post( $post_id );
+
+		if ( ! $post ) {
+			return new WP_Error(
+				'post_read_failed',
+				__( 'Failed to read post after creation.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		return new WP_REST_Response(
 			array(
@@ -246,7 +278,16 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update status.
 		if ( ! empty( $body['status'] ) ) {
-			$post_data['post_status'] = sanitize_text_field( $body['status'] );
+			$status           = sanitize_text_field( $body['status'] );
+			$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
+			if ( ! in_array( $status, $allowed_statuses, true ) ) {
+				return new WP_Error(
+					'invalid_status',
+					__( 'Invalid post status.', 'arcadia-agents' ),
+					array( 'status' => 400 )
+				);
+			}
+			$post_data['post_status'] = $status;
 		}
 
 		// Update content.
@@ -261,7 +302,8 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		// Set current user so wp_update_post() grants unfiltered_html capability.
-		$post = get_post( $post_id );
+		$original_user_id = get_current_user_id();
+		$post             = get_post( $post_id );
 		if ( $post ) {
 			wp_set_current_user( $post->post_author );
 		}
@@ -270,6 +312,8 @@ trait Arcadia_API_Posts_Handler {
 		$post_data = wp_slash( $post_data );
 
 		$result = wp_update_post( $post_data, true );
+
+		wp_set_current_user( $original_user_id );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -300,6 +344,14 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$post = get_post( $post_id );
+
+		if ( ! $post ) {
+			return new WP_Error(
+				'post_read_failed',
+				__( 'Failed to read post after update.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		return new WP_REST_Response(
 			array(
@@ -358,10 +410,13 @@ trait Arcadia_API_Posts_Handler {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_pages( $request ) {
+		$per_page = (int) ( $request->get_param( 'per_page' ) ?? 50 );
+		$per_page = max( 1, min( 100, $per_page ) );
+
 		$args = array(
 			'post_type'      => 'page',
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
-			'posts_per_page' => $request->get_param( 'per_page' ) ?? 50,
+			'posts_per_page' => $per_page,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
 			'orderby'        => 'menu_order title',
 			'order'          => 'ASC',
@@ -421,7 +476,16 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update status.
 		if ( ! empty( $body['status'] ) ) {
-			$post_data['post_status'] = sanitize_text_field( $body['status'] );
+			$status           = sanitize_text_field( $body['status'] );
+			$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
+			if ( ! in_array( $status, $allowed_statuses, true ) ) {
+				return new WP_Error(
+					'invalid_status',
+					__( 'Invalid post status.', 'arcadia-agents' ),
+					array( 'status' => 400 )
+				);
+			}
+			$post_data['post_status'] = $status;
 		}
 
 		// Update content.
@@ -436,7 +500,8 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		// Set current user so wp_update_post() grants unfiltered_html capability.
-		$page = get_post( $page_id );
+		$original_user_id = get_current_user_id();
+		$page             = get_post( $page_id );
 		if ( $page ) {
 			wp_set_current_user( $page->post_author );
 		}
@@ -445,6 +510,8 @@ trait Arcadia_API_Posts_Handler {
 		$post_data = wp_slash( $post_data );
 
 		$result = wp_update_post( $post_data, true );
+
+		wp_set_current_user( $original_user_id );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -459,6 +526,14 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$page = get_post( $page_id );
+
+		if ( ! $page ) {
+			return new WP_Error(
+				'page_read_failed',
+				__( 'Failed to read page after update.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		return new WP_REST_Response(
 			array(
@@ -506,7 +581,7 @@ trait Arcadia_API_Posts_Handler {
 			)
 		);
 
-		return ! empty( $admins ) ? (int) $admins[0] : 1;
+		return ! empty( $admins ) && is_array( $admins ) ? (int) $admins[0] : 1;
 	}
 
 	/**

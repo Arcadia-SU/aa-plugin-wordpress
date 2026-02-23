@@ -97,6 +97,13 @@ trait Arcadia_API_Taxonomies_Handler {
 			// If term already exists, return it.
 			if ( 'term_exists' === $result->get_error_code() ) {
 				$term = get_term( $result->get_error_data(), 'category' );
+				if ( ! $term || is_wp_error( $term ) ) {
+					return new WP_Error(
+						'term_read_failed',
+						__( 'Failed to read existing category.', 'arcadia-agents' ),
+						array( 'status' => 500 )
+					);
+				}
 				return new WP_REST_Response(
 					array(
 						'success'     => true,
@@ -111,6 +118,14 @@ trait Arcadia_API_Taxonomies_Handler {
 		}
 
 		$term = get_term( $result['term_id'], 'category' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_read_failed',
+				__( 'Failed to read category after creation.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
 
 		return new WP_REST_Response(
 			array(

@@ -66,6 +66,14 @@ trait Arcadia_API_Media_Handler {
 
 		$attachment = get_post( $attachment_id );
 
+		if ( ! $attachment ) {
+			return new WP_Error(
+				'attachment_read_failed',
+				__( 'Failed to read attachment after upload.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
+
 		return new WP_REST_Response(
 			array(
 				'success'       => true,

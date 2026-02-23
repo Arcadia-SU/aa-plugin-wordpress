@@ -44,14 +44,14 @@ function arcadia_agents_settings_page() {
 	if ( isset( $_POST['arcadia_agents_save'] ) && check_admin_referer( 'arcadia_agents_settings' ) ) {
 		// Save connection key.
 		$new_connection_key = sanitize_text_field( wp_unslash( $_POST['arcadia_agents_connection_key'] ?? '' ) );
-		update_option( 'arcadia_agents_connection_key', $new_connection_key );
+		update_option( 'arcadia_agents_connection_key', $new_connection_key, false );
 		$connection_key = $new_connection_key;
 
 		// Save scopes.
 		$selected_scopes = isset( $_POST['arcadia_agents_scopes'] ) ? array_map( 'sanitize_text_field', $_POST['arcadia_agents_scopes'] ) : array();
 		// Validate scopes.
 		$selected_scopes = array_intersect( $selected_scopes, $all_scopes );
-		update_option( 'arcadia_agents_scopes', $selected_scopes );
+		update_option( 'arcadia_agents_scopes', $selected_scopes, false );
 
 		$notice      = __( 'Settings saved.', 'arcadia-agents' );
 		$notice_type = 'success';
@@ -88,9 +88,9 @@ function arcadia_agents_settings_page() {
 			$notice      = __( 'Invalid public key. Must be a PEM-encoded RSA public key.', 'arcadia-agents' );
 			$notice_type = 'error';
 		} else {
-			update_option( 'arcadia_agents_public_key', $public_key );
-			update_option( 'arcadia_agents_connected', true );
-			update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ) );
+			update_option( 'arcadia_agents_public_key', $public_key, false );
+			update_option( 'arcadia_agents_connected', true, false );
+			update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ), false );
 			$is_connected = true;
 			$connected_at = current_time( 'mysql' );
 			$notice       = __( 'Manual setup complete. Public key saved.', 'arcadia-agents' );

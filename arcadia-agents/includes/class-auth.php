@@ -126,9 +126,12 @@ class Arcadia_Auth {
 		}
 
 		// Store the public key.
-		update_option( 'arcadia_agents_public_key', $data['public_key'] );
-		update_option( 'arcadia_agents_connected', true );
-		update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ) );
+		update_option( 'arcadia_agents_public_key', $data['public_key'], false );
+		update_option( 'arcadia_agents_connected', true, false );
+		update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ), false );
+
+		// Remove the connection key — it's single-use and no longer needed.
+		delete_option( 'arcadia_agents_connection_key' );
 
 		return array(
 			'success'   => true,
@@ -160,7 +163,7 @@ class Arcadia_Auth {
 			$payload = json_decode( wp_json_encode( $decoded ), true );
 
 			// Update last activity.
-			update_option( 'arcadia_agents_last_activity', current_time( 'mysql' ) );
+			update_option( 'arcadia_agents_last_activity', current_time( 'mysql' ), false );
 
 			return $payload;
 
@@ -341,6 +344,7 @@ class Arcadia_Auth {
 		delete_option( 'arcadia_agents_connected' );
 		delete_option( 'arcadia_agents_connected_at' );
 		delete_option( 'arcadia_agents_last_activity' );
+		delete_option( 'arcadia_agents_connection_key' );
 		return true;
 	}
 }
