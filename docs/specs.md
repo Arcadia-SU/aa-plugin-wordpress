@@ -106,6 +106,37 @@
 
 **MVP sans frontend AA :** La Connection Key peut être générée manuellement (CLI/DB) pour le premier client.
 
+### Fallback Header : `X-AA-Token`
+
+**Problème :** Certains environnements (HTTP Basic Auth Apache/Nginx, shared hosting, CDN, WAF) interceptent ou suppriment le header `Authorization` avant qu'il n'atteigne le plugin.
+
+**Solution :** Le plugin accepte le JWT depuis **deux sources**, par ordre de priorité :
+
+1. `Authorization: Bearer <jwt>` — méthode standard
+2. `X-AA-Token: Bearer <jwt>` — fallback si `Authorization` est absent ou ne contient pas un Bearer token
+
+**Côté ArcadiaAgents (connector) :**
+- Envoie **toujours** `X-AA-Token: Bearer <jwt>` en plus de `Authorization`
+- Si Basic Auth est configuré pour le site : `Authorization: Basic <credentials>` (Apache passe, JWT dans `X-AA-Token`)
+- Si pas de Basic Auth : `Authorization: Bearer <jwt>` + `X-AA-Token: Bearer <jwt>` (rétrocompatible)
+
+**Côté plugin (PHP) :**
+```php
+// Extraction du JWT — priorité au header standard
+$auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+if (str_starts_with($auth_header, 'Bearer ')) {
+    $token = substr($auth_header, 7);
+} else {
+    // Fallback : X-AA-Token (Apache/Basic Auth scenarios)
+    $token = $_SERVER['HTTP_X_AA_TOKEN'] ?? '';
+    if (str_starts_with($token, 'Bearer ')) {
+        $token = substr($token, 7);
+    }
+}
+```
+
+**Sécurité :** Le JWT est toujours vérifié avec la même signature RS256. Le header de transport ne change pas le niveau de sécurité.
+
 ### API Contract : Handshake Endpoint (côté serveur ArcadiaAgents)
 
 **Endpoint :** `POST https://api.arcadia-agents.com/v1/wordpress/handshake`

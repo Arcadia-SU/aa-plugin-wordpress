@@ -56,6 +56,7 @@
 - [DONE] Implémenter réponses d'erreur structurées
 - [DONE] Implémenter handshake avec ArcadiaAgents
 - [DONE] Sauvegarder les scopes sélectionnés
+- [DONE] Fallback header `X-AA-Token` (Apache/Basic Auth/CDN/WAF compatibility)
 
 ---
 
