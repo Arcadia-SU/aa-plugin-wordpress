@@ -233,6 +233,16 @@ class Arcadia_API {
 			)
 		);
 
+		// Blocks usage analysis endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/blocks/usage',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_blocks_usage' ),
+				'permission_callback' => array( $this, 'check_site_read_permission' ),
+			)
+		);
 	}
 
 	// =========================================================================

@@ -111,6 +111,35 @@ class Arcadia_Agents {
 
 		// Admin menu.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+
+		// Invalidate blocks usage cache when posts are saved.
+		add_action( 'save_post', array( $this, 'invalidate_blocks_usage_cache' ) );
+	}
+
+	/**
+	 * Invalidate blocks usage transient cache when a post is saved.
+	 *
+	 * @param int $post_id The post ID.
+	 */
+	public function invalidate_blocks_usage_cache( $post_id ) {
+		// Skip revisions and autosaves.
+		if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
+			return;
+		}
+
+		global $wpdb;
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+				'_transient_arcadia_blocks_usage%'
+			)
+		);
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->options} WHERE option_name LIKE %s",
+				'_transient_timeout_arcadia_blocks_usage%'
+			)
+		);
 	}
 
 	/**
