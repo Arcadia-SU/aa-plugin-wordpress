@@ -21,6 +21,7 @@ require_once __DIR__ . '/api/trait-api-posts.php';
 require_once __DIR__ . '/api/trait-api-media.php';
 require_once __DIR__ . '/api/trait-api-taxonomies.php';
 require_once __DIR__ . '/api/trait-api-blocks.php';
+require_once __DIR__ . '/api/trait-api-acf-fields.php';
 
 /**
  * Class Arcadia_API
@@ -35,6 +36,7 @@ class Arcadia_API {
 	use Arcadia_API_Media_Handler;
 	use Arcadia_API_Taxonomies_Handler;
 	use Arcadia_API_Blocks_Handler;
+	use Arcadia_API_ACF_Fields_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -230,6 +232,7 @@ class Arcadia_API {
 				'permission_callback' => array( $this, 'check_site_read_permission' ),
 			)
 		);
+
 	}
 
 	// =========================================================================
@@ -387,8 +390,9 @@ class Arcadia_API {
 					'version' => ARCADIA_AGENTS_VERSION,
 					'adapter' => $this->blocks->get_adapter_name(),
 				),
-				'acf_available'  => Arcadia_Blocks::is_acf_available(),
-				'permalink'      => get_option( 'permalink_structure' ),
+				'acf_available'    => Arcadia_Blocks::is_acf_available(),
+				'acf_field_groups' => $this->get_acf_field_groups_for_post_types(),
+				'permalink'        => get_option( 'permalink_structure' ),
 			),
 			200
 		);

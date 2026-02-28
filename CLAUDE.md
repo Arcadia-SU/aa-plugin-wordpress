@@ -15,11 +15,18 @@ Cocher les cases au fur et à mesure de l'avancement.
 
 ### Source de vérité des specs
 
-**Fichier maître :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/next/plugin-wp-specs.md`
+**Dossier maître :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/`
+
+| Fichier | Contenu |
+|---------|---------|
+| `plugin-wp-specs.md` | Spécifications techniques (fichier principal) |
+| `plugin-wp-decisions-log.md` | Historique des décisions validées |
+| `plugin-wp-dev-guide.md` | Guide dev, repo, CI/CD, publication WP.org |
+| `plugin-wp-code-review.md` | Audit code v2.0.1 (33 issues) |
 
 **Après toute modification des specs :**
 ```bash
-cp /Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/next/plugin-wp-specs.md docs/specs.md
+cp /Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/plugin-wp-specs.md docs/specs.md
 ```
 
 Cela permet aux sessions Claude Code sans accès au repo ArcadiaAgents d'avoir le contexte complet.

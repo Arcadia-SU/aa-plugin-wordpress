@@ -244,14 +244,7 @@ class Arcadia_Block_Registry {
 
 		$acf_blocks = acf_get_block_types();
 
-		// ACF builtin block names that we handle via adapters.
-		$skip_blocks = array( 'acf/title', 'acf/text', 'acf/image' );
-
 		foreach ( $acf_blocks as $block_name => $block_config ) {
-			if ( in_array( $block_name, $skip_blocks, true ) ) {
-				continue;
-			}
-
 			// Extract short name from "acf/block-name".
 			$short_name = preg_replace( '/^acf\//', '', $block_name );
 
@@ -304,6 +297,7 @@ class Arcadia_Block_Registry {
 					'type'     => $acf_field['type'],
 					'required' => ! empty( $acf_field['required'] ),
 					'label'    => $acf_field['label'] ?? $acf_field['name'],
+					'key'      => $acf_field['key'],
 				);
 
 				// Add choices for select/radio fields.

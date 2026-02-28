@@ -178,6 +178,9 @@ trait Arcadia_API_Posts_Handler {
 		$original_user_id = get_current_user_id();
 		wp_set_current_user( $post_author );
 
+		// Save rendered post_content before wp_slash for ACF wysiwyg fallback.
+		$rendered_post_content = $post_data['post_content'] ?? '';
+
 		// Slash data for wp_insert_post() which internally calls wp_unslash().
 		// Without this, backslashes in JSON block data (e.g. escaped quotes in
 		// href attributes) are stripped, breaking the block JSON structure.
@@ -214,6 +217,31 @@ trait Arcadia_API_Posts_Handler {
 		}
 		if ( ! empty( $meta['description'] ) ) {
 			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
+		}
+
+		// Process ACF fields: explicit payload or auto-populate from content.
+		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ) {
+			$acf_result = $this->process_acf_fields(
+				$post_id, $body['acf_fields'], $post_type, $rendered_post_content
+			);
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
+		} else {
+			// No explicit acf_fields — create safe ACF references.
+			// Ensures get_fields() returns an array (not false), preventing
+			// fatal errors in themes that don't guard against false.
+			$this->auto_populate_acf_fields( $post_id, $post_type );
+		}
+
+		// Always set _acf_changed when ACF is active (finding 023).
+		if ( function_exists( 'update_field' ) ) {
+			update_post_meta( $post_id, '_acf_changed', 1 );
+		}
+
+		// Trigger ACF save hook to create field reference entries (finding 023).
+		if ( function_exists( 'update_field' ) ) {
+			do_action( 'acf/save_post', $post_id );
 		}
 
 		$post = get_post( $post_id );
@@ -308,6 +336,9 @@ trait Arcadia_API_Posts_Handler {
 			wp_set_current_user( $post->post_author );
 		}
 
+		// Save rendered post_content before wp_slash for ACF wysiwyg fallback.
+		$rendered_post_content = $post_data['post_content'] ?? '';
+
 		// Slash data for wp_update_post() which internally calls wp_unslash().
 		$post_data = wp_slash( $post_data );
 
@@ -341,6 +372,35 @@ trait Arcadia_API_Posts_Handler {
 		}
 		if ( ! empty( $meta['description'] ) ) {
 			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
+		}
+
+		// Process ACF fields: explicit payload or auto-populate from content.
+		$content_for_acf = $rendered_post_content;
+		if ( empty( $content_for_acf ) ) {
+			$existing = get_post( $post_id );
+			$content_for_acf = $existing ? $existing->post_content : '';
+		}
+
+		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ) {
+			$acf_result = $this->process_acf_fields(
+				$post_id, $body['acf_fields'], $post->post_type, $content_for_acf
+			);
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
+		} else {
+			// No explicit acf_fields — create safe ACF references.
+			$this->auto_populate_acf_fields( $post_id, $post->post_type );
+		}
+
+		// Always set _acf_changed when ACF is active (finding 023).
+		if ( function_exists( 'update_field' ) ) {
+			update_post_meta( $post_id, '_acf_changed', 1 );
+		}
+
+		// Trigger ACF save hook to create field reference entries (finding 023).
+		if ( function_exists( 'update_field' ) ) {
+			do_action( 'acf/save_post', $post_id );
 		}
 
 		$post = get_post( $post_id );

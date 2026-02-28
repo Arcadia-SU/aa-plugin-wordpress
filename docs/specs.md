@@ -4,17 +4,18 @@
 **Repo:** [github.com/Arcadia-SU/aa-plugin-wordpress](https://github.com/Arcadia-SU/aa-plugin-wordpress)
 **Lié à:** [PRD Agent SEO](./prd.md)
 
+**Fichiers satellites :**
+- [Decisions Log](./plugin-wp-decisions-log.md) — historique des décisions validées
+- [Dev Guide](./plugin-wp-dev-guide.md) — repo, CI/CD, publication WP.org
+- [Code Review](./plugin-wp-code-review.md) — audit v2.0.1 (33 issues)
+
 ---
 
 ## 1. Communication Agent → Plugin
 
-- **Direction:** ✅ Agent initie toujours (push vers WordPress)
-  - Rationale : L'agent orchestre, le plugin exécute. Pas besoin que WP initie.
-
-- **Protocole:** ✅ REST API exposée par le plugin WordPress
-  - Rationale : WP déjà sur internet, standard WP (écosystème, debugging), stateless. Sécurité gérée via endpoints custom + auth robuste.
-
-- **Capacités requises:** ✅ 14 endpoints validés
+- **Direction:** Agent initie toujours (push vers WordPress)
+- **Protocole:** REST API exposée par le plugin WordPress
+- **Capacités requises:** 14 endpoints validés
   - Articles :
     - `POST /articles` - create_article(title, content, status, meta) → article_id
     - `GET /articles` - get_articles(?post_type, ?status, ?page, ?per_page) → paginated list
@@ -34,40 +35,36 @@
     - `GET /site-info` - get_site_info() → url, name, theme, etc.
   - Blocs :
     - `GET /blocks` - get_blocks() → available block types + fields schema
+    - `GET /blocks/usage` - get_blocks_usage(?post_type, ?sample_size) → block usage stats + examples from existing content
 
-  **Nommage `/articles` (2026-02-14) :** Le code agent (`WordPressSiteConnector`) utilise `/articles` comme path, pas `/posts`. Cohérent avec le vocabulaire CMS-agnostic du `SiteConnector` protocol. WordPress utilise "post" en interne, mais l'API Arcadia expose des "articles" — c'est le concept métier. Le plugin traduit `article` ↔ `wp_post` en interne.
+**Nommage `/articles` :** Le code agent (`WordPressSiteConnector`) utilise `/articles` comme path, pas `/posts`. Cohérent avec le vocabulaire CMS-agnostic du `SiteConnector` protocol. Le plugin traduit `article` ↔ `wp_post` en interne.
 
-  **Paramètres de query — `GET /articles` et `GET /pages` (2026-02-14) :**
+**Paramètres de query — `GET /articles` et `GET /pages` :**
 
-  | Paramètre | Type | Défaut | Description |
-  |-----------|------|--------|-------------|
-  | `post_type` | string | `post` | Type de contenu WP (`GET /articles` uniquement). Ex: `article`, `post` |
-  | `status` | string | tous | Filtrer par statut CMS : `publish`, `draft`, `pending` |
-  | `page` | int | `1` | Page de résultats |
-  | `per_page` | int | `20` | Items par page (max: 100) |
+| Paramètre | Type | Défaut | Description |
+|-----------|------|--------|-------------|
+| `post_type` | string | `post` | Type de contenu WP (`GET /articles` uniquement) |
+| `status` | string | tous | Filtrer par statut CMS : `publish`, `draft`, `pending` |
+| `page` | int | `1` | Page de résultats |
+| `per_page` | int | `20` | Items par page (max: 100) |
 
-  Pourquoi : L'agent (`get_cms_content`) a besoin de filtrer par statut (vérifier ce qui est publié) et de paginer (sites avec beaucoup de contenu). Sans pagination, un site avec 500 articles saturerait la réponse.
+**Champs modifiables — `PUT /articles/{id}` et `PUT /pages/{id}` :**
 
-  **Champs modifiables — `PUT /articles/{id}` et `PUT /pages/{id}` (2026-02-14) :**
+| Champ | Type | Description |
+|-------|------|-------------|
+| `content` | string (JSON blocks) | Contenu de l'article |
+| `title` | string | Titre |
+| `status` | string | Statut : `publish`, `draft`, `pending` |
+| `meta` | object | Métadonnées (categories, tags, author, etc.) |
 
-  | Champ | Type | Description |
-  |-------|------|-------------|
-  | `content` | string (JSON blocks) | Contenu de l'article |
-  | `title` | string | Titre |
-  | `status` | string | Statut : `publish`, `draft`, `pending` |
-  | `meta` | object | Métadonnées (categories, tags, author, etc.) |
-
-  Tous les champs sont optionnels — seuls les champs fournis sont modifiés. Pourquoi documenter `status` explicitement : l'agent utilise `push_article_update(status="draft")` pour unpublish un article sans modifier son contenu. C'est un cas d'usage critique qui doit être garanti côté plugin.
+Tous les champs sont optionnels — seuls les champs fournis sont modifiés.
 
 ---
 
 ## 2. Authentification & Sécurité
 
-- **Stockage credentials:** ✅ Dans ArcadiaAgents (avec les autres intégrations)
-  - Rationale : Cohérence avec autres intégrations, gestion centralisée
-
-- **Méthode d'auth:** ✅ JWT signé par ArcadiaAgents (asymétrique RS256)
-  - Rationale : Sécurisé (signature crypto), expiration auto (pas de rotation manuelle), supporte les scopes dans les claims. Simplifie la vie au client.
+- **Stockage credentials:** Dans ArcadiaAgents (avec les autres intégrations)
+- **Méthode d'auth:** JWT signé par ArcadiaAgents (asymétrique RS256)
 
 ### Flow de connexion (Connection Key + Handshake)
 
@@ -108,34 +105,27 @@
 
 ### Fallback Header : `X-AA-Token`
 
-**Problème :** Certains environnements (HTTP Basic Auth Apache/Nginx, shared hosting, CDN, WAF) interceptent ou suppriment le header `Authorization` avant qu'il n'atteigne le plugin.
-
-**Solution :** Le plugin accepte le JWT depuis **deux sources**, par ordre de priorité :
+Le plugin accepte le JWT depuis **deux sources**, par ordre de priorité :
 
 1. `Authorization: Bearer <jwt>` — méthode standard
-2. `X-AA-Token: Bearer <jwt>` — fallback si `Authorization` est absent ou ne contient pas un Bearer token
+2. `X-AA-Token: Bearer <jwt>` — fallback si `Authorization` est absent (Apache/Basic Auth scenarios)
 
 **Côté ArcadiaAgents (connector) :**
 - Envoie **toujours** `X-AA-Token: Bearer <jwt>` en plus de `Authorization`
-- Si Basic Auth est configuré pour le site : `Authorization: Basic <credentials>` (Apache passe, JWT dans `X-AA-Token`)
-- Si pas de Basic Auth : `Authorization: Bearer <jwt>` + `X-AA-Token: Bearer <jwt>` (rétrocompatible)
+- Si Basic Auth configuré : `Authorization: Basic <credentials>` + JWT dans `X-AA-Token`
 
 **Côté plugin (PHP) :**
 ```php
-// Extraction du JWT — priorité au header standard
 $auth_header = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
 if (str_starts_with($auth_header, 'Bearer ')) {
     $token = substr($auth_header, 7);
 } else {
-    // Fallback : X-AA-Token (Apache/Basic Auth scenarios)
     $token = $_SERVER['HTTP_X_AA_TOKEN'] ?? '';
     if (str_starts_with($token, 'Bearer ')) {
         $token = substr($token, 7);
     }
 }
 ```
-
-**Sécurité :** Le JWT est toujours vérifié avec la même signature RS256. Le header de transport ne change pas le niveau de sécurité.
 
 ### API Contract : Handshake Endpoint (côté serveur ArcadiaAgents)
 
@@ -186,94 +176,56 @@ if (str_starts_with($auth_header, 'Bearer ')) {
   ```
 - Durée : 15-30 min recommandé
 
-- **Scopes (permissions granulaires):** ✅ Par ressource+action
-  - Rationale : Granulaire mais pas explosif (~8 scopes), standard industrie (GitHub, Slack, Google)
-  - Liste des scopes :
-    - `articles:read` - Lire les articles
-    - `articles:write` - Créer/modifier articles
-    - `articles:delete` - Supprimer articles
-    - `media:read` - Lire la media library
-    - `media:write` - Upload images
-    - `taxonomies:read` - Lire catégories/tags
-    - `taxonomies:write` - Créer catégories/tags
-    - `site:read` - Lire infos site + pages
-  - Interface WP admin : checkboxes pour activer/désactiver chaque scope
-  - Erreur scope manquant : réponse JSON structurée
-    ```json
-    {
-      "error": "scope_denied",
-      "required_scope": "articles:delete",
-      "message": "This action requires the 'articles:delete' scope which is not enabled in WordPress settings."
-    }
-    ```
-  - L'agent interprète et explique à l'user en langage naturel
+### Scopes (permissions granulaires)
+
+8 scopes par ressource+action :
+
+| Scope | Description |
+|-------|-------------|
+| `articles:read` | Lire les articles |
+| `articles:write` | Créer/modifier articles |
+| `articles:delete` | Supprimer articles |
+| `media:read` | Lire la media library |
+| `media:write` | Upload images |
+| `taxonomies:read` | Lire catégories/tags |
+| `taxonomies:write` | Créer catégories/tags |
+| `site:read` | Lire infos site + pages |
+
+- Interface WP admin : checkboxes pour activer/désactiver chaque scope
+- Erreur scope manquant : réponse JSON structurée
+  ```json
+  {
+    "error": "scope_denied",
+    "required_scope": "articles:delete",
+    "message": "This action requires the 'articles:delete' scope which is not enabled in WordPress settings."
+  }
+  ```
 
 ---
 
 ## 3. Scope du Plugin
 
-- **MVP:** ✅ Plugin minimal (API only), pas d'interface admin complexe
-  - Rationale : Simplicité, le dashboard est dans ArcadiaAgents
-
-- **Interface admin minimale:** ✅ Minimaliste, pas de logs
+- **MVP:** Plugin minimal (API only), pas d'interface admin complexe
+- **Interface admin minimale:**
   - État connexion (vert/rouge + timestamp dernière activité)
   - Checkboxes scopes (8 permissions)
   - Bouton "Test connection"
-  - Rationale : L'admin WP a juste besoin de savoir si ça marche. Debug/logs vivent dans ArcadiaAgents.
 
 ---
 
 ## 4. Médias & Images
 
-- **Support médias:** ✅ L'agent génère des images et doit pouvoir les publier
-
-- **Détails d'implémentation:** ✅ Via URL (sideload)
-  - Format : L'agent upload l'image sur storage ArcadiaAgents, envoie l'URL au plugin
-  - Plugin utilise `media_sideload_image()` pour importer dans WP media library
-  - Featured image : paramètre explicite dans `create_article()` ou via endpoint dédié
-  - Rationale : Évite base64 (lourd) et multipart (complexe). URL = simple, standard, debuggable.
+- Via URL (sideload) : l'agent upload sur storage ArcadiaAgents, envoie l'URL au plugin
+- Plugin utilise `media_sideload_image()` pour importer dans WP media library
+- Featured image : paramètre explicite dans `create_article()` ou via endpoint dédié
 
 ---
 
-## 5. Blocs de contenu (ACF Blocks)
+## 5. Blocs de contenu
 
-**Contexte :** Demande client, obligatoire. L'agent doit générer du contenu compatible avec le thème WP existant.
+### JSON Schema (ADR-013 - Unified Block Model)
 
-### Découverte : ACF Blocks (pas Gutenberg natif)
-
-**Analyse du site client (2026-01-30) :**
-- Le client utilise **ACF Pro** avec des **ACF Blocks** (blocs Gutenberg custom définis via ACF)
-- L'éditeur Gutenberg classique apparaît vide car le contenu est stocké dans des blocs ACF
-- Le thème définit ~30 blocs custom (export ACF analysé)
-
-**Blocs ACF disponibles (pertinents pour articles) :**
-| Bloc ACF | ID technique | Usage |
-|----------|--------------|-------|
-| Texte riche | `acf/text` | Paragraphes (wysiwyg) |
-| Titre | `acf/title` | Headings H2/H3 |
-| Texte + image | `acf/text-image` | Paragraphe avec image |
-| Image | `acf/image` | Image seule |
-| Liste numérique | `acf/liste-numerique` | Listes ordonnées |
-| Citation | `acf/citation` | Quotes |
-| FAQ | `acf/faq` | Questions/réponses |
-| Message d'alerte | `acf/message-alerte` | Encadrés/callouts |
-| Bouton | `acf/bouton` | CTA |
-| Tableau | `acf/tableau` | Tables |
-
-**Impact :** Le plugin génère des ACF Blocks, pas des blocs Gutenberg natifs.
-
----
-
-### Q1. Format de sortie de l'agent ✅ JSON hiérarchique (sémantique)
-
-L'agent génère un JSON structuré, le plugin mappe vers ACF Blocks.
-
-**Schema JSON (ADR-013 - Unified Block Model) :**
-
-Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
-- Tout est un **block** avec `type`
-- Nesting via **`children`** (pas `items`, `content`, `subsections`)
-- Pas de strings nus - même les items de liste sont des blocks `text`
+Modèle unifié : tout est un **block** avec `type`, nesting via **`children`**, pas de strings nus.
 
 ```json
 {
@@ -327,6 +279,7 @@ Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
 ```
 
 **Types de blocks (MVP) :**
+
 | Type | Champs | Description |
 |------|--------|-------------|
 | `paragraph` | `content: string` | Paragraphe de texte |
@@ -336,6 +289,7 @@ Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
 | `section` | `heading: string?`, `level: 2\|3?`, `children: block[]` | Section H2/H3 |
 
 **Types de blocks (post-MVP) :**
+
 | Type | Champs | Description |
 |------|--------|-------------|
 | `quote` | `content: string` | Citation |
@@ -344,41 +298,16 @@ Modèle unifié inspiré de Notion/Slate.js/ProseMirror :
 | `table` | `headers: []`, `rows: [[]]` | Tableau |
 
 **Principes :**
-- Pas d'`intro`/`conclusion` spéciaux - juste des sections avec `heading: null`
-- **Tout dans `children`** - sections H3 sont des blocks dans les children de H2
+- Pas d'`intro`/`conclusion` spéciaux — juste des sections avec `heading: null`
+- Sections H3 sont des blocks dans les children de H2
 - Profondeur max : **H3** (pas de H4, enforced par le domain model)
-- Structure uniforme et extensible (ajout futur de `image`, `table`, `cta`...)
 
-**Formatage inline (markdown) :**
+**Formatage inline (markdown) :** Le champ `content` accepte `**bold**`, `*italic*`, `[texte](url)`, `` `code` ``. Le plugin parse le markdown et génère le HTML approprié. Voir ADR-013 pour le rationale markdown vs nodes structurés.
 
-Le champ `content` des blocks texte accepte un subset de markdown :
+### Mapping JSON → Blocs WordPress
 
-| Syntaxe | Rendu |
-|---------|-------|
-| `**bold**` | **gras** |
-| `*italic*` | *italique* |
-| `[texte](url)` | lien hypertexte |
-| `` `code` `` | code inline |
+**Mapping ACF (MVP) :**
 
-**Exemple :**
-```json
-{"type": "paragraph", "content": "Pour les **freelances** et [indépendants](https://...), la priorité est simple."}
-```
-
-**Pourquoi markdown et pas des nodes structurés ?**
-
-Notion/Slate/ProseMirror fragmentent le texte en nodes avec marks (voir ADR-013). Ce pattern est conçu pour les **éditeurs interactifs** (sélection + clic "Bold"). Notre pipeline est différent :
-- Le LLM génère naturellement du markdown
-- On n'édite pas interactivement le texte
-- WordPress convertit markdown → HTML avec des libs standard
-
-→ Le plugin parse le markdown et génère le HTML approprié (`<strong>`, `<a href>`, etc.)
-
----
-
-### Q2-Q4. Mapping JSON → ACF Blocks ✅
-
-**Mapping MVP :**
 | Type JSON | → ACF Block | Champ ACF |
 |-----------|-------------|-----------|
 | `section` (level: 2) | `acf/title` | `title` (H2) |
@@ -389,6 +318,7 @@ Notion/Slate/ProseMirror fragmentent le texte en nodes avec marks (voir ADR-013)
 | `image` | `acf/image` | `image` (image field) |
 
 **Mapping post-MVP :**
+
 | Type JSON | → ACF Block |
 |-----------|-------------|
 | `quote` | `acf/citation` |
@@ -403,63 +333,24 @@ Notion/Slate/ProseMirror fragmentent le texte en nodes avec marks (voir ADR-013)
 <!-- wp:acf/text {"name":"acf/text","data":{"text":"<p>Mon paragraphe...</p>"}} /-->
 ```
 
-**Q2. Découverte des blocs** ✅ Non nécessaire
-- Les blocs ACF sont fixes, définis par le thème client
-- Le plugin connaît le mapping hardcodé
-- Pas besoin d'endpoint de découverte dynamique
+**Résumé des décisions blocs (Q1-Q7) :**
 
-**Q3. Qui choisit le mapping** ✅ Le plugin (hardcodé)
-- Le plugin fait le mapping JSON → ACF Block
-- Pas de choix utilisateur nécessaire pour MVP
-- Future : interface admin pour override si besoin
+| Question | Décision |
+|----------|----------|
+| Q1 Format | JSON hiérarchique (ADR-013) |
+| Q2 Découverte | Dynamique : `GET /blocks` (disponibilité) + `GET /blocks/usage` (exemples réels) → agent génère des descriptions |
+| Q3 Choix template | Plugin décide (mapping) |
+| Q4 Blocs custom | Supportés via ACF Blocks |
+| Q5 Validation | Best effort + warning (fallback `acf/text`) |
+| Q6 Blocs dynamiques | Non utilisés |
+| Q7 Zones éditables | Non applicable |
 
-**Q4. Blocs custom du thème** ✅ Supportés via mapping
-- Les blocs ACF du client SONT les blocs custom du thème
-- Le mapping ci-dessus les utilise directement
+### Custom Blocks (Q8)
 
----
+Le plugin supporte des blocs custom via découverte dynamique.
 
-### Q5. Validation ✅ Best effort + warning
+**Endpoint `GET /arcadia/v1/blocks` :** Le plugin expose les blocs disponibles via introspection. Scope requis : `site:read`.
 
-- Le plugin génère les blocs ACF et insère dans le post
-- Si un type JSON n'a pas de mapping → fallback vers `acf/text`
-- Log warning dans ArcadiaAgents, pas d'erreur bloquante
-- Rationale : mieux vaut publier imparfait que bloquer
-
----
-
-### Q6-Q7. Blocs dynamiques et zones éditables ✅ Non applicable
-
-- **Q6.** Blocs dynamiques : Non utilisés. On génère des blocs statiques avec contenu.
-- **Q7.** Zones éditables : Non applicable avec ACF Blocks. Chaque bloc = une unité autonome.
-
----
-
-### Résumé Q1-Q7
-
-| Question | Statut | Décision |
-|----------|--------|----------|
-| Q1 Format | ✅ | JSON hiérarchique |
-| Q2 Découverte | ✅ | Non nécessaire (mapping hardcodé) |
-| Q3 Choix template | ✅ | Plugin décide (mapping) |
-| Q4 Blocs custom | ✅ | Supportés via ACF Blocks |
-| Q5 Validation | ✅ | Best effort + warning |
-| Q6 Blocs dynamiques | ✅ | Non utilisés |
-| Q7 Zones éditables | ✅ | Non applicable |
-
----
-
-### Q8. Custom Blocks ✅
-
-**Contexte :** Le plugin doit supporter des blocs custom (CTA, FAQ, etc.) au-delà des blocs MVP, en s'adaptant dynamiquement au thème WordPress du client. Ref: [client-services.md](../article-gen/client-services.md)
-
-**Décisions validées (2026-02-13) :**
-
-#### Endpoint de découverte : `GET /arcadia/v1/blocks`
-
-Le plugin expose les blocs disponibles sur le site via introspection dynamique. Scope requis : `site:read`.
-
-**Response :**
 ```json
 {
   "adapter": "acf",
@@ -485,20 +376,28 @@ Le plugin expose les blocs disponibles sur le site via introspection dynamique. 
 }
 ```
 
-**Sources d'introspection selon le mode :**
-- **ACF :** `acf_get_block_types()` + `acf_get_fields()` sur les field groups associés au bloc
+**Sources d'introspection :**
+- **ACF :** `acf_get_block_types()` + `acf_get_fields()`
 - **Gutenberg :** `WP_Block_Type_Registry` → attributs déclarés dans `register_block_type()`
 
-#### Convention properties
+> **Bug connu (finding 022) :** Les blocs `builtin` peuvent ne pas avoir `type`/`description` sur certains sites ACF. Le connector AA flatten les deux groupes et skip les non-dict. Le plugin devrait garantir que chaque élément est un objet avec au minimum `type`.
 
-Les `properties` d'un bloc custom correspondent **directement** aux noms de champs/attributs du bloc cible :
-- Mode ACF → noms des champs ACF (ex: `bouton_label`, `bouton_lien`)
-- Mode Gutenberg → noms des attributs du bloc (ex: `author`, `rating`)
+> **Bug connu (finding 023) :** `get_fields()` retourne `false` → PHP fatal error sur le front-end.
+>
+> **Root cause (diagnostiquee en prod 2026-02-24) :** Ce n'est PAS `_acf_changed`. Les deux articles (cassé et fonctionnel) ont `_acf_changed: true`. La vraie cause est triple :
+> 1. **Pas de field group ACF pour le post type `article`** — seul `[PAGE] - Header` existe, assigné à `page` uniquement
+> 2. **Pas d'entrées de référence ACF dans `wp_postmeta`** — les posts créés via REST API n'ont pas les paires `_field_name → field_key` qu'ACF crée lors d'un save via WP admin
+> 3. **Bug thème** — `article.php:26` appelle `_get_the_title(get_fields())` avec type hint `array` strict, sans gérer `false`
+>
+> **Fix thème (Vertuelle) :** `$fields = get_fields(); _get_the_title(is_array($fields) ? $fields : []);`
+>
+> **Fix plugin (robustesse) :** Après `wp_insert_post`, appeler `do_action('acf/save_post', $post_id)` pour déclencher le mécanisme ACF et créer les entrées de référence. Ça rend nos posts compatibles avec tout thème qui appelle `get_fields()`.
+>
+> Le fix `_acf_changed` (issue #1) reste valide comme bonne pratique mais ne résout pas ce crash spécifique.
 
-Pas de couche de traduction dans le plugin. Les noms exposés par `GET /blocks` sont les noms à utiliser dans `properties`.
+**Convention properties :** Les `properties` d'un bloc custom correspondent **directement** aux noms de champs/attributs du bloc cible. Pas de couche de traduction.
 
-#### Format JSON d'un bloc custom dans un article
-
+**Format JSON d'un bloc custom dans un article :**
 ```json
 {
   "type": "bouton",
@@ -510,13 +409,7 @@ Pas de couche de traduction dans le plugin. Les noms exposés par `GET /blocks` 
 }
 ```
 
-Le bloc s'insère dans `children` au même niveau que les blocs MVP.
-
-#### Gestion des erreurs : fail fast (HTTP 422)
-
-Si un bloc custom est envoyé dans un `POST /articles` ou `PUT /articles/{id}` et que :
-- Le type n'existe pas sur le site → HTTP 422
-- Un champ requis est manquant → HTTP 422
+**Gestion des erreurs : fail fast (HTTP 422).** Type inconnu ou champ requis manquant → requête entière rejetée.
 
 ```json
 {
@@ -527,11 +420,7 @@ Si un bloc custom est envoyé dans un `POST /articles` ou `PUT /articles/{id}` e
 }
 ```
 
-La requête entière est rejetée. Aucun contenu n'est créé ni modifié.
-
-#### Transformations de types de champs ACF
-
-Certains types de champs ACF nécessitent une transformation côté plugin avant insertion :
+**Transformations de types de champs ACF :**
 
 | Type ACF | Property reçue | Transformation plugin |
 |----------|---------------|----------------------|
@@ -540,22 +429,185 @@ Certains types de champs ACF nécessitent une transformation côté plugin avant
 | `image` | URL string | Sideload → attachment ID |
 | `repeater` | Array d'objets | Aplatissement ACF (`field_0_subfield`, `field_1_subfield`...) |
 
-#### Blocs supportés
+**Blocs supportés :**
 
 | Type de bloc | Supporté | Notes |
 |-------------|----------|-------|
 | Blocs MVP (paragraph, heading, image, list) | ✅ | Adapters existants |
 | Blocs ACF custom | ✅ | Introspection dynamique |
 | Blocs Gutenberg dynamiques custom (server-rendered) | ✅ | Attributs via Registry, self-closing |
-| Blocs Gutenberg statiques custom (saved HTML) | ❌ Différé | Nécessite la structure HTML interne, non exposée côté serveur |
+| Blocs Gutenberg statiques custom (saved HTML) | ❌ Différé | Nécessite la structure HTML interne |
+
+### Block Usage Discovery (Q10)
+
+L'agent doit pouvoir comprendre comment les blocs sont **réellement utilisés** sur le site, pas seulement lesquels sont disponibles. Ceci lui permet de générer des descriptions riches et de prendre de meilleures décisions éditoriales.
+
+**Motivation :** Le `GET /blocks` retourne les blocs disponibles avec des descriptions basiques. Mais pour qu'un agent comprenne vraiment à quoi sert `acf/citation` ou `acf/tableau`, il doit voir des exemples concrets d'utilisation dans le contenu existant du site.
+
+**Endpoint `GET /arcadia/v1/blocks/usage` :** Retourne des statistiques d'usage et des exemples de blocs depuis le contenu existant. Scope requis : `site:read`.
+
+**Paramètres de query :**
+
+| Paramètre | Type | Défaut | Description |
+|-----------|------|--------|-------------|
+| `post_type` | string | tous | Filtrer par type de contenu |
+| `sample_size` | int | `3` | Nombre d'exemples par type de bloc (max: 10) |
+
+**Response :**
+
+```json
+{
+  "total_posts_analyzed": 47,
+  "blocks": [
+    {
+      "type": "acf/text",
+      "count": 312,
+      "posts_with_block": 45,
+      "examples": [
+        {
+          "post_id": 123,
+          "post_title": "Investir en loi Pinel en 2024",
+          "block_data": {
+            "text": "<p>La loi Pinel permet de bénéficier d'une réduction d'impôt...</p>"
+          },
+          "context": {
+            "parent_block": "acf/title",
+            "position": 2
+          }
+        }
+      ]
+    },
+    {
+      "type": "acf/citation",
+      "count": 8,
+      "posts_with_block": 6,
+      "examples": [
+        {
+          "post_id": 456,
+          "post_title": "Témoignages clients iSelection",
+          "block_data": {
+            "citation_texte": "Un accompagnement exceptionnel du début à la fin.",
+            "citation_auteur": "Marie D., acheteuse 2023"
+          },
+          "context": {
+            "parent_block": "acf/title",
+            "position": 5
+          }
+        }
+      ]
+    },
+    {
+      "type": "acf/tableau",
+      "count": 3,
+      "posts_with_block": 3,
+      "examples": [
+        {
+          "post_id": 789,
+          "post_title": "Comparatif dispositifs fiscaux",
+          "block_data": {
+            "tableau_contenu": "<table>...</table>"
+          },
+          "context": {
+            "parent_block": "acf/title",
+            "position": 3
+          }
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Implémentation PHP :**
+
+1. Requête `WP_Query` sur les posts publiés du `post_type` demandé
+2. Pour chaque post, parser `post_content` via `parse_blocks()`
+3. Compter les occurrences de chaque type de bloc
+4. Collecter `sample_size` exemples par type (bloc data + contexte parent + position)
+5. Retourner les stats agrégées
+
+**Performance :** Ce endpoint peut être lent sur un site avec beaucoup de contenu. Stratégies :
+- Limiter le scan aux N posts les plus récents (ex: 100)
+- Cache transient WP (ex: 24h, invalidé au save_post)
+- Le connector AA n'appelle ce endpoint qu'une fois lors du `discover_site`, pas à chaque article
+
+---
+
+### ACF Fields per Post Type (Q9)
+
+Les thèmes CPT+ACF ne lisent pas `post_content` — ils lisent les champs ACF via `get_fields()`. Le plugin doit écrire dans les deux.
+
+**Décision : Discovery + mapping explicite.** Le mapping est fait une fois par site après `discover_site` et stocké dans `cms_schema` côté AA. Le plugin reçoit des noms de champs ACF finaux + valeurs.
+
+#### 1. Discovery : champs ACF dans `GET /site-info`
+
+```json
+{
+  "post_types": [...],
+  "acf_field_groups": [
+    {
+      "title": "Article Fields",
+      "post_types": ["article"],
+      "fields": [
+        {"name": "titre_article", "type": "text", "required": true, "label": "Titre"},
+        {"name": "contenu_principal", "type": "wysiwyg", "required": true, "label": "Contenu"},
+        {"name": "image_hero", "type": "image", "required": false, "label": "Image hero"}
+      ]
+    }
+  ]
+}
+```
+
+**Implémentation PHP :** `acf_get_field_groups(['post_type' => $type])` + `acf_get_fields($group)` pour chaque post type.
+
+#### 2. Payload `POST /articles` avec `acf_fields`
+
+```json
+{
+  "meta": {
+    "title": "SEO title",
+    "description": "Meta description",
+    "post_type": "article"
+  },
+  "h1": "Mon titre H1",
+  "children": [...],
+  "acf_fields": {
+    "titre_article": "Mon titre visible",
+    "contenu_principal": null,
+    "image_hero": "https://storage.arcadiaagents.com/..."
+  }
+}
+```
+
+**Règles plugin :**
+- Pour chaque entrée : `update_field($name, $value, $post_id)`
+- **Valeur `null` sur `wysiwyg`** : le plugin copie le `post_content` rendu dans ce champ ACF
+- **`post_content` est toujours écrit** (blocs Gutenberg), même si `acf_fields` est présent
+- Si `acf_fields` absent ou vide : comportement inchangé (rétro-compatible)
+
+#### 3. Mapping côté AA (dans `cms_schema`)
+
+```json
+{
+  "acf_mapping": {
+    "article": {
+      "titre_article": "meta.title",
+      "contenu_principal": "rendered_content",
+      "image_hero": "meta.featured_image_url"
+    }
+  }
+}
+```
+
+Sources possibles : `meta.title`, `meta.description`, `meta.featured_image_url`, `rendered_content` (→ `null` dans le payload), `h1`.
+
+L'agent propose un mapping après `discover_site`. L'utilisateur valide ou ajuste. Persisté dans `cms_schema` via `update_configuration`.
 
 ---
 
 ## 6. Compatibilité multi-builders
 
 ### Architecture à adaptateurs
-
-Le JSON sémantique de l'agent est agnostique du format cible. Le plugin utilise des **adaptateurs** pour générer le format approprié selon le setup WordPress du client.
 
 ```
                     ┌→ [ACF Adapter]      → ACF Blocks (acf/text, acf/title...)
@@ -569,335 +621,55 @@ Agent JSON → Plugin ├→ [Gutenberg Adapter] → Blocs natifs (wp:paragraph,
 |------|----------|---------------|--------|
 | **ACF Blocks** | `post_content` | `<!-- wp:acf/text {...} /-->` | ✅ MVP |
 | **Gutenberg natif** | `post_content` | `<!-- wp:paragraph -->...<!-- /wp:paragraph -->` | ✅ MVP |
-| **Elementor** | `_elementor_data` (post_meta) | JSON propriétaire Elementor | ❓ Futur (non prévu) |
+| **Elementor** | `_elementor_data` (post_meta) | JSON propriétaire Elementor | ❓ Futur |
 
-> **Note :** Gutenberg natif est inclus dans le MVP car ACF Pro est payant et tous les clients ne l'ont pas.
+> Gutenberg natif inclus dans le MVP car ACF Pro est payant.
 
 ### Détail des adaptateurs
 
-**ACF Blocks (MVP)**
-- Détection : présence du plugin ACF Pro
-- Mapping : JSON → blocs `acf/*`
-- Effort : ✅ Fait
+**ACF Blocks (MVP)** — Détection : présence du plugin ACF Pro. ✅ Fait.
 
-**Gutenberg natif (MVP)**
-- Détection : absence d'ACF ou config explicite
-- Mapping direct, blocs plus simples :
-  | JSON | Bloc natif |
-  |------|------------|
-  | `paragraph` | `wp:paragraph` |
-  | `heading` | `wp:heading {"level": 2}` |
-  | `image` | `wp:image` |
-  | `list` | `wp:list` |
-- Effort : Faible (blocs natifs bien documentés)
+**Gutenberg natif (MVP)** — Détection : absence d'ACF ou config explicite.
 
-**Elementor (Future, si demande)**
-- Stockage différent : `_elementor_data` dans post_meta, pas `post_content`
-- Format : JSON propriétaire avec widgets Elementor
-- Détection : présence du plugin Elementor
-- Effort : **Significatif** (reverse-engineering du format, pas d'API publique documentée)
+| JSON | Bloc natif |
+|------|------------|
+| `paragraph` | `wp:paragraph` |
+| `heading` | `wp:heading {"level": 2}` |
+| `image` | `wp:image` |
+| `list` | `wp:list` |
 
-**Autres page builders**
-| Builder | Format | Effort estimé |
-|---------|--------|---------------|
-| WPBakery | Shortcodes propriétaires | Moyen |
-| Divi | JSON dans post_meta | Significatif |
-| Beaver Builder | JSON propriétaire | Significatif |
+**Elementor (Future, si demande)** — Effort significatif (format propriétaire, pas d'API documentée).
 
 ### Détection automatique
 
-Le plugin détecte le mode au démarrage :
 1. ACF Pro actif + blocs ACF enregistrés → Mode ACF
 2. Elementor actif → Mode Elementor (si supporté)
 3. Sinon → Mode Gutenberg natif
 
-**Override possible** via config admin si le client veut forcer un mode.
-
-### Roadmap
-
-| Phase | Scope | Effort |
-|-------|-------|--------|
-| **MVP** | ACF Blocks + Gutenberg natif | ✅ |
-| **Future** | + Elementor (si demande client) | Significatif |
+Override possible via config admin.
 
 ---
 
-## 7. Décisions validées (historique)
+## 7. Décisions validées
 
-- **2026-01-27 | Direction communication**
-  - Quoi : Agent → Plugin (push)
-  - Pourquoi : L'agent orchestre, le plugin exécute. Pas besoin que WP initie.
-
-- **2026-01-27 | Stockage credentials**
-  - Quoi : Dans ArcadiaAgents
-  - Pourquoi : Cohérence avec autres intégrations, gestion centralisée
-
-- **2026-01-27 | Scope MVP**
-  - Quoi : API only, admin minimal
-  - Pourquoi : Simplicité, le dashboard est dans ArcadiaAgents
-
-- **2026-01-27 | Support médias**
-  - Quoi : Oui, images générées
-  - Pourquoi : L'agent génère des images pour les articles
-
-- **2026-01-27 | Protocole**
-  - Quoi : REST API (plugin expose endpoints)
-  - Pourquoi : Standard WP, stateless, debuggable. Sécurité via endpoints custom + auth
-
-- **2026-01-27 | Capacités**
-  - Quoi : 14 endpoints (CRUD articles, pages, media, taxonomies, site info, blocks)
-  - Pourquoi : Couvre tous les besoins agent : publish, update, images, linking, discovery
-
-- **2026-01-27 | Méthode d'auth**
-  - Quoi : JWT signé par ArcadiaAgents
-  - Pourquoi : Sécurisé (crypto), expiration auto, supporte scopes. Simplifie la vie client (pas de rotation manuelle).
-
-- **2026-01-27 | Scopes**
-  - Quoi : 8 scopes par ressource+action (articles, media, taxonomies, site × read/write/delete)
-  - Comment : Checkboxes dans WP admin, erreur JSON structurée si scope manquant
-  - Pourquoi : Granulaire, standard industrie, permet à l'agent d'expliquer les erreurs à l'user
-
-- **2026-01-30 | Interface admin minimale**
-  - Quoi : État connexion + checkboxes scopes + bouton test. Pas de logs.
-  - Pourquoi : L'admin WP a juste besoin de savoir si ça marche. Debug/logs dans ArcadiaAgents.
-
-- **2026-01-30 | Upload médias**
-  - Quoi : Via URL (sideload). Agent upload sur storage AA, envoie URL, plugin fait media_sideload_image()
-  - Pourquoi : Simple, standard, debuggable. Évite base64 (lourd) et multipart (complexe).
-
-- **2026-01-30 | Format JSON hiérarchique (Gutenberg Q1)**
-  - Quoi : JSON structuré hiérarchique (meta + h1 + sections[H2 → subsections[H3 → content]])
-  - Structure : sections/subsections avec heading optionnel (null = pas de titre)
-  - Profondeur max : H3 (pas de H4), title ≠ h1
-  - Pas d'intro/conclusion spéciaux : juste des sections avec heading: null
-  - Types MVP : paragraph, image, list
-  - Extensible : cta, table, faq, quote prévus post-MVP
-  - Limitations : colonnes/layouts = modification manuelle (rare, accepté)
-  - Pourquoi :
-    - Hiérarchique car workflow déterministe avec structure connue
-    - Le moins opinionated possible (structure uniforme)
-    - Listicles rentrent bien
-    - Agent agnostique WP (JSON sémantique → plugin mappe vers Gutenberg)
-    - Validation facile (structure explicite vs parsing linéaire)
-    - Alternatives rejetées : linéaire (complexité déplacée vers code), HTML brut (perd richesse Gutenberg)
-
-- **2026-01-30 | Links inline en markdown**
-  - Quoi : Format `[texte](url)` dans le texte des paragraphes
-  - Plugin parse markdown → HTML
-  - Pourquoi :
-    - Léger et lisible
-    - Standard (markdown)
-    - Plugin contrôle la conversion (sécurité vs HTML brut)
-    - Alternatives rejetées : HTML brut (mélange formats, XSS théorique), structured positions (verbeux, fragile)
-
-- **2026-02-02 | Formatage inline = markdown (pas nodes structurés)**
-  - Quoi : `content` accepte markdown inline (`**bold**`, `*italic*`, `[link](url)`, `` `code` ``)
-  - Alternative rejetée : nodes fragmentés avec marks (style Notion/Slate/ProseMirror)
-  - Pourquoi :
-    - Le pattern nodes+marks est conçu pour les **éditeurs interactifs** (sélection + clic "Bold")
-    - Notre use case est un **pipeline de génération** : LLM génère → JSON stocke → WordPress affiche
-    - Le LLM génère naturellement du markdown, pas des structures fragmentées
-    - Complexité inutile : parser markdown → nodes → HTML vs simple markdown → HTML
-    - JSON 10x plus compact et lisible
-  - Voir ADR-013 pour le détail du rationale
-
-- **2026-01-30 | Découverte ACF Blocks (Q2-Q7)**
-  - Quoi : Le client utilise ACF Pro avec ACF Blocks, pas Gutenberg natif
-  - Impact : Plugin génère des ACF Blocks (`acf/text`, `acf/title`, etc.)
-  - Mapping hardcodé JSON → ACF Block
-  - Q2-Q7 résolues :
-    - Découverte : non nécessaire (blocs fixes)
-    - Choix template : plugin décide (mapping)
-    - Blocs custom : supportés (ACF Blocks = blocs custom)
-    - Validation : best effort + warning
-    - Blocs dynamiques : non utilisés
-    - Zones éditables : non applicable
-  - Pourquoi : Analyse de l'export ACF du client (acf-export-2026-01-30.json)
-
-- **2026-01-30 | Architecture multi-builders**
-  - Quoi : Plugin avec adaptateurs pour différents formats WordPress
-  - Modes : ACF Blocks (MVP) → Gutenberg natif (V1.1) → Elementor (future, si demande)
-  - Détection automatique du mode selon plugins actifs
-  - Pourquoi :
-    - JSON sémantique permet cette flexibilité
-    - Gutenberg natif = faible effort (blocs standards)
-    - Elementor = effort significatif (format propriétaire, pas d'API publique)
-    - Autres builders (WPBakery, Divi) = chacun son format propriétaire
-
-- **2026-01-31 | Flow de connexion**
-  - Quoi : Connection Key + handshake pour échanger la public key RSA
-  - MVP sans frontend AA : génération manuelle de la Connection Key (CLI/DB)
-  - Pourquoi : Sécurisé (asymétrique), simple pour l'utilisateur (copier-coller une clé)
-
-- **2026-01-31 | Gutenberg natif MVP**
-  - Quoi : Gutenberg natif inclus dans le MVP (pas V1.1)
-  - Pourquoi : ACF Pro est payant, pas tous les clients l'ont
-
-- **2026-01-31 | Featured image dans meta**
-  - Quoi : `meta.featured_image_url` dans le JSON schema
-  - Plugin fait sideload de l'image et la définit comme featured image
-  - Pourquoi : Simplifie le flow (pas besoin d'appel séparé via `PUT /articles/{id}/featured-image`)
-
-- **2026-01-31 | Edit pages**
-  - Quoi : Ajout endpoint `PUT /pages/{id}` pour modifier les pages existantes
-  - Pourquoi : Nécessaire pour l'internal linking et l'optimisation des pages commerciales
-
-- **2026-02-13 | Authors**
-  - Quoi : `meta.author` (email ou login WP) dans `POST /articles` + liste `authors` dans `GET /site-info`
-  - `GET /site-info` retourne `authors: [{email, name, role}]` (admins, editors, authors)
-  - `POST /articles` : `meta.author` résolu via email/login → user ID. Fallback : premier admin
-  - Pourquoi : L'agent découvre les auteurs disponibles puis assigne le bon à chaque article
-
-- **2026-02-13 | Custom post types**
-  - Quoi : Support des custom post types (certains thèmes utilisent `article` au lieu de `post`)
-  - `GET /site-info` retourne `post_types: [{name, label, hierarchical, count: {publish, draft, total}}]`
-  - L'agent identifie le bon type via le count (ex: `article` = 104 publiés vs `post` = 0)
-  - `GET /articles` accepte `?post_type=article` (défaut: `post`)
-  - `POST /articles` accepte `meta.post_type` (défaut: `post`)
-  - Pourquoi : Le thème iSelection utilise un CPT `article`, pas le type natif `post`
-
-- **2026-02-13 | Custom blocks (Q8)**
-  - Quoi : Support des blocs custom via découverte dynamique (`GET /blocks`)
-  - Properties = noms de champs ACF / attributs Gutenberg directement (pas de mapping custom)
-  - Erreurs : fail fast HTTP 422, requête rejetée si bloc inconnu ou champ requis manquant
-  - Blocs Gutenberg statiques custom : différé (pas de use case actuel)
-  - Pourquoi : Permet au plugin de s'adapter dynamiquement au thème du client sans mise à jour du code
-
-- **2026-02-14 | Nommage endpoints `/articles` (pas `/posts`)**
-  - Quoi : Tous les endpoints articles utilisent `/articles` comme path, pas `/posts`
-  - Scopes renommés : `articles:read`, `articles:write`, `articles:delete` (au lieu de `posts:*`)
-  - Pourquoi : Cohérence avec le vocabulaire CMS-agnostic du `SiteConnector` protocol côté agent. "Article" est le concept métier, "post" est l'implémentation WP. Le plugin traduit `article` ↔ `wp_post` en interne. Le code agent (`WordPressSiteConnector`) utilisait déjà `/articles`.
-
-- **2026-02-14 | Query parameters sur GET endpoints**
-  - Quoi : `GET /articles` et `GET /pages` acceptent `?status`, `?page`, `?per_page`. `GET /articles` accepte aussi `?post_type`.
-  - Pourquoi : L'agent (`get_cms_content`) doit filtrer par statut (vérifier ce qui est publié vs brouillon) et paginer (sites avec beaucoup de contenu). Sans pagination, un site avec 500+ articles saturerait la réponse et le contexte de l'agent.
-
-- **2026-02-14 | Status comme champ modifiable sur PUT**
-  - Quoi : `PUT /articles/{id}` et `PUT /pages/{id}` acceptent `status` comme champ optionnel (`publish`, `draft`, `pending`)
-  - Pourquoi : L'agent utilise `push_article_update(status="draft")` pour unpublish un article sans modifier son contenu. Le plugin doit pouvoir changer le statut indépendamment du contenu. Champs fournis = modifiés, champs omis = inchangés.
+Historique complet des décisions : **[plugin-wp-decisions-log.md](./plugin-wp-decisions-log.md)**
 
 ---
 
-## 8. Développement & Publication du Plugin
+## 8. Développement & Publication
 
-### Modèle business
+Guide complet (repo, CI/CD, WP.org, standards) : **[plugin-wp-dev-guide.md](./plugin-wp-dev-guide.md)**
 
-**Gratuit.** Le plugin est un connecteur. Ce sont les agents ArcadiaAgents qui sont payants.
+---
 
-### Repo dédié
+## 9. Code Review
 
-```
-github.com/Arcadia-SU/aa-plugin-wordpress
-├── arcadia-agents/              ← Le plugin lui-même
-│   ├── arcadia-agents.php       ← Point d'entrée (métadonnées + hooks)
-│   ├── includes/
-│   │   ├── class-api.php        ← Endpoints REST
-│   │   ├── class-auth.php       ← JWT validation
-│   │   └── class-blocks.php     ← Génération ACF Blocks
-│   ├── admin/
-│   │   └── settings.php         ← Page admin WP
-│   └── readme.txt               ← OBLIGATOIRE pour WP.org
-├── tests/                       ← PHPUnit tests
-├── .github/
-│   └── workflows/
-│       ├── test.yml             ← CI: lint + tests
-│       └── release.yml          ← CD: build + deploy WP.org
-├── composer.json                ← Dépendances PHP
-├── phpcs.xml                    ← WordPress coding standards
-└── README.md                    ← GitHub (différent de readme.txt)
-```
+Audit v2.0.1 (33 issues : 1 critical, 6 high, 12 medium, 14 low) : **[plugin-wp-code-review.md](./plugin-wp-code-review.md)**
 
-### Soumission WordPress.org
-
-**Première fois (manuel) :**
-1. Créer un compte wordpress.org
-2. Soumettre le plugin via https://wordpress.org/plugins/developers/add/
-3. Review manuelle (1-7 jours) - vérification sécurité + guidelines
-4. Si approuvé → accès SVN (oui, SVN, pas Git)
-
-**Après approbation :**
-```
-https://plugins.svn.wordpress.org/arcadia-agents/
-├── /trunk/      ← Code actuel
-├── /tags/1.0.0/ ← Versions taguées
-└── /assets/     ← Screenshots, bannière, icône
-```
-
-### Workflow de release
-
-**Dev quotidien (GitHub) :**
-1. Dev sur branch `feature/*`
-2. PR → `main`
-3. Tests CI passent
-4. Merge
-
-**Release (GitHub → WP.org) :**
-1. Bump version dans `arcadia-agents.php` + `readme.txt`
-2. Create GitHub release (tag `v1.2.0`)
-3. GitHub Action pousse automatiquement vers SVN WP.org
-4. Users reçoivent la mise à jour dans leur WP admin
-
-**GitHub Action pour deploy WP.org :**
-```yaml
-# .github/workflows/release.yml
-name: Deploy to WordPress.org
-on:
-  release:
-    types: [published]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: 10up/action-wordpress-plugin-deploy@stable
-        env:
-          SVN_USERNAME: ${{ secrets.WP_ORG_USERNAME }}
-          SVN_PASSWORD: ${{ secrets.WP_ORG_PASSWORD }}
-          SLUG: arcadia-agents
-```
-
-### Standards WP.org (obligatoires)
-
-Pour être accepté sur la marketplace :
-
-- ✅ **GPL compatible** - Licence open source obligatoire
-- ✅ **WordPress Coding Standards** - PHPCS vérifie automatiquement
-- ✅ **Pas de code obfusqué** - Tout doit être lisible
-- ✅ **Pas de tracking sans consentement** - RGPD
-- ✅ **readme.txt bien formaté** - Changelog, FAQ, screenshots
-- ✅ **Préfixer tout** - Fonctions, classes, options → `arcadia_*`
-- ✅ **Sanitize/escape** - Toutes les données (sécurité critique)
-
-### Environnement de développement
-
-**Option recommandée : Local by Flywheel**
-- GUI simple, gratuit : https://localwp.com/
-- Crée un site WP local en 2 clics
-- Hot reload : modifie le code → refresh → test
-
-**Alternative : Docker**
-```bash
-docker run -d -p 8080:80 wordpress
-```
-
-### Parcours complet
-
-```
-Phase 1 : Setup
-├── Créer repo GitHub arcadia-wordpress-plugin
-├── Setup environnement local (Local by Flywheel)
-└── Développer le plugin MVP
-
-Phase 2 : Publication
-├── Soumettre à WP.org
-├── Attendre review (1-7 jours)
-└── Setup CI/CD GitHub → WP.org
-
-Phase 3 : Maintenance
-├── Releases via GitHub tags
-├── Updates automatiques pour les users
-└── Support via GitHub issues + forum WP.org
-```
+**Priorités fix :**
+1. **BLOQUANT** : #1 (`do_action('acf/save_post')` — crash front-end sur tout site ACF)
+2. **CRITICAL + HIGH** : #27 (test file), #4 (timing attack), #13 (image SSRF), #29 (secret visible), #24 (SEO update), #2 (secret stockage)
+3. **MEDIUM** : #5 + #3 (JWT hardening), #26 (slug), #7 + #10 (validation), #12 (DRY), #14 (basename)
 
 ---
 
@@ -918,3 +690,6 @@ Phase 3 : Maintenance
 13. Soumettre à WP.org
 14. ~~Spécifier custom blocks (Q8)~~ ✅
 15. Implémenter Q8 : block registry + endpoint `GET /blocks` + custom_block() adapters + fail fast validation
+16. **Fix plugin CRITICAL + HIGH** (voir [code review](./plugin-wp-code-review.md))
+17. Fix plugin MEDIUM (voir [code review](./plugin-wp-code-review.md))
+18. Implémenter Q10 : `GET /blocks/usage` endpoint (block usage stats + examples)
