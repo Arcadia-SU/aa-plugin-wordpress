@@ -58,9 +58,9 @@ arcadia-agents/
 ./stop.sh    # Arrête les containers
 ```
 
-- WordPress : http://localhost:8080
-- PHPMyAdmin : http://localhost:8081
-- Health check : http://localhost:8080/wp-json/arcadia/v1/health
+- WordPress : http://localhost:8082
+- PHPMyAdmin : http://localhost:8083
+- Health check : http://localhost:8082/wp-json/arcadia/v1/health
 
 ## Dépendances PHP
 

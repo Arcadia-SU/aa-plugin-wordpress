@@ -116,6 +116,21 @@
 - [DONE] Tests unitaires custom blocks
 - [DONE] Tests intégration endpoint `GET /blocks`
 
+### ACF Fields (Q9)
+- [DONE] Discovery champs ACF par post type dans `GET /site-info` (`acf_field_groups`)
+- [DONE] Écriture via `acf_fields` dans `POST /articles` et `PUT /articles/{id}`
+- [DONE] Fallback wysiwyg null → copie `post_content`
+- [DONE] Auto-populate ACF fields (safety net pour `get_fields()`)
+- [DONE] Fix finding 023 : `do_action('acf/save_post', $post_id)` dans create + update
+- [DONE] Tests unitaires ACF fields (10 tests)
+
+### Block Usage (Q10)
+- [DONE] Endpoint `GET /arcadia/v1/blocks/usage` (scope `site:read`)
+- [DONE] Params : `post_type` filter, `sample_size` (clamped 1-10)
+- [DONE] Récursion `innerBlocks` avec context parent
+- [DONE] Cache transient 24h + invalidation `save_post`
+- [DONE] Tests unitaires block usage (12 tests)
+
 ---
 
 ## Phase 5 : Tests
@@ -137,6 +152,34 @@
 - [DONE] GitHub Action : deploy WP.org (10up/action-wordpress-plugin-deploy)
 
 *Note : noté done mais à vérifier*
+
+---
+
+## Phase 6b : Code Review Fixes
+
+*Ref: [plugin-wp-code-review.md](../../docs/tasks_backlog/agent-seo/plugin-wp-specs/plugin-wp-code-review.md) — Audit v2.0.1, 33 issues*
+
+### CRITICAL + HIGH (specs item 16)
+- [DONE] #1 — `do_action('acf/save_post')` manquant (finding 023)
+- [N/A] #2 — JWT secret en clair dans wp_options (on utilise RS256 + public key, pas de secret côté plugin)
+- [N/A] #4 — Timing attack JWT (délégué à firebase/php-jwt pour RS256)
+- [ ] #13 — Featured image download : timeout explicite + SSRF hardening
+- [DONE] #24 — SEO meta manquant dans `update_post`
+- [ ] #27 — Test files exclus du zip (à vérifier manuellement)
+- [ ] #29 — Champ Connection Key en `type="password"` dans admin
+
+### MEDIUM (specs item 17)
+- [ ] #3 — JWT clock skew tolerance + validation iat/nbf
+- [N/A] #5 — base64url_decode (délégué à firebase/php-jwt)
+- [ ] #6 — Type-checking strict sur retour validate_jwt
+- [DONE] #7 — Validation post_type contre types enregistrés
+- [ ] #9 — Gestion erreur création catégorie silencieuse
+- [DONE] #10 — update_post vérifie existence du post
+- [ ] #11 — update_post empêche changement de post_type
+- [ ] #12 — DRY catégories/tags
+- [DONE] #14 — basename() query strings
+- [ ] #18 — GET /site-info expose versions WP/PHP
+- [ ] #22 — Categories update remplace au lieu de merger
 
 ---
 

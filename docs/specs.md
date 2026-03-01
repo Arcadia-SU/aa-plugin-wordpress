@@ -689,7 +689,8 @@ Audit v2.0.1 (33 issues : 1 critical, 6 high, 12 medium, 14 low) : **[plugin-wp-
 12. Tester avec WP local + site client
 13. Soumettre à WP.org
 14. ~~Spécifier custom blocks (Q8)~~ ✅
-15. Implémenter Q8 : block registry + endpoint `GET /blocks` + custom_block() adapters + fail fast validation
-16. **Fix plugin CRITICAL + HIGH** (voir [code review](./plugin-wp-code-review.md))
+15. ~~Implémenter Q8 : block registry + endpoint `GET /blocks` + custom_block() adapters + fail fast validation~~ ✅
+16. **Fix plugin CRITICAL + HIGH** (voir [code review](./plugin-wp-code-review.md)) — #1 ✅, #24 ✅, #2/#4 N/A (RS256), reste #27 #29 à vérifier
 17. Fix plugin MEDIUM (voir [code review](./plugin-wp-code-review.md))
-18. Implémenter Q10 : `GET /blocks/usage` endpoint (block usage stats + examples)
+18. ~~Implémenter Q10 : `GET /blocks/usage` endpoint (block usage stats + examples)~~ ✅
+19. ~~Implémenter Q9 : ACF fields discovery + write + fix finding 023~~ ✅
