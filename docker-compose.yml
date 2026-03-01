@@ -1,9 +1,9 @@
 services:
   wordpress:
-    image: wordpress:latest
+    build: .
     container_name: arcadia-wp
     ports:
-      - "8080:80"
+      - "8082:80"
     environment:
       WORDPRESS_DB_HOST: db
       WORDPRESS_DB_USER: wordpress
@@ -36,7 +36,7 @@ services:
     image: phpmyadmin:latest
     container_name: arcadia-wp-pma
     ports:
-      - "8081:80"
+      - "8083:80"
     environment:
       PMA_HOST: db
       MYSQL_ROOT_PASSWORD: root

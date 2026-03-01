@@ -3,7 +3,7 @@
 # Copy this file to config.sh and adjust values
 
 # WordPress site URL
-export WP_URL="http://localhost:8080"
+export WP_URL="http://localhost:8082"
 
 # API namespace
 export API_BASE="${WP_URL}/wp-json/arcadia/v1"
