@@ -360,15 +360,18 @@ trait Arcadia_API_Posts_Handler {
 			return $result;
 		}
 
+		// Append mode: add taxonomies instead of replacing (finding #22).
+		$append = ! empty( $body['append_taxonomies'] );
+
 		// Update categories.
 		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
 			$category_ids = $this->get_or_create_terms( $meta['categories'], 'category' );
-			wp_set_post_categories( $post_id, $category_ids );
+			wp_set_post_categories( $post_id, $category_ids, $append );
 		}
 
 		// Update tags.
 		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			wp_set_post_tags( $post_id, $meta['tags'] );
+			wp_set_post_tags( $post_id, $meta['tags'], $append );
 		}
 
 		// Update featured image.

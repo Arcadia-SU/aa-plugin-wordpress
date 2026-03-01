@@ -163,15 +163,15 @@
 - [DONE] #1 — `do_action('acf/save_post')` manquant (finding 023)
 - [N/A] #2 — JWT secret en clair dans wp_options (on utilise RS256 + public key, pas de secret côté plugin)
 - [N/A] #4 — Timing attack JWT (délégué à firebase/php-jwt pour RS256)
-- [ ] #13 — Featured image download : timeout explicite + SSRF hardening
+- [DONE] #13 — Featured image download : timeout explicite + SSRF hardening
 - [DONE] #24 — SEO meta manquant dans `update_post`
 - [ ] #27 — Test files exclus du zip (à vérifier manuellement)
 - [ ] #29 — Champ Connection Key en `type="password"` dans admin
 
 ### MEDIUM (specs item 17)
-- [ ] #3 — JWT clock skew tolerance + validation iat/nbf
+- [DONE] #3 — JWT clock skew tolerance + validation iat/nbf
 - [N/A] #5 — base64url_decode (délégué à firebase/php-jwt)
-- [ ] #6 — Type-checking strict sur retour validate_jwt
+- [DONE] #6 — Type-checking strict sur retour validate_jwt
 - [DONE] #7 — Validation post_type contre types enregistrés
 - [ ] #9 — Gestion erreur création catégorie silencieuse
 - [DONE] #10 — update_post vérifie existence du post
@@ -179,7 +179,7 @@
 - [ ] #12 — DRY catégories/tags
 - [DONE] #14 — basename() query strings
 - [ ] #18 — GET /site-info expose versions WP/PHP
-- [ ] #22 — Categories update remplace au lieu de merger
+- [DONE] #22 — Categories update remplace au lieu de merger
 
 ---
 

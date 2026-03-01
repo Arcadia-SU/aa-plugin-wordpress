@@ -161,13 +161,32 @@ trait Arcadia_API_Media_Handler {
 	 * @return int|WP_Error Attachment ID or error.
 	 */
 	private function sideload_image( $url, $title = '' ) {
+		// Validate URL scheme — only HTTP(S) allowed (finding #13).
+		$parsed = wp_parse_url( $url );
+		if ( empty( $parsed['scheme'] ) || ! in_array( $parsed['scheme'], array( 'http', 'https' ), true ) ) {
+			return new WP_Error(
+				'invalid_url_scheme',
+				__( 'Only HTTP and HTTPS URLs are allowed.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		// Block private/reserved IPs — SSRF protection (finding #13).
+		if ( ! wp_http_validate_url( $url ) ) {
+			return new WP_Error(
+				'invalid_url',
+				__( 'URL is not allowed (private/reserved IP).', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		// Require media functions.
 		require_once ABSPATH . 'wp-admin/includes/file.php';
 		require_once ABSPATH . 'wp-admin/includes/media.php';
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
-		// Download the file.
-		$tmp = download_url( $url );
+		// Download the file with 30s timeout (finding #13).
+		$tmp = download_url( $url, 30 );
 
 		if ( is_wp_error( $tmp ) ) {
 			return new WP_Error(

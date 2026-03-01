@@ -157,6 +157,9 @@ class Arcadia_Auth {
 		}
 
 		try {
+			// Allow ±30s clock drift between servers (finding #3).
+			JWT::$leeway = 30;
+
 			$decoded = JWT::decode( $token, new Key( $public_key, 'RS256' ) );
 
 			// Convert stdClass to array for consistent return type.
@@ -309,6 +312,15 @@ class Arcadia_Auth {
 		$payload = $this->validate_jwt( $token );
 		if ( is_wp_error( $payload ) ) {
 			return $payload;
+		}
+
+		// Defensive: ensure payload is a valid array (finding #6).
+		if ( ! is_array( $payload ) ) {
+			return $this->error_response(
+				'invalid_payload',
+				__( 'JWT payload is not a valid array.', 'arcadia-agents' ),
+				401
+			);
 		}
 
 		// Check scope if required.
