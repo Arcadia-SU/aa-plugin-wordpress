@@ -187,9 +187,15 @@ trait Arcadia_API_Taxonomies_Handler {
 				$term_ids[] = $term->term_id;
 			} else {
 				$result = wp_insert_term( $name, $taxonomy );
-				if ( ! is_wp_error( $result ) ) {
-					$term_ids[] = $result['term_id'];
+				if ( is_wp_error( $result ) ) {
+					// Term already exists — retrieve its ID (finding #9).
+					if ( 'term_exists' === $result->get_error_code() ) {
+						$term_ids[] = (int) $result->get_error_data();
+					}
+					// Other errors: skip silently — best effort during post creation.
+					continue;
 				}
+				$term_ids[] = $result['term_id'];
 			}
 		}
 

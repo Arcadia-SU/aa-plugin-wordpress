@@ -389,12 +389,8 @@ class Arcadia_API {
 				'authors'        => $this->get_authors(),
 				'post_types'     => $this->get_post_types(),
 				'theme'          => array(
-					'name'    => $theme->get( 'Name' ),
-					'version' => $theme->get( 'Version' ),
-					'author'  => $theme->get( 'Author' ),
-				),
-				'wordpress'      => array(
-					'version' => get_bloginfo( 'version' ),
+					'name'   => $theme->get( 'Name' ),
+					'author' => $theme->get( 'Author' ),
 				),
 				'plugin'         => array(
 					'version' => ARCADIA_AGENTS_VERSION,

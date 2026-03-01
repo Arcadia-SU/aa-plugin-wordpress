@@ -162,12 +162,13 @@ function arcadia_agents_settings_page() {
 						<label for="arcadia_agents_connection_key"><?php esc_html_e( 'Connection Key', 'arcadia-agents' ); ?></label>
 					</th>
 					<td>
-						<input type="text"
+						<input type="password"
 							id="arcadia_agents_connection_key"
 							name="arcadia_agents_connection_key"
 							value="<?php echo esc_attr( $connection_key ); ?>"
 							class="regular-text"
 							placeholder="aa_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							autocomplete="off"
 							<?php echo $is_connected ? 'readonly' : ''; ?>
 						/>
 						<?php if ( $is_connected ) : ?>

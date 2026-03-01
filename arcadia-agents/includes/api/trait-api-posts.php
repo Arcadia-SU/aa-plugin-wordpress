@@ -285,6 +285,16 @@ trait Arcadia_API_Posts_Handler {
 		$body = $request->get_json_params();
 		$meta = isset( $body['meta'] ) ? $body['meta'] : array();
 
+		// Reject post_type changes (finding #11).
+		$requested_type = ! empty( $meta['post_type'] ) ? $meta['post_type'] : ( ! empty( $body['post_type'] ) ? $body['post_type'] : null );
+		if ( null !== $requested_type && $requested_type !== $post->post_type ) {
+			return new WP_Error(
+				'post_type_change_forbidden',
+				__( 'Changing post_type via update is not allowed. Delete and re-create instead.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
 		$post_data = array( 'ID' => $post_id );
 
 		// Update title.
