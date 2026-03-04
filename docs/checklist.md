@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-02-03
+**Dernière mise à jour :** 2026-03-04
 
 ---
 
@@ -130,6 +130,8 @@
 - [DONE] Récursion `innerBlocks` avec context parent
 - [DONE] Cache transient 24h + invalidation `save_post`
 - [DONE] Tests unitaires block usage (12 tests)
+- [DONE] ~~Finding 024 : strip namespace prefixes~~ → **Superseded by ADR-022 D2** (2026-03-02)
+- [DONE] ADR-022 D2 : retourner noms CMS namespaced (`core/paragraph`, `acf/bouton`) dans `/blocks` et `/blocks/usage`
 
 ---
 
@@ -165,20 +167,20 @@
 - [N/A] #4 — Timing attack JWT (délégué à firebase/php-jwt pour RS256)
 - [DONE] #13 — Featured image download : timeout explicite + SSRF hardening
 - [DONE] #24 — SEO meta manquant dans `update_post`
-- [ ] #27 — Test files exclus du zip (à vérifier manuellement)
-- [ ] #29 — Champ Connection Key en `type="password"` dans admin
+- [DONE] #27 — Test files exclus du zip (vérifié : build.sh exclut `/tests/*` + check 9)
+- [DONE] #29 — Champ Connection Key en `type="password"` dans admin
 
 ### MEDIUM (specs item 17)
 - [DONE] #3 — JWT clock skew tolerance + validation iat/nbf
 - [N/A] #5 — base64url_decode (délégué à firebase/php-jwt)
 - [DONE] #6 — Type-checking strict sur retour validate_jwt
 - [DONE] #7 — Validation post_type contre types enregistrés
-- [ ] #9 — Gestion erreur création catégorie silencieuse
+- [DONE] #9 — Gestion erreur création catégorie/tag : warnings surfacés dans la réponse API
 - [DONE] #10 — update_post vérifie existence du post
-- [ ] #11 — update_post empêche changement de post_type
-- [ ] #12 — DRY catégories/tags
+- [DONE] #11 — update_post empêche changement de post_type (retourne 400)
+- [DONE] #12 — DRY catégories/tags : les deux utilisent `get_or_create_terms()`
 - [DONE] #14 — basename() query strings
-- [ ] #18 — GET /site-info expose versions WP/PHP
+- [DONE] #18 — `/health` n'expose plus les versions WP/PHP (info disclosure)
 - [DONE] #22 — Categories update remplace au lieu de merger
 
 ---

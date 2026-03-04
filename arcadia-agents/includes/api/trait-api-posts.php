@@ -195,15 +195,19 @@ trait Arcadia_API_Posts_Handler {
 			return $post_id;
 		}
 
-		// Set categories.
+		// Set categories and tags, collecting any creation warnings.
+		$taxonomy_warnings = array();
+
 		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
-			$category_ids = $this->get_or_create_terms( $meta['categories'], 'category' );
-			wp_set_post_categories( $post_id, $category_ids );
+			$cat_result = $this->get_or_create_terms( $meta['categories'], 'category' );
+			wp_set_post_categories( $post_id, $cat_result['ids'] );
+			$taxonomy_warnings = array_merge( $taxonomy_warnings, $cat_result['errors'] );
 		}
 
-		// Set tags.
 		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			wp_set_post_tags( $post_id, $meta['tags'] );
+			$tag_result = $this->get_or_create_terms( $meta['tags'], 'post_tag' );
+			wp_set_post_tags( $post_id, $tag_result['ids'] );
+			$taxonomy_warnings = array_merge( $taxonomy_warnings, $tag_result['errors'] );
 		}
 
 		// Handle featured image from URL.
@@ -254,14 +258,17 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		return new WP_REST_Response(
-			array(
-				'success' => true,
-				'post_id' => $post_id,
-				'post'    => $this->format_post( $post ),
-			),
-			201
+		$response_data = array(
+			'success' => true,
+			'post_id' => $post_id,
+			'post'    => $this->format_post( $post ),
 		);
+
+		if ( ! empty( $taxonomy_warnings ) ) {
+			$response_data['warnings'] = $taxonomy_warnings;
+		}
+
+		return new WP_REST_Response( $response_data, 201 );
 	}
 
 	/**
@@ -363,15 +370,19 @@ trait Arcadia_API_Posts_Handler {
 		// Append mode: add taxonomies instead of replacing (finding #22).
 		$append = ! empty( $body['append_taxonomies'] );
 
-		// Update categories.
+		// Update categories and tags, collecting any creation warnings.
+		$taxonomy_warnings = array();
+
 		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
-			$category_ids = $this->get_or_create_terms( $meta['categories'], 'category' );
-			wp_set_post_categories( $post_id, $category_ids, $append );
+			$cat_result = $this->get_or_create_terms( $meta['categories'], 'category' );
+			wp_set_post_categories( $post_id, $cat_result['ids'], $append );
+			$taxonomy_warnings = array_merge( $taxonomy_warnings, $cat_result['errors'] );
 		}
 
-		// Update tags.
 		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			wp_set_post_tags( $post_id, $meta['tags'], $append );
+			$tag_result = $this->get_or_create_terms( $meta['tags'], 'post_tag' );
+			wp_set_post_tags( $post_id, $tag_result['ids'], $append );
+			$taxonomy_warnings = array_merge( $taxonomy_warnings, $tag_result['errors'] );
 		}
 
 		// Update featured image.
@@ -426,13 +437,16 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		return new WP_REST_Response(
-			array(
-				'success' => true,
-				'post'    => $this->format_post( $post ),
-			),
-			200
+		$response_data = array(
+			'success' => true,
+			'post'    => $this->format_post( $post ),
 		);
+
+		if ( ! empty( $taxonomy_warnings ) ) {
+			$response_data['warnings'] = $taxonomy_warnings;
+		}
+
+		return new WP_REST_Response( $response_data, 200 );
 	}
 
 	/**

@@ -172,8 +172,6 @@ class Arcadia_Agents {
 			array(
 				'status'  => 'ok',
 				'version' => ARCADIA_AGENTS_VERSION,
-				'php'     => PHP_VERSION,
-				'wp'      => get_bloginfo( 'version' ),
 			),
 			200
 		);

@@ -172,12 +172,16 @@ trait Arcadia_API_Taxonomies_Handler {
 	/**
 	 * Get or create terms by name.
 	 *
+	 * Returns an associative array with 'ids' and 'errors' keys so callers
+	 * can surface warnings to the agent instead of silently swallowing failures.
+	 *
 	 * @param array  $names    Array of term names.
 	 * @param string $taxonomy Taxonomy name.
-	 * @return array Array of term IDs.
+	 * @return array{ids: int[], errors: string[]} Term IDs and error messages.
 	 */
 	private function get_or_create_terms( $names, $taxonomy ) {
 		$term_ids = array();
+		$errors   = array();
 
 		foreach ( $names as $name ) {
 			$name = sanitize_text_field( $name );
@@ -188,17 +192,20 @@ trait Arcadia_API_Taxonomies_Handler {
 			} else {
 				$result = wp_insert_term( $name, $taxonomy );
 				if ( is_wp_error( $result ) ) {
-					// Term already exists — retrieve its ID (finding #9).
 					if ( 'term_exists' === $result->get_error_code() ) {
 						$term_ids[] = (int) $result->get_error_data();
+					} else {
+						$errors[] = sprintf( '%s: %s', $name, $result->get_error_message() );
 					}
-					// Other errors: skip silently — best effort during post creation.
 					continue;
 				}
 				$term_ids[] = $result['term_id'];
 			}
 		}
 
-		return $term_ids;
+		return array(
+			'ids'    => $term_ids,
+			'errors' => $errors,
+		);
 	}
 }
