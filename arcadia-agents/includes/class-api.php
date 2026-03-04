@@ -194,6 +194,23 @@ class Arcadia_API {
 			)
 		);
 
+		register_rest_route(
+			$this->namespace,
+			'/media/(?P<id>\d+)',
+			array(
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_media' ),
+					'permission_callback' => array( $this, 'check_media_write_permission' ),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_media' ),
+					'permission_callback' => array( $this, 'check_media_delete_permission' ),
+				),
+			)
+		);
+
 		// Taxonomies endpoints.
 		register_rest_route(
 			$this->namespace,
@@ -365,6 +382,20 @@ class Arcadia_API {
 	 */
 	public function check_media_write_permission( $request ) {
 		$result = $this->auth->authenticate_request( $request, 'media:write' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check media:delete permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_media_delete_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'media:delete' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

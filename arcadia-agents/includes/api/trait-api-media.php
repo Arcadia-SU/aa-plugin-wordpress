@@ -260,6 +260,7 @@ trait Arcadia_API_Media_Handler {
 		$page      = (int) $request->get_param( 'page' ) ?: 1;
 		$search    = $request->get_param( 'search' );
 		$mime_type = $request->get_param( 'mime_type' );
+		$type      = $request->get_param( 'type' );
 
 		// Validate per_page bounds.
 		$per_page = max( 1, min( 100, $per_page ) );
@@ -278,9 +279,33 @@ trait Arcadia_API_Media_Handler {
 			$args['s'] = sanitize_text_field( $search );
 		}
 
-		// Filter by MIME type.
+		// Filter by MIME type (exact).
 		if ( $mime_type ) {
 			$args['post_mime_type'] = sanitize_mime_type( $mime_type );
+		}
+
+		// Filter by high-level type (image → image/*, video → video/*).
+		if ( $type && ! $mime_type ) {
+			$type_whitelist = array( 'image', 'video', 'audio', 'application' );
+			$type           = sanitize_text_field( $type );
+			if ( in_array( $type, $type_whitelist, true ) ) {
+				$args['post_mime_type'] = $type;
+			}
+		}
+
+		// Date range filters.
+		$date_from = $request->get_param( 'date_from' );
+		$date_to   = $request->get_param( 'date_to' );
+		if ( $date_from || $date_to ) {
+			$date_query = array();
+			if ( $date_from ) {
+				$date_query['after'] = sanitize_text_field( $date_from );
+			}
+			if ( $date_to ) {
+				$date_query['before'] = sanitize_text_field( $date_to );
+			}
+			$date_query['inclusive'] = true;
+			$args['date_query']     = array( $date_query );
 		}
 
 		$query = new WP_Query( $args );
@@ -295,6 +320,107 @@ trait Arcadia_API_Media_Handler {
 				'media'       => $media,
 				'total'       => (int) $query->found_posts,
 				'total_pages' => (int) $query->max_num_pages,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Update media metadata (alt text, title, caption).
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_media( $request ) {
+		$attachment_id = (int) $request->get_param( 'id' );
+		$attachment    = get_post( $attachment_id );
+
+		if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
+			return new WP_Error(
+				'media_not_found',
+				__( 'Media not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$body      = $request->get_json_params();
+		$post_data = array( 'ID' => $attachment_id );
+		$updated   = false;
+
+		if ( isset( $body['title'] ) ) {
+			$post_data['post_title'] = sanitize_text_field( $body['title'] );
+			$updated = true;
+		}
+
+		if ( isset( $body['caption'] ) ) {
+			$post_data['post_excerpt'] = sanitize_textarea_field( $body['caption'] );
+			$updated = true;
+		}
+
+		if ( $updated ) {
+			wp_update_post( $post_data );
+		}
+
+		if ( isset( $body['alt_text'] ) ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $body['alt_text'] ) );
+			$updated = true;
+		}
+
+		if ( ! $updated ) {
+			return new WP_Error(
+				'nothing_to_update',
+				__( 'No fields to update.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$attachment = get_post( $attachment_id );
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'media'   => $this->format_media( $attachment ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Delete a media attachment.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_media( $request ) {
+		$attachment_id = (int) $request->get_param( 'id' );
+		$attachment    = get_post( $attachment_id );
+
+		if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
+			return new WP_Error(
+				'media_not_found',
+				__( 'Media not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$body  = $request->get_json_params();
+		$force = ! empty( $body['force'] );
+
+		$result = wp_delete_attachment( $attachment_id, $force );
+
+		if ( ! $result ) {
+			return new WP_Error(
+				'delete_failed',
+				__( 'Failed to delete media.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'deleted' => $attachment_id,
+				'force'   => $force,
 			),
 			200
 		);

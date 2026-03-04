@@ -222,6 +222,7 @@ class Arcadia_Auth {
 			'articles:delete',
 			'media:read',
 			'media:write',
+			'media:delete',
 			'taxonomies:read',
 			'taxonomies:write',
 			'taxonomies:delete',

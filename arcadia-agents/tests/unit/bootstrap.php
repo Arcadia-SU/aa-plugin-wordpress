@@ -648,6 +648,35 @@ if ( ! function_exists( 'sanitize_title' ) ) {
     }
 }
 
+// wp_delete_attachment() stub.
+if ( ! function_exists( 'wp_delete_attachment' ) ) {
+    function wp_delete_attachment( $attachment_id, $force = false ) {
+        return true;
+    }
+}
+
+// wp_update_post() stub.
+if ( ! function_exists( 'wp_update_post' ) ) {
+    function wp_update_post( $post_data, $wp_error = false ) {
+        $id = isset( $post_data['ID'] ) ? $post_data['ID'] : 0;
+        return $id;
+    }
+}
+
+// sanitize_mime_type() stub.
+if ( ! function_exists( 'sanitize_mime_type' ) ) {
+    function sanitize_mime_type( $mime_type ) {
+        return preg_replace( '/[^a-zA-Z0-9\/\-\+\.]/', '', $mime_type );
+    }
+}
+
+// esc_url_raw() stub.
+if ( ! function_exists( 'esc_url_raw' ) ) {
+    function esc_url_raw( $url ) {
+        return filter_var( $url, FILTER_SANITIZE_URL );
+    }
+}
+
 // get_post_type_object() stub.
 if ( ! function_exists( 'get_post_type_object' ) ) {
     global $_test_post_type_objects;
