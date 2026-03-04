@@ -94,6 +94,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
@@ -109,11 +110,49 @@ class Arcadia_Agents {
 		// Register REST API endpoints.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 
+		// Register custom taxonomy for source tracking.
+		add_action( 'init', array( $this, 'register_arcadia_source_taxonomy' ) );
+
 		// Admin menu.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 
 		// Invalidate blocks usage cache when posts are saved.
 		add_action( 'save_post', array( $this, 'invalidate_blocks_usage_cache' ) );
+	}
+
+	/**
+	 * Register the hidden arcadia_source taxonomy.
+	 *
+	 * Used to track which posts were created by Arcadia Agents
+	 * vs. manually in WordPress.
+	 */
+	public function register_arcadia_source_taxonomy() {
+		register_taxonomy(
+			'arcadia_source',
+			$this->get_source_taxonomy_post_types(),
+			array(
+				'label'             => 'Arcadia Source',
+				'public'            => false,
+				'show_ui'           => false,
+				'show_in_rest'      => false,
+				'show_admin_column' => false,
+				'hierarchical'      => false,
+				'rewrite'           => false,
+			)
+		);
+	}
+
+	/**
+	 * Get post types for the arcadia_source taxonomy.
+	 *
+	 * Returns all public post types that the plugin can manage.
+	 *
+	 * @return array Post type names.
+	 */
+	private function get_source_taxonomy_post_types() {
+		$types = get_post_types( array( 'public' => true ), 'names' );
+		unset( $types['attachment'] );
+		return array_values( $types );
 	}
 
 	/**

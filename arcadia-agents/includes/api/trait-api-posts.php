@@ -248,6 +248,11 @@ trait Arcadia_API_Posts_Handler {
 			do_action( 'acf/save_post', $post_id );
 		}
 
+		// Tag post as created by Arcadia (source tracking).
+		if ( taxonomy_exists( 'arcadia_source' ) ) {
+			wp_set_object_terms( $post_id, 'arcadia', 'arcadia_source' );
+		}
+
 		$post = get_post( $post_id );
 
 		if ( ! $post ) {

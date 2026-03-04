@@ -358,8 +358,261 @@ if ( ! function_exists( 'update_post_meta' ) ) {
     }
 }
 
+// get_post_meta() stub.
+if ( ! function_exists( 'get_post_meta' ) ) {
+    global $_test_post_meta;
+    if ( ! isset( $_test_post_meta ) ) {
+        $_test_post_meta = array();
+    }
+
+    function get_post_meta( $post_id, $key = '', $single = false ) {
+        global $_test_post_meta;
+        if ( '' === $key ) {
+            return isset( $_test_post_meta[ $post_id ] ) ? $_test_post_meta[ $post_id ] : array();
+        }
+        if ( ! isset( $_test_post_meta[ $post_id ][ $key ] ) ) {
+            return $single ? '' : array();
+        }
+        return $single ? $_test_post_meta[ $post_id ][ $key ] : array( $_test_post_meta[ $post_id ][ $key ] );
+    }
+}
+
+// get_permalink() stub.
+if ( ! function_exists( 'get_permalink' ) ) {
+    function get_permalink( $post_id = 0 ) {
+        return 'http://localhost/?p=' . $post_id;
+    }
+}
+
+// get_userdata() stub.
+if ( ! function_exists( 'get_userdata' ) ) {
+    global $_test_users;
+    $_test_users = array();
+
+    function get_userdata( $user_id ) {
+        global $_test_users;
+        return isset( $_test_users[ $user_id ] ) ? $_test_users[ $user_id ] : false;
+    }
+}
+
+// wp_get_post_categories() stub.
+if ( ! function_exists( 'wp_get_post_categories' ) ) {
+    global $_test_post_categories;
+    $_test_post_categories = array();
+
+    function wp_get_post_categories( $post_id, $args = array() ) {
+        global $_test_post_categories;
+        return isset( $_test_post_categories[ $post_id ] ) ? $_test_post_categories[ $post_id ] : array();
+    }
+}
+
+// wp_get_post_tags() stub.
+if ( ! function_exists( 'wp_get_post_tags' ) ) {
+    global $_test_post_tags;
+    $_test_post_tags = array();
+
+    function wp_get_post_tags( $post_id, $args = array() ) {
+        global $_test_post_tags;
+        return isset( $_test_post_tags[ $post_id ] ) ? $_test_post_tags[ $post_id ] : array();
+    }
+}
+
+// get_post_thumbnail_id() stub.
+if ( ! function_exists( 'get_post_thumbnail_id' ) ) {
+    function get_post_thumbnail_id( $post_id ) {
+        global $_test_post_meta;
+        return isset( $_test_post_meta[ $post_id ]['_thumbnail_id'] ) ? $_test_post_meta[ $post_id ]['_thumbnail_id'] : 0;
+    }
+}
+
+// wp_get_attachment_url() stub.
+if ( ! function_exists( 'wp_get_attachment_url' ) ) {
+    function wp_get_attachment_url( $attachment_id ) {
+        return 'http://localhost/wp-content/uploads/image-' . $attachment_id . '.jpg';
+    }
+}
+
+// wp_strip_all_tags() stub.
+if ( ! function_exists( 'wp_strip_all_tags' ) ) {
+    function wp_strip_all_tags( $text ) {
+        return strip_tags( $text );
+    }
+}
+
+// has_blocks() stub.
+if ( ! function_exists( 'has_blocks' ) ) {
+    function has_blocks( $content ) {
+        return false !== strpos( $content, '<!-- wp:' );
+    }
+}
+
+// taxonomy_exists() stub.
+if ( ! function_exists( 'taxonomy_exists' ) ) {
+    global $_test_taxonomies;
+    $_test_taxonomies = array();
+
+    function taxonomy_exists( $taxonomy ) {
+        global $_test_taxonomies;
+        return in_array( $taxonomy, $_test_taxonomies, true );
+    }
+}
+
+// wp_set_object_terms() stub.
+if ( ! function_exists( 'wp_set_object_terms' ) ) {
+    global $_test_object_terms;
+    $_test_object_terms = array();
+
+    function wp_set_object_terms( $object_id, $terms, $taxonomy, $append = false ) {
+        global $_test_object_terms;
+        $_test_object_terms[ $object_id ][ $taxonomy ] = $terms;
+        return array( 1 );
+    }
+}
+
+// get_page_template_slug() stub.
+if ( ! function_exists( 'get_page_template_slug' ) ) {
+    function get_page_template_slug( $post_id ) {
+        return '';
+    }
+}
+
+// register_taxonomy() stub.
+if ( ! function_exists( 'register_taxonomy' ) ) {
+    function register_taxonomy( $taxonomy, $object_type, $args = array() ) {
+        global $_test_taxonomies;
+        $_test_taxonomies[] = $taxonomy;
+    }
+}
+
+// wp_get_nav_menus() stub.
+if ( ! function_exists( 'wp_get_nav_menus' ) ) {
+    global $_test_nav_menus;
+    $_test_nav_menus = array();
+
+    function wp_get_nav_menus() {
+        global $_test_nav_menus;
+        return $_test_nav_menus;
+    }
+}
+
+// wp_get_nav_menu_items() stub.
+if ( ! function_exists( 'wp_get_nav_menu_items' ) ) {
+    global $_test_nav_menu_items;
+    $_test_nav_menu_items = array();
+
+    function wp_get_nav_menu_items( $menu, $args = array() ) {
+        global $_test_nav_menu_items;
+        $menu_id = is_object( $menu ) ? $menu->term_id : $menu;
+        return isset( $_test_nav_menu_items[ $menu_id ] ) ? $_test_nav_menu_items[ $menu_id ] : array();
+    }
+}
+
+// get_users() stub.
+if ( ! function_exists( 'get_users' ) ) {
+    global $_test_wp_users;
+    $_test_wp_users = array();
+
+    function get_users( $args = array() ) {
+        global $_test_wp_users;
+        return $_test_wp_users;
+    }
+}
+
+// count_user_posts() stub.
+if ( ! function_exists( 'count_user_posts' ) ) {
+    function count_user_posts( $user_id, $post_type = 'post', $public_only = false ) {
+        return 0;
+    }
+}
+
+// wp_delete_term() stub.
+if ( ! function_exists( 'wp_delete_term' ) ) {
+    function wp_delete_term( $term_id, $taxonomy ) {
+        return true;
+    }
+}
+
+// wp_update_term() stub.
+if ( ! function_exists( 'wp_update_term' ) ) {
+    function wp_update_term( $term_id, $taxonomy, $args = array() ) {
+        return array( 'term_id' => $term_id );
+    }
+}
+
+// get_term() stub.
+if ( ! function_exists( 'get_term' ) ) {
+    global $_test_terms;
+    $_test_terms = array();
+
+    function get_term( $term_id, $taxonomy = '' ) {
+        global $_test_terms;
+        $key = $taxonomy ? $taxonomy . ':' . $term_id : $term_id;
+        if ( isset( $_test_terms[ $key ] ) ) {
+            return $_test_terms[ $key ];
+        }
+        if ( isset( $_test_terms[ $term_id ] ) ) {
+            return $_test_terms[ $term_id ];
+        }
+        return null;
+    }
+}
+
+// wp_insert_term() stub.
+if ( ! function_exists( 'wp_insert_term' ) ) {
+    function wp_insert_term( $term, $taxonomy, $args = array() ) {
+        return array( 'term_id' => 99 );
+    }
+}
+
+// get_term_by() stub.
+if ( ! function_exists( 'get_term_by' ) ) {
+    function get_term_by( $field, $value, $taxonomy = '' ) {
+        return false;
+    }
+}
+
+// wp_delete_post() stub.
+if ( ! function_exists( 'wp_delete_post' ) ) {
+    function wp_delete_post( $post_id, $force = false ) {
+        return true;
+    }
+}
+
+// wp_attachment_is_image() stub.
+if ( ! function_exists( 'wp_attachment_is_image' ) ) {
+    function wp_attachment_is_image( $attachment_id ) {
+        return true;
+    }
+}
+
+// wp_get_attachment_metadata() stub.
+if ( ! function_exists( 'wp_get_attachment_metadata' ) ) {
+    function wp_get_attachment_metadata( $attachment_id ) {
+        return array( 'width' => 800, 'height' => 600 );
+    }
+}
+
+// wp_update_attachment_metadata() stub.
+if ( ! function_exists( 'wp_update_attachment_metadata' ) ) {
+    function wp_update_attachment_metadata( $attachment_id, $data ) {
+        return true;
+    }
+}
+
+// delete_post_meta() stub.
+if ( ! function_exists( 'delete_post_meta' ) ) {
+    function delete_post_meta( $post_id, $meta_key, $meta_value = '' ) {
+        global $_test_post_meta;
+        unset( $_test_post_meta[ $post_id ][ $meta_key ] );
+        return true;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 
 // Load the classes we want to test (only those that don't have heavy WP dependencies).
 // Note: We only load parse_markdown from Arcadia_Blocks since it's a static method.
+
+// Load SEO meta class for testing.
+require_once dirname( __DIR__, 2 ) . '/includes/class-seo-meta.php';

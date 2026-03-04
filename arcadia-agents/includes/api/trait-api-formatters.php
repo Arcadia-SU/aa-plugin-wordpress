@@ -24,12 +24,33 @@ trait Arcadia_API_Formatters {
 	/**
 	 * Format a post for API response.
 	 *
+	 * Returns enriched data including resolved author name, category/tag names,
+	 * word count, block detection, and SEO metadata.
+	 *
 	 * @param WP_Post $post The post object.
 	 * @return array Formatted post data.
 	 */
 	private function format_post( $post ) {
 		$featured_image_id  = get_post_thumbnail_id( $post->ID );
 		$featured_image_url = $featured_image_id ? wp_get_attachment_url( $featured_image_id ) : null;
+
+		// Resolve author display name.
+		$author_data = get_userdata( (int) $post->post_author );
+		$author_name = $author_data ? $author_data->display_name : '';
+
+		// Resolve category and tag names.
+		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
+		$tags       = wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) );
+
+		// Word count from stripped content.
+		$stripped    = wp_strip_all_tags( $post->post_content );
+		$word_count  = str_word_count( $stripped );
+
+		// Block detection.
+		$has_blocks = has_blocks( $post->post_content );
+
+		// SEO metadata via multi-plugin detection.
+		$seo = Arcadia_SEO_Meta::get_seo_meta( $post->ID );
 
 		return array(
 			'id'                 => $post->ID,
@@ -39,15 +60,16 @@ trait Arcadia_API_Formatters {
 			'url'                => get_permalink( $post->ID ),
 			'excerpt'            => $post->post_excerpt,
 			'content'            => $post->post_content,
-			'author'             => (int) $post->post_author,
-			'date'               => $post->post_date,
-			'date_gmt'           => $post->post_date_gmt,
-			'modified'           => $post->post_modified,
-			'modified_gmt'       => $post->post_modified_gmt,
+			'author'             => $author_name,
+			'published_at'       => $post->post_date,
+			'last_modified'      => $post->post_modified,
+			'word_count'         => $word_count,
+			'has_blocks'         => $has_blocks,
 			'featured_image_id'  => $featured_image_id ? (int) $featured_image_id : null,
 			'featured_image_url' => $featured_image_url,
-			'categories'         => wp_get_post_categories( $post->ID ),
-			'tags'               => wp_get_post_tags( $post->ID, array( 'fields' => 'ids' ) ),
+			'categories'         => is_array( $categories ) ? $categories : array(),
+			'tags'               => is_array( $tags ) ? $tags : array(),
+			'seo'                => $seo,
 		);
 	}
 
