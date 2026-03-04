@@ -333,6 +333,72 @@ trait Arcadia_API_Taxonomies_Handler {
 	}
 
 	/**
+	 * Delete a category.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_category( $request ) {
+		$term_id = (int) $request->get_param( 'id' );
+		$term    = get_term( $term_id, 'category' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_not_found',
+				__( 'Category not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$result = wp_delete_term( $term_id, 'category' );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'deleted' => $term_id,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Delete a tag.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function delete_tag( $request ) {
+		$term_id = (int) $request->get_param( 'id' );
+		$term    = get_term( $term_id, 'post_tag' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_not_found',
+				__( 'Tag not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$result = wp_delete_term( $term_id, 'post_tag' );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'deleted' => $term_id,
+			),
+			200
+		);
+	}
+
+	/**
 	 * Get tags.
 	 *
 	 * @param WP_REST_Request $request The request.

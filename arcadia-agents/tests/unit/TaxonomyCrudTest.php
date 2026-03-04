@@ -187,4 +187,80 @@ class TaxonomyCrudTest extends TestCase {
         $this->assertTrue( $data['success'] );
         $this->assertArrayHasKey( 'tag', $data );
     }
+
+    /**
+     * Test delete_category returns 404 for missing term.
+     */
+    public function test_delete_category_not_found(): void {
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '999' );
+
+        $result = $this->helper->delete_category( $request );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'term_not_found', $result->get_error_code() );
+    }
+
+    /**
+     * Test delete_category success.
+     */
+    public function test_delete_category_success(): void {
+        global $_test_terms;
+        $_test_terms['category:10'] = (object) array(
+            'term_id'     => 10,
+            'name'        => 'To Delete',
+            'slug'        => 'to-delete',
+            'description' => '',
+            'parent'      => 0,
+            'count'       => 0,
+        );
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '10' );
+
+        $result = $this->helper->delete_category( $request );
+
+        $this->assertInstanceOf( \WP_REST_Response::class, $result );
+        $data = $result->get_data();
+        $this->assertTrue( $data['success'] );
+        $this->assertEquals( 10, $data['deleted'] );
+    }
+
+    /**
+     * Test delete_tag returns 404 for missing term.
+     */
+    public function test_delete_tag_not_found(): void {
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '999' );
+
+        $result = $this->helper->delete_tag( $request );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'term_not_found', $result->get_error_code() );
+    }
+
+    /**
+     * Test delete_tag success.
+     */
+    public function test_delete_tag_success(): void {
+        global $_test_terms;
+        $_test_terms['post_tag:15'] = (object) array(
+            'term_id'     => 15,
+            'name'        => 'Obsolete Tag',
+            'slug'        => 'obsolete-tag',
+            'description' => '',
+            'parent'      => 0,
+            'count'       => 0,
+        );
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '15' );
+
+        $result = $this->helper->delete_tag( $request );
+
+        $this->assertInstanceOf( \WP_REST_Response::class, $result );
+        $data = $result->get_data();
+        $this->assertTrue( $data['success'] );
+        $this->assertEquals( 15, $data['deleted'] );
+    }
 }

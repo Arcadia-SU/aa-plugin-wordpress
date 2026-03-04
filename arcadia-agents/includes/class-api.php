@@ -233,9 +233,16 @@ class Arcadia_API {
 			$this->namespace,
 			'/categories/(?P<id>\d+)',
 			array(
-				'methods'             => 'PUT',
-				'callback'            => array( $this, 'update_category' ),
-				'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_category' ),
+					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_category' ),
+					'permission_callback' => array( $this, 'check_taxonomies_delete_permission' ),
+				),
 			)
 		);
 
@@ -243,9 +250,16 @@ class Arcadia_API {
 			$this->namespace,
 			'/tags/(?P<id>\d+)',
 			array(
-				'methods'             => 'PUT',
-				'callback'            => array( $this, 'update_tag' ),
-				'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_tag' ),
+					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+				),
+				array(
+					'methods'             => 'DELETE',
+					'callback'            => array( $this, 'delete_tag' ),
+					'permission_callback' => array( $this, 'check_taxonomies_delete_permission' ),
+				),
 			)
 		);
 
@@ -379,6 +393,20 @@ class Arcadia_API {
 	 */
 	public function check_taxonomies_write_permission( $request ) {
 		$result = $this->auth->authenticate_request( $request, 'taxonomies:write' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check taxonomies:delete permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_taxonomies_delete_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'taxonomies:delete' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

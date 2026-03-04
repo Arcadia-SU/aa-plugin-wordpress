@@ -34,6 +34,7 @@ function arcadia_agents_settings_page() {
 		'media:write',
 		'taxonomies:read',
 		'taxonomies:write',
+		'taxonomies:delete',
 		'site:read',
 	);
 
@@ -119,8 +120,9 @@ function arcadia_agents_settings_page() {
 		'media:read'       => __( 'Read media library', 'arcadia-agents' ),
 		'media:write'      => __( 'Upload media', 'arcadia-agents' ),
 		'taxonomies:read'  => __( 'Read categories/tags', 'arcadia-agents' ),
-		'taxonomies:write' => __( 'Create categories/tags', 'arcadia-agents' ),
-		'site:read'        => __( 'Read site info & pages', 'arcadia-agents' ),
+		'taxonomies:write'  => __( 'Create/edit categories/tags', 'arcadia-agents' ),
+		'taxonomies:delete' => __( 'Delete categories/tags', 'arcadia-agents' ),
+		'site:read'         => __( 'Read site info & pages', 'arcadia-agents' ),
 	);
 
 	?>
