@@ -22,6 +22,7 @@ require_once __DIR__ . '/api/trait-api-media.php';
 require_once __DIR__ . '/api/trait-api-taxonomies.php';
 require_once __DIR__ . '/api/trait-api-blocks.php';
 require_once __DIR__ . '/api/trait-api-acf-fields.php';
+require_once __DIR__ . '/api/trait-api-site.php';
 
 /**
  * Class Arcadia_API
@@ -37,6 +38,7 @@ class Arcadia_API {
 	use Arcadia_API_Taxonomies_Handler;
 	use Arcadia_API_Blocks_Handler;
 	use Arcadia_API_ACF_Fields_Handler;
+	use Arcadia_API_Site_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -287,6 +289,28 @@ class Arcadia_API {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_site_info' ),
+				'permission_callback' => array( $this, 'check_site_read_permission' ),
+			)
+		);
+
+		// Menus endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/menus',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_menus' ),
+				'permission_callback' => array( $this, 'check_site_read_permission' ),
+			)
+		);
+
+		// Users endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/users',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_users_list' ),
 				'permission_callback' => array( $this, 'check_site_read_permission' ),
 			)
 		);
