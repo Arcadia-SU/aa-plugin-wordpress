@@ -185,6 +185,75 @@
 
 ---
 
+## Phase 8 : Endpoints v2
+
+### Source tracking & Enriched format_post (P0-a)
+- [DONE] Hidden taxonomy `arcadia_source` registration
+- [DONE] `wp_set_object_terms` in `create_post()` for source tracking
+- [DONE] `Arcadia_SEO_Meta` class (multi-plugin detection: Yoast > RankMath > AIOSEO > native)
+- [DONE] Enriched `format_post()`: author name, category/tag names, published_at, last_modified, word_count, has_blocks, seo{}
+
+### Enriched filters GET /articles (P0-b)
+- [DONE] category filter (slug or ID)
+- [DONE] tag filter
+- [DONE] author filter (email/login/ID resolution)
+- [DONE] date_from/date_to filter (date_query)
+- [DONE] orderby whitelist (date, title, modified)
+- [DONE] order whitelist (ASC, DESC)
+- [DONE] source filter (arcadia/wordpress/all via tax_query)
+
+### GET /articles/{id}/blocks (P0-c)
+- [DONE] `get_article_blocks()` using `parse_blocks()`
+- [DONE] Recursive `format_parsed_blocks()` with innerBlocks
+- [DONE] Null blockName skip, empty attrs as object
+
+### POST /tags + PUT categories + PUT tags (P1-a)
+- [DONE] `create_tag()` with duplicate detection
+- [DONE] `update_category()` via `wp_update_term()`
+- [DONE] `update_tag()` via `wp_update_term()`
+
+### DELETE categories + DELETE tags (P1-b)
+- [DONE] `delete_category()` via `wp_delete_term()`
+- [DONE] `delete_tag()` via `wp_delete_term()`
+- [DONE] Scope `taxonomies:delete` + admin checkbox
+
+### Media enriched + PUT/DELETE media (P2-a)
+- [DONE] `type` param (image/video/audio/application → MIME prefix)
+- [DONE] `date_from`/`date_to` filters
+- [DONE] `update_media()` (title, caption, alt_text)
+- [DONE] `delete_media()` with force flag
+- [DONE] Scope `media:delete` + admin checkbox
+
+### GET /menus + GET /users (P2-b)
+- [DONE] `get_menus()`: hierarchical tree from `wp_get_nav_menu_items()`
+- [DONE] `get_users_list()`: role filter + `count_user_posts()`
+
+### Redirects CRUD (P2-c)
+- [DONE] Hidden CPT `arcadia_redirect`
+- [DONE] `template_redirect` hook for serving 301/302
+- [DONE] Transient cache (24h) with invalidation on CRUD
+- [DONE] `get_redirects()`, `create_redirect()`, `delete_redirect()`
+- [DONE] Scopes `redirects:read`, `redirects:write` + admin checkboxes
+
+### Scopes v2 (8 MVP → 12 v2)
+- [DONE] `media:delete`
+- [DONE] `taxonomies:delete`
+- [DONE] `redirects:read`
+- [DONE] `redirects:write`
+
+### Tests v2
+- [DONE] SeoMetaTest (9 tests)
+- [DONE] PostsFiltersTest (12 tests)
+- [DONE] ArticleBlocksTest (6 tests)
+- [DONE] TaxonomyCrudTest (11 tests)
+- [DONE] MediaCrudTest (8 tests)
+- [DONE] SiteEndpointsTest (6 tests)
+- [DONE] RedirectsTest (11 tests)
+- [DONE] Updated FormattersTest (17 fields)
+- [DONE] Updated AuthTest (12 scopes)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

@@ -247,20 +247,28 @@ class AuthTest extends TestCase {
             'articles:delete',
             'media:read',
             'media:write',
+            'media:delete',
             'taxonomies:read',
             'taxonomies:write',
+            'taxonomies:delete',
             'site:read',
+            'redirects:read',
+            'redirects:write',
         );
 
-        // These are the scopes the plugin should support.
-        $this->assertCount( 8, $expected_scopes );
+        // These are the scopes the plugin should support (v2: 12 scopes).
+        $this->assertCount( 12, $expected_scopes );
         $this->assertContains( 'articles:read', $expected_scopes );
         $this->assertContains( 'articles:write', $expected_scopes );
         $this->assertContains( 'articles:delete', $expected_scopes );
         $this->assertContains( 'media:read', $expected_scopes );
         $this->assertContains( 'media:write', $expected_scopes );
+        $this->assertContains( 'media:delete', $expected_scopes );
         $this->assertContains( 'taxonomies:read', $expected_scopes );
         $this->assertContains( 'taxonomies:write', $expected_scopes );
+        $this->assertContains( 'taxonomies:delete', $expected_scopes );
         $this->assertContains( 'site:read', $expected_scopes );
+        $this->assertContains( 'redirects:read', $expected_scopes );
+        $this->assertContains( 'redirects:write', $expected_scopes );
     }
 }

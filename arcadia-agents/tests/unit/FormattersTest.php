@@ -25,7 +25,7 @@ class FormattersTest extends TestCase {
      * Full integration testing would require WordPress environment.
      */
     public function test_format_post_structure(): void {
-        // Expected fields in a formatted post.
+        // Expected fields in a formatted post (v2 enriched).
         $expected_fields = array(
             'id',
             'title',
@@ -35,19 +35,20 @@ class FormattersTest extends TestCase {
             'excerpt',
             'content',
             'author',
-            'date',
-            'date_gmt',
-            'modified',
-            'modified_gmt',
+            'published_at',
+            'last_modified',
+            'word_count',
+            'has_blocks',
             'featured_image_id',
             'featured_image_url',
             'categories',
             'tags',
+            'seo',
         );
 
         // This test documents the expected structure.
         // Actual formatting is tested via integration tests.
-        $this->assertCount( 16, $expected_fields, 'format_post should return 16 fields' );
+        $this->assertCount( 17, $expected_fields, 'format_post should return 17 fields' );
         $this->assertContains( 'id', $expected_fields );
         $this->assertContains( 'title', $expected_fields );
         $this->assertContains( 'content', $expected_fields );
