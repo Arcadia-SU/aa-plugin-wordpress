@@ -518,6 +518,18 @@ if ( ! function_exists( 'get_users' ) ) {
     }
 }
 
+// get_user_by() stub.
+if ( ! function_exists( 'get_user_by' ) ) {
+    global $_test_users_by;
+    $_test_users_by = array();
+
+    function get_user_by( $field, $value ) {
+        global $_test_users_by;
+        $key = $field . ':' . $value;
+        return isset( $_test_users_by[ $key ] ) ? $_test_users_by[ $key ] : false;
+    }
+}
+
 // count_user_posts() stub.
 if ( ! function_exists( 'count_user_posts' ) ) {
     function count_user_posts( $user_id, $post_type = 'post', $public_only = false ) {

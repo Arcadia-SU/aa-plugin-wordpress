@@ -32,31 +32,101 @@ trait Arcadia_API_Posts_Handler {
 		$per_page  = (int) ( $request->get_param( 'per_page' ) ?? 20 );
 		$per_page  = max( 1, min( 100, $per_page ) );
 
+		// Whitelist orderby to prevent arbitrary column queries.
+		$orderby_whitelist = array( 'date', 'title', 'modified' );
+		$orderby           = $request->get_param( 'orderby' ) ?? 'date';
+		if ( ! in_array( $orderby, $orderby_whitelist, true ) ) {
+			$orderby = 'date';
+		}
+
+		// Whitelist order direction.
+		$order = strtoupper( $request->get_param( 'order' ) ?? 'DESC' );
+		if ( ! in_array( $order, array( 'ASC', 'DESC' ), true ) ) {
+			$order = 'DESC';
+		}
+
 		$args = array(
 			'post_type'      => sanitize_text_field( $post_type ),
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
 			'posts_per_page' => $per_page,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
-			'orderby'        => $request->get_param( 'orderby' ) ?? 'date',
-			'order'          => $request->get_param( 'order' ) ?? 'DESC',
+			'orderby'        => $orderby,
+			'order'          => $order,
 		);
 
 		// Filter by status.
 		$status = $request->get_param( 'status' );
 		if ( $status ) {
-			$args['post_status'] = $status;
+			$args['post_status'] = sanitize_text_field( $status );
 		}
 
-		// Filter by category.
+		// Filter by category (slug or ID).
 		$category = $request->get_param( 'category' );
 		if ( $category ) {
-			$args['cat'] = $category;
+			if ( is_numeric( $category ) ) {
+				$args['cat'] = (int) $category;
+			} else {
+				$args['category_name'] = sanitize_text_field( $category );
+			}
+		}
+
+		// Filter by tag (slug).
+		$tag = $request->get_param( 'tag' );
+		if ( $tag ) {
+			$args['tag'] = sanitize_text_field( $tag );
+		}
+
+		// Filter by author (email or login → resolved to ID).
+		$author = $request->get_param( 'author' );
+		if ( $author ) {
+			$author_id = $this->resolve_author_filter( $author );
+			if ( $author_id ) {
+				$args['author'] = $author_id;
+			}
+		}
+
+		// Filter by date range.
+		$date_from = $request->get_param( 'date_from' );
+		$date_to   = $request->get_param( 'date_to' );
+		if ( $date_from || $date_to ) {
+			$date_query = array();
+			if ( $date_from ) {
+				$date_query['after'] = sanitize_text_field( $date_from );
+			}
+			if ( $date_to ) {
+				$date_query['before'] = sanitize_text_field( $date_to );
+			}
+			$date_query['inclusive'] = true;
+			$args['date_query']     = array( $date_query );
 		}
 
 		// Search.
 		$search = $request->get_param( 'search' );
 		if ( $search ) {
 			$args['s'] = $search;
+		}
+
+		// Filter by source (arcadia, wordpress, or all).
+		$source = $request->get_param( 'source' );
+		if ( $source && 'all' !== $source ) {
+			if ( 'arcadia' === $source ) {
+				$args['tax_query'] = array(
+					array(
+						'taxonomy' => 'arcadia_source',
+						'field'    => 'slug',
+						'terms'    => 'arcadia',
+					),
+				);
+			} elseif ( 'wordpress' === $source ) {
+				$args['tax_query'] = array(
+					array(
+						'taxonomy' => 'arcadia_source',
+						'field'    => 'slug',
+						'terms'    => 'arcadia',
+						'operator' => 'NOT IN',
+					),
+				);
+			}
 		}
 
 		$query = new WP_Query( $args );
@@ -74,6 +144,37 @@ trait Arcadia_API_Posts_Handler {
 			),
 			200
 		);
+	}
+
+	/**
+	 * Resolve an author filter value to a user ID.
+	 *
+	 * Tries email first, then login name.
+	 *
+	 * @param string $author Author email or login.
+	 * @return int|null User ID or null if not found.
+	 */
+	private function resolve_author_filter( $author ) {
+		$author_value = sanitize_text_field( $author );
+
+		// Try email.
+		$user = get_user_by( 'email', $author_value );
+		if ( $user ) {
+			return (int) $user->ID;
+		}
+
+		// Try login.
+		$user = get_user_by( 'login', $author_value );
+		if ( $user ) {
+			return (int) $user->ID;
+		}
+
+		// Try numeric ID directly.
+		if ( is_numeric( $author_value ) ) {
+			return (int) $author_value;
+		}
+
+		return null;
 	}
 
 	/**
