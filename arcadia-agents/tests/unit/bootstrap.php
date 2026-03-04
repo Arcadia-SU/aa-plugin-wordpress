@@ -691,6 +691,58 @@ if ( ! function_exists( 'get_post_type_object' ) ) {
     }
 }
 
+// wp_insert_post() stub.
+if ( ! function_exists( 'wp_insert_post' ) ) {
+    global $_test_next_post_id;
+    $_test_next_post_id = 1000;
+
+    function wp_insert_post( $post_data, $wp_error = false ) {
+        global $_test_posts, $_test_next_post_id, $_test_post_meta;
+
+        $id = $_test_next_post_id++;
+        $_test_posts[ $id ] = (object) array(
+            'ID'             => $id,
+            'post_type'      => isset( $post_data['post_type'] ) ? $post_data['post_type'] : 'post',
+            'post_title'     => isset( $post_data['post_title'] ) ? $post_data['post_title'] : '',
+            'post_status'    => isset( $post_data['post_status'] ) ? $post_data['post_status'] : 'draft',
+            'post_content'   => isset( $post_data['post_content'] ) ? $post_data['post_content'] : '',
+            'post_excerpt'   => isset( $post_data['post_excerpt'] ) ? $post_data['post_excerpt'] : '',
+            'post_date'      => date( 'Y-m-d H:i:s' ),
+            'post_modified'  => date( 'Y-m-d H:i:s' ),
+            'post_author'    => isset( $post_data['post_author'] ) ? $post_data['post_author'] : 1,
+            'post_name'      => '',
+            'post_mime_type' => '',
+        );
+
+        if ( ! isset( $_test_post_meta[ $id ] ) ) {
+            $_test_post_meta[ $id ] = array();
+        }
+
+        return $id;
+    }
+}
+
+// register_post_type() stub.
+if ( ! function_exists( 'register_post_type' ) ) {
+    function register_post_type( $post_type, $args = array() ) {
+        return (object) array( 'name' => $post_type );
+    }
+}
+
+// is_admin() stub.
+if ( ! function_exists( 'is_admin' ) ) {
+    function is_admin() {
+        return false;
+    }
+}
+
+// wp_redirect() stub.
+if ( ! function_exists( 'wp_redirect' ) ) {
+    function wp_redirect( $location, $status = 302 ) {
+        return true;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

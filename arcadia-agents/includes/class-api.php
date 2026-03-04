@@ -23,6 +23,7 @@ require_once __DIR__ . '/api/trait-api-taxonomies.php';
 require_once __DIR__ . '/api/trait-api-blocks.php';
 require_once __DIR__ . '/api/trait-api-acf-fields.php';
 require_once __DIR__ . '/api/trait-api-site.php';
+require_once __DIR__ . '/api/trait-api-redirects.php';
 
 /**
  * Class Arcadia_API
@@ -39,6 +40,7 @@ class Arcadia_API {
 	use Arcadia_API_Blocks_Handler;
 	use Arcadia_API_ACF_Fields_Handler;
 	use Arcadia_API_Site_Handler;
+	use Arcadia_API_Redirects_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -315,6 +317,34 @@ class Arcadia_API {
 			)
 		);
 
+		// Redirects endpoints.
+		register_rest_route(
+			$this->namespace,
+			'/redirects',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_redirects' ),
+					'permission_callback' => array( $this, 'check_redirects_read_permission' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'create_redirect' ),
+					'permission_callback' => array( $this, 'check_redirects_write_permission' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/redirects/(?P<id>\d+)',
+			array(
+				'methods'             => 'DELETE',
+				'callback'            => array( $this, 'delete_redirect' ),
+				'permission_callback' => array( $this, 'check_redirects_write_permission' ),
+			)
+		);
+
 		// Blocks discovery endpoint.
 		register_rest_route(
 			$this->namespace,
@@ -462,6 +492,34 @@ class Arcadia_API {
 	 */
 	public function check_taxonomies_delete_permission( $request ) {
 		$result = $this->auth->authenticate_request( $request, 'taxonomies:delete' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check redirects:read permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_redirects_read_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'redirects:read' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check redirects:write permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_redirects_write_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'redirects:write' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

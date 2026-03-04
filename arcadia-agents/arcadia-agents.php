@@ -95,6 +95,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-redirects.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
@@ -112,6 +113,10 @@ class Arcadia_Agents {
 
 		// Register custom taxonomy for source tracking.
 		add_action( 'init', array( $this, 'register_arcadia_source_taxonomy' ) );
+
+		// Register redirects CPT and handler.
+		add_action( 'init', array( $this, 'register_redirect_post_type' ) );
+		add_action( 'template_redirect', array( $this, 'handle_arcadia_redirects' ) );
 
 		// Admin menu.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -153,6 +158,20 @@ class Arcadia_Agents {
 		$types = get_post_types( array( 'public' => true ), 'names' );
 		unset( $types['attachment'] );
 		return array_values( $types );
+	}
+
+	/**
+	 * Register the arcadia_redirect Custom Post Type.
+	 */
+	public function register_redirect_post_type() {
+		Arcadia_Redirects::get_instance()->register_post_type();
+	}
+
+	/**
+	 * Handle arcadia redirects on template_redirect hook.
+	 */
+	public function handle_arcadia_redirects() {
+		Arcadia_Redirects::get_instance()->handle_redirect();
 	}
 
 	/**

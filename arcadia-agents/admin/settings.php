@@ -37,6 +37,8 @@ function arcadia_agents_settings_page() {
 		'taxonomies:write',
 		'taxonomies:delete',
 		'site:read',
+		'redirects:read',
+		'redirects:write',
 	);
 
 	$notice        = '';
@@ -125,6 +127,8 @@ function arcadia_agents_settings_page() {
 		'taxonomies:write'  => __( 'Create/edit categories/tags', 'arcadia-agents' ),
 		'taxonomies:delete' => __( 'Delete categories/tags', 'arcadia-agents' ),
 		'site:read'         => __( 'Read site info & pages', 'arcadia-agents' ),
+		'redirects:read'    => __( 'Read redirects', 'arcadia-agents' ),
+		'redirects:write'   => __( 'Create/delete redirects', 'arcadia-agents' ),
 	);
 
 	?>

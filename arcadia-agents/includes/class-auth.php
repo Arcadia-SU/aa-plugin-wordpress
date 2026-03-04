@@ -227,6 +227,8 @@ class Arcadia_Auth {
 			'taxonomies:write',
 			'taxonomies:delete',
 			'site:read',
+			'redirects:read',
+			'redirects:write',
 		);
 		$enabled_scopes = get_option( 'arcadia_agents_scopes', $all_scopes );
 
