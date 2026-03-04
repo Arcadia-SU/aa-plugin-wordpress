@@ -15,10 +15,12 @@
 
 - **Direction:** Agent initie toujours (push vers WordPress)
 - **Protocole:** REST API exposée par le plugin WordPress
-- **Capacités requises:** 14 endpoints validés
+- **Capacités requises:** 28 endpoints (15 MVP ✅ + 13 v2)
+
+  **MVP (implémenté ✅) :**
   - Articles :
     - `POST /articles` - create_article(title, content, status, meta) → article_id
-    - `GET /articles` - get_articles(?post_type, ?status, ?page, ?per_page) → paginated list
+    - `GET /articles` - get_articles(?post_type, ?status, ?page, ?per_page, + filtres v2) → paginated list
     - `PUT /articles/{id}` - update_article(article_id, fields) → success
     - `DELETE /articles/{id}` - delete_article(article_id) → success
   - Pages :
@@ -31,22 +33,84 @@
     - `GET /categories` - get_categories() → list
     - `GET /tags` - get_tags() → list
     - `POST /categories` - create_category(name, parent?) → cat_id
+    - `POST /tags` - create_tag(name) → tag_id
   - Structure site :
     - `GET /site-info` - get_site_info() → url, name, theme, etc.
   - Blocs :
     - `GET /blocks` - get_blocks() → available block types + fields schema
     - `GET /blocks/usage` - get_blocks_usage(?post_type, ?sample_size) → block usage stats + examples from existing content
 
+  **v2 — Agent Capabilities Expansion** ([specs détaillées](../next/plugin-v2-agent-capabilities.md)) :
+  - Articles :
+    - `GET /articles/{id}/blocks` - structure de blocs d'un article via `parse_blocks()` (A1)
+  - Taxonomies :
+    - `PUT /categories/{id}` - update_category(id, name, parent?, description?) → success (B2)
+    - `PUT /tags/{id}` - update_tag(id, name, description?) → success
+    - `DELETE /categories/{id}` - delete_category(id) → success (B3)
+    - `DELETE /tags/{id}` - delete_tag(id) → success (B3)
+  - Médias :
+    - `GET /media` - list_media(?type, ?search, ?date_from, ?date_to, ?per_page, ?page) → paginated list (C1)
+    - `PUT /media/{id}` - update_media_meta(id, alt_text?, title?, caption?) → success (C2)
+    - `DELETE /media/{id}` - delete_media(id, ?force) → success (C3)
+  - Structure site :
+    - `GET /menus` - get_menus() → navigation menus with items hierarchy (D1)
+    - `GET /users` - get_users() → editors+ with posts_count (D3)
+  - Maintenance :
+    - `GET /redirects` - list_redirects() → existing redirections (E2)
+    - `POST /redirects` - create_redirect(source, target, type) → redirect_id (E2)
+    - `DELETE /redirects/{id}` - delete_redirect(id) → success (E2)
+
 **Nommage `/articles` :** Le code agent (`WordPressSiteConnector`) utilise `/articles` comme path, pas `/posts`. Cohérent avec le vocabulaire CMS-agnostic du `SiteConnector` protocol. Le plugin traduit `article` ↔ `wp_post` en interne.
 
 **Paramètres de query — `GET /articles` et `GET /pages` :**
 
-| Paramètre | Type | Défaut | Description |
-|-----------|------|--------|-------------|
-| `post_type` | string | `post` | Type de contenu WP (`GET /articles` uniquement) |
-| `status` | string | tous | Filtrer par statut CMS : `publish`, `draft`, `pending` |
-| `page` | int | `1` | Page de résultats |
-| `per_page` | int | `20` | Items par page (max: 100) |
+| Paramètre | Type | Défaut | Description | Statut |
+|-----------|------|--------|-------------|--------|
+| `post_type` | string | `post` | Type de contenu WP (`GET /articles` uniquement) | MVP ✅ |
+| `status` | string | tous | Filtrer par statut CMS : `publish`, `draft`, `pending` | MVP ✅ |
+| `page` | int | `1` | Page de résultats | MVP ✅ |
+| `per_page` | int | `20` | Items par page (max: 100) | MVP ✅ |
+| `source` | string | `all` | `arcadia` \| `wordpress` \| `all` | v2 (A2) |
+| `category` | string | — | Filtrer par catégorie | v2 (F1) |
+| `tag` | string | — | Filtrer par tag | v2 (F1) |
+| `author` | string | — | Filtrer par auteur | v2 (F1) |
+| `search` | string | — | Recherche full-text | v2 (F1) |
+| `date_from` | string | — | Date début (ISO 8601) | v2 (F1) |
+| `date_to` | string | — | Date fin (ISO 8601) | v2 (F1) |
+| `orderby` | string | `date` | `date` \| `title` \| `modified` | v2 (F1) |
+| `order` | string | `desc` | `asc` \| `desc` | v2 (F1) |
+
+**Réponse enrichie `GET /articles` (v2 — A2/F3/A3) :**
+
+Les champs suivants sont ajoutés à chaque article dans la réponse paginée :
+
+```json
+{
+  "id": "12345",
+  "title": "...",
+  "slug": "...",
+  "status": "publish",
+  "url": "...",
+  "published_at": "...",
+  "last_modified": "...",
+  "author": "Jean Dupont",
+  "word_count": 1850,
+  "categories": ["Fiscalité"],
+  "tags": ["LMNP", "Plus-value"],
+  "has_blocks": true,
+  "seo": {
+    "meta_title": "...",
+    "meta_description": "...",
+    "canonical_url": "...",
+    "og_title": "...",
+    "og_description": "...",
+    "robots": "index,follow"
+  }
+}
+```
+
+Champs v2 : `last_modified`, `author`, `word_count`, `categories`, `tags`, `has_blocks`, `seo`.
+SEO : lecture depuis Yoast, RankMath, ou All-in-One SEO (fallback WP natif si aucun plugin SEO).
 
 **Champs modifiables — `PUT /articles/{id}` et `PUT /pages/{id}` :**
 
@@ -178,18 +242,22 @@ if (str_starts_with($auth_header, 'Bearer ')) {
 
 ### Scopes (permissions granulaires)
 
-8 scopes par ressource+action :
+12 scopes par ressource+action (8 MVP + 4 v2) :
 
-| Scope | Description |
-|-------|-------------|
-| `articles:read` | Lire les articles |
-| `articles:write` | Créer/modifier articles |
-| `articles:delete` | Supprimer articles |
-| `media:read` | Lire la media library |
-| `media:write` | Upload images |
-| `taxonomies:read` | Lire catégories/tags |
-| `taxonomies:write` | Créer catégories/tags |
-| `site:read` | Lire infos site + pages |
+| Scope | Description | Statut |
+|-------|-------------|--------|
+| `articles:read` | Lire les articles (+ structure blocs v2) | MVP ✅ |
+| `articles:write` | Créer/modifier articles | MVP ✅ |
+| `articles:delete` | Supprimer articles | MVP ✅ |
+| `media:read` | Lire la media library | MVP ✅ |
+| `media:write` | Upload images / modifier métas | MVP ✅ |
+| `media:delete` | Supprimer un média | v2 (C3) |
+| `taxonomies:read` | Lire catégories/tags | MVP ✅ |
+| `taxonomies:write` | Créer/modifier catégories/tags | MVP ✅ |
+| `taxonomies:delete` | Supprimer catégories/tags | v2 (B3) |
+| `site:read` | Lire infos site, pages, menus, users, templates | MVP ✅ |
+| `redirects:read` | Lire les redirections | v2 (E2) |
+| `redirects:write` | Créer/supprimer des redirections | v2 (E2) |
 
 - Interface WP admin : checkboxes pour activer/désactiver chaque scope
 - Erreur scope manquant : réponse JSON structurée
@@ -356,14 +424,14 @@ Le plugin supporte des blocs custom via découverte dynamique.
   "adapter": "acf",
   "blocks": {
     "builtin": [
-      {"type": "paragraph", "description": "Text block"},
-      {"type": "heading", "description": "H2/H3 heading"},
-      {"type": "image", "description": "Single image"},
-      {"type": "list", "description": "Ordered/unordered list"}
+      {"type": "core/paragraph", "description": "Text block"},
+      {"type": "core/heading", "description": "H2/H3 heading"},
+      {"type": "core/image", "description": "Single image"},
+      {"type": "core/list", "description": "Ordered/unordered list"}
     ],
     "custom": [
       {
-        "type": "bouton",
+        "type": "acf/bouton",
         "title": "Bouton CTA",
         "fields": [
           {"name": "bouton_label", "type": "text", "required": true, "label": "Label du bouton"},
@@ -442,7 +510,26 @@ Le plugin supporte des blocs custom via découverte dynamique.
 
 L'agent doit pouvoir comprendre comment les blocs sont **réellement utilisés** sur le site, pas seulement lesquels sont disponibles. Ceci lui permet de générer des descriptions riches et de prendre de meilleures décisions éditoriales.
 
-**Motivation :** Le `GET /blocks` retourne les blocs disponibles avec des descriptions basiques. Mais pour qu'un agent comprenne vraiment à quoi sert `acf/citation` ou `acf/tableau`, il doit voir des exemples concrets d'utilisation dans le contenu existant du site.
+**Motivation :** Le `GET /blocks` retourne les blocs disponibles avec des descriptions basiques. Mais pour qu'un agent comprenne vraiment à quoi sert `citation` ou `tableau`, il doit voir des exemples concrets d'utilisation dans le contenu existant du site.
+
+> **Finding 024 — Noms de blocs : ~~noms courts~~ → noms CMS namespaced (ADR-022 D2)**
+>
+> **Constaté en E2E (2026-03-01) :** `/blocks` retourne des noms courts (`paragraph`, `bouton`) tandis que `/blocks/usage` retourne des noms Gutenberg natifs (`core/paragraph`, `acf/bouton`). Mismatch côté AA.
+>
+> **Décision initiale (2026-03-01) :** Noms courts = le contrat.
+>
+> **~~Supersédé par ADR-022 D2 (2026-03-02)~~** : Le plugin retourne les **noms CMS namespaced** :
+> - Core blocks : `core/paragraph`, `core/heading`, `core/image`
+> - ACF blocks : `acf/text`, `acf/text-image`, `acf/button`
+> - Third-party : `kadence/rowlayout`, `generateblocks/container`
+>
+> Les types assembly restent des noms courts (`paragraph`, `text`, `section`, `list`, `image`, `quote`).
+>
+> **Règle de disambiguation :** contient `/` → bloc CMS natif. Pas de `/` → type assembly structurel.
+>
+> Le connector AA mappe les types assembly vers les équivalents CMS au publish (`paragraph` → `core/paragraph`). Les noms CMS natifs passent tels quels.
+>
+> **Impact :** `GET /blocks` et `GET /blocks/usage` retournent des noms namespaced. Le `context.parent_block` aussi.
 
 **Endpoint `GET /arcadia/v1/blocks/usage` :** Retourne des statistiques d'usage et des exemples de blocs depuis le contenu existant. Scope requis : `site:read`.
 
@@ -470,6 +557,10 @@ L'agent doit pouvoir comprendre comment les blocs sont **réellement utilisés**
           "block_data": {
             "text": "<p>La loi Pinel permet de bénéficier d'une réduction d'impôt...</p>"
           },
+          "attrs": {
+            "text": "<p>La loi Pinel permet de bénéficier d'une réduction d'impôt...</p>",
+            "apply_background_image": "plain"
+          },
           "context": {
             "parent_block": "acf/title",
             "position": 2
@@ -489,6 +580,10 @@ L'agent doit pouvoir comprendre comment les blocs sont **réellement utilisés**
             "citation_texte": "Un accompagnement exceptionnel du début à la fin.",
             "citation_auteur": "Marie D., acheteuse 2023"
           },
+          "attrs": {
+            "citation_texte": "Un accompagnement exceptionnel du début à la fin.",
+            "citation_auteur": "Marie D., acheteuse 2023"
+          },
           "context": {
             "parent_block": "acf/title",
             "position": 5
@@ -505,6 +600,9 @@ L'agent doit pouvoir comprendre comment les blocs sont **réellement utilisés**
           "post_id": 789,
           "post_title": "Comparatif dispositifs fiscaux",
           "block_data": {
+            "tableau_contenu": "<table>...</table>"
+          },
+          "attrs": {
             "tableau_contenu": "<table>...</table>"
           },
           "context": {
@@ -540,6 +638,16 @@ Les thèmes CPT+ACF ne lisent pas `post_content` — ils lisent les champs ACF v
 **Décision : Discovery + mapping explicite.** Le mapping est fait une fois par site après `discover_site` et stocké dans `cms_schema` côté AA. Le plugin reçoit des noms de champs ACF finaux + valeurs.
 
 #### 1. Discovery : champs ACF dans `GET /site-info`
+
+**v2 (D2)** — Le endpoint retourne aussi les templates disponibles :
+```json
+{
+  "templates": {
+    "post": ["default", "full-width", "landing-page"],
+    "page": ["default", "sidebar", "full-width", "contact"]
+  }
+}
+```
 
 ```json
 {
@@ -675,6 +783,7 @@ Audit v2.0.1 (33 issues : 1 critical, 6 high, 12 medium, 14 low) : **[plugin-wp-
 
 ## Next Steps
 
+**MVP (fait) :**
 1. ~~Décider protocole de communication~~ ✅
 2. ~~Définir liste exhaustive des capacités~~ ✅
 3. ~~Choisir méthode d'authentification~~ ✅
@@ -694,3 +803,12 @@ Audit v2.0.1 (33 issues : 1 critical, 6 high, 12 medium, 14 low) : **[plugin-wp-
 17. Fix plugin MEDIUM (voir [code review](./plugin-wp-code-review.md))
 18. ~~Implémenter Q10 : `GET /blocks/usage` endpoint (block usage stats + examples)~~ ✅
 19. ~~Implémenter Q9 : ACF fields discovery + write + fix finding 023~~ ✅
+
+**v2 — Agent Capabilities Expansion** ([specs détaillées](../next/plugin-v2-agent-capabilities.md), [ADR-022](../../adr/ADR-022-article-cms-mapping-pipeline.md)) :
+
+20. **v2 P0 — MVP agent learning** : A1 (`GET /articles/{id}/blocks`), A2 (filtres + réponse enrichie `GET /articles`), F2 (attrs dans `/blocks/usage`)
+21. **v2 P0 — Naming convention** : Migrer `/blocks` et `/blocks/usage` vers noms CMS namespaced (ADR-022 D2)
+22. **v2 P1 — Contenu + taxonomie** : A3 (SEO meta lecture multi-plugin), B1-B3 (CRUD tags/catégories complet), F1/F3 (filtres/metadata enrichis)
+23. **v2 P2 — Médias, structure, maintenance** : C1-C3 (CRUD media library), D1-D3 (menus, templates, users), E2 (redirections)
+24. **v2 Scopes** : Ajouter `media:delete`, `taxonomies:delete`, `redirects:read`, `redirects:write` (8 → 12 scopes)
+25. Code review issues résolues par v2 : #32 (taxonomy CRUD → B2/B3), #23 (SEO multi-plugin → A3), #33 (pagination taxonomies → v2 filtres)
