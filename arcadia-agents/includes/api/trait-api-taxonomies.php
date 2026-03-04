@@ -138,6 +138,201 @@ trait Arcadia_API_Taxonomies_Handler {
 	}
 
 	/**
+	 * Create a tag.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function create_tag( $request ) {
+		$body = $request->get_json_params();
+
+		if ( empty( $body['name'] ) ) {
+			return new WP_Error(
+				'missing_name',
+				__( 'Tag name is required.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$args = array(
+			'slug' => isset( $body['slug'] ) ? sanitize_title( $body['slug'] ) : '',
+		);
+
+		if ( ! empty( $body['description'] ) ) {
+			$args['description'] = sanitize_textarea_field( $body['description'] );
+		}
+
+		$result = wp_insert_term(
+			sanitize_text_field( $body['name'] ),
+			'post_tag',
+			$args
+		);
+
+		if ( is_wp_error( $result ) ) {
+			// If term already exists, return it.
+			if ( 'term_exists' === $result->get_error_code() ) {
+				$term = get_term( $result->get_error_data(), 'post_tag' );
+				if ( ! $term || is_wp_error( $term ) ) {
+					return new WP_Error(
+						'term_read_failed',
+						__( 'Failed to read existing tag.', 'arcadia-agents' ),
+						array( 'status' => 500 )
+					);
+				}
+				return new WP_REST_Response(
+					array(
+						'success'  => true,
+						'tag_id'   => $term->term_id,
+						'tag'      => $this->format_term( $term ),
+						'existing' => true,
+					),
+					200
+				);
+			}
+			return $result;
+		}
+
+		$term = get_term( $result['term_id'], 'post_tag' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_read_failed',
+				__( 'Failed to read tag after creation.', 'arcadia-agents' ),
+				array( 'status' => 500 )
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'tag_id'  => $result['term_id'],
+				'tag'     => $this->format_term( $term ),
+			),
+			201
+		);
+	}
+
+	/**
+	 * Update a category.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_category( $request ) {
+		$term_id = (int) $request->get_param( 'id' );
+		$term    = get_term( $term_id, 'category' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_not_found',
+				__( 'Category not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$body = $request->get_json_params();
+		$args = array();
+
+		if ( ! empty( $body['name'] ) ) {
+			$args['name'] = sanitize_text_field( $body['name'] );
+		}
+
+		if ( ! empty( $body['slug'] ) ) {
+			$args['slug'] = sanitize_title( $body['slug'] );
+		}
+
+		if ( isset( $body['description'] ) ) {
+			$args['description'] = sanitize_textarea_field( $body['description'] );
+		}
+
+		if ( isset( $body['parent'] ) ) {
+			$args['parent'] = (int) $body['parent'];
+		}
+
+		if ( empty( $args ) ) {
+			return new WP_Error(
+				'nothing_to_update',
+				__( 'No fields to update.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$result = wp_update_term( $term_id, 'category', $args );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$updated_term = get_term( $term_id, 'category' );
+
+		return new WP_REST_Response(
+			array(
+				'success'  => true,
+				'category' => $this->format_term( $updated_term ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Update a tag.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function update_tag( $request ) {
+		$term_id = (int) $request->get_param( 'id' );
+		$term    = get_term( $term_id, 'post_tag' );
+
+		if ( ! $term || is_wp_error( $term ) ) {
+			return new WP_Error(
+				'term_not_found',
+				__( 'Tag not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		$body = $request->get_json_params();
+		$args = array();
+
+		if ( ! empty( $body['name'] ) ) {
+			$args['name'] = sanitize_text_field( $body['name'] );
+		}
+
+		if ( ! empty( $body['slug'] ) ) {
+			$args['slug'] = sanitize_title( $body['slug'] );
+		}
+
+		if ( isset( $body['description'] ) ) {
+			$args['description'] = sanitize_textarea_field( $body['description'] );
+		}
+
+		if ( empty( $args ) ) {
+			return new WP_Error(
+				'nothing_to_update',
+				__( 'No fields to update.', 'arcadia-agents' ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$result = wp_update_term( $term_id, 'post_tag', $args );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		$updated_term = get_term( $term_id, 'post_tag' );
+
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'tag'     => $this->format_term( $updated_term ),
+			),
+			200
+		);
+	}
+
+	/**
 	 * Get tags.
 	 *
 	 * @param WP_REST_Request $request The request.

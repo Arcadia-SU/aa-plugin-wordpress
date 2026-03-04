@@ -132,8 +132,9 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
      * Minimal WP_REST_Request stub for unit testing.
      */
     class WP_REST_Request {
-        private $headers = array();
-        private $params  = array();
+        private $headers     = array();
+        private $params      = array();
+        private $json_params = array();
 
         public function set_header( $key, $value ) {
             $this->headers[ strtolower( $key ) ] = $value;
@@ -150,6 +151,14 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
         public function get_param( $key ) {
             return isset( $this->params[ $key ] ) ? $this->params[ $key ] : null;
+        }
+
+        public function set_json_params( $params ) {
+            $this->json_params = $params;
+        }
+
+        public function get_json_params() {
+            return $this->json_params;
         }
     }
 }
@@ -617,6 +626,25 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
         global $_test_post_meta;
         unset( $_test_post_meta[ $post_id ][ $meta_key ] );
         return true;
+    }
+}
+
+// get_terms() stub.
+if ( ! function_exists( 'get_terms' ) ) {
+    global $_test_get_terms_results;
+    $_test_get_terms_results = array();
+
+    function get_terms( $args = array() ) {
+        global $_test_get_terms_results;
+        $taxonomy = isset( $args['taxonomy'] ) ? $args['taxonomy'] : 'category';
+        return isset( $_test_get_terms_results[ $taxonomy ] ) ? $_test_get_terms_results[ $taxonomy ] : array();
+    }
+}
+
+// sanitize_title() stub.
+if ( ! function_exists( 'sanitize_title' ) ) {
+    function sanitize_title( $title ) {
+        return strtolower( preg_replace( '/[^a-z0-9-]/', '-', strtolower( trim( $title ) ) ) );
     }
 }
 

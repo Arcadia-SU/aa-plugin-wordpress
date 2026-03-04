@@ -216,9 +216,36 @@ class Arcadia_API {
 			$this->namespace,
 			'/tags',
 			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_tags' ),
-				'permission_callback' => array( $this, 'check_taxonomies_read_permission' ),
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_tags' ),
+					'permission_callback' => array( $this, 'check_taxonomies_read_permission' ),
+				),
+				array(
+					'methods'             => 'POST',
+					'callback'            => array( $this, 'create_tag' ),
+					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+				),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/categories/(?P<id>\d+)',
+			array(
+				'methods'             => 'PUT',
+				'callback'            => array( $this, 'update_category' ),
+				'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/tags/(?P<id>\d+)',
+			array(
+				'methods'             => 'PUT',
+				'callback'            => array( $this, 'update_tag' ),
+				'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
 			)
 		);
 
