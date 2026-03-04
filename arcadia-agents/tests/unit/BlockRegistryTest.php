@@ -45,10 +45,10 @@ class BlockRegistryTest extends TestCase {
 		$this->assertCount( 4, $builtins );
 
 		$types = array_column( $builtins, 'type' );
-		$this->assertContains( 'paragraph', $types );
-		$this->assertContains( 'heading', $types );
-		$this->assertContains( 'image', $types );
-		$this->assertContains( 'list', $types );
+		$this->assertContains( 'core/paragraph', $types );
+		$this->assertContains( 'core/heading', $types );
+		$this->assertContains( 'core/image', $types );
+		$this->assertContains( 'core/list', $types );
 	}
 
 	/**

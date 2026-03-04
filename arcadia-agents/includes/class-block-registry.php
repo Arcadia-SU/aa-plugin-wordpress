@@ -96,7 +96,13 @@ class Arcadia_Block_Registry {
 	 * @return array Array of builtin block descriptors.
 	 */
 	public function get_builtin_blocks() {
-		return array_values( self::BUILTIN_BLOCKS );
+		return array_map(
+			function ( $block ) {
+				$block['type'] = 'core/' . $block['type'];
+				return $block;
+			},
+			array_values( self::BUILTIN_BLOCKS )
+		);
 	}
 
 	/**
@@ -245,11 +251,11 @@ class Arcadia_Block_Registry {
 		$acf_blocks = acf_get_block_types();
 
 		foreach ( $acf_blocks as $block_name => $block_config ) {
-			// Extract short name from "acf/block-name".
+			// Extract short name for title fallback only.
 			$short_name = preg_replace( '/^acf\//', '', $block_name );
 
 			$block_descriptor = array(
-				'type'  => $short_name,
+				'type'  => $block_name,
 				'title' => $block_config['title'] ?? $short_name,
 			);
 
