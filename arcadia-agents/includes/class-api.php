@@ -133,6 +133,17 @@ class Arcadia_API {
 			)
 		);
 
+		// Article blocks structure endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/articles/(?P<id>\d+)/blocks',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_article_blocks' ),
+				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+			)
+		);
+
 		// Featured image endpoint.
 		register_rest_route(
 			$this->namespace,

@@ -620,6 +620,20 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
     }
 }
 
+// get_post_type_object() stub.
+if ( ! function_exists( 'get_post_type_object' ) ) {
+    global $_test_post_type_objects;
+    $_test_post_type_objects = array(
+        'post' => (object) array( 'name' => 'post', 'public' => true, 'hierarchical' => false ),
+        'page' => (object) array( 'name' => 'page', 'public' => true, 'hierarchical' => true ),
+    );
+
+    function get_post_type_object( $post_type ) {
+        global $_test_post_type_objects;
+        return isset( $_test_post_type_objects[ $post_type ] ) ? $_test_post_type_objects[ $post_type ] : null;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

@@ -556,6 +556,87 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
+	 * Get the block structure of a post.
+	 *
+	 * Uses parse_blocks() to return the parsed block tree.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_article_blocks( $request ) {
+		$post_id = (int) $request->get_param( 'id' );
+		$post    = get_post( $post_id );
+
+		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
+			return new WP_Error(
+				'post_not_found',
+				__( 'Post not found.', 'arcadia-agents' ),
+				array( 'status' => 404 )
+			);
+		}
+
+		if ( empty( $post->post_content ) ) {
+			return new WP_REST_Response(
+				array(
+					'post_id' => $post_id,
+					'blocks'  => array(),
+				),
+				200
+			);
+		}
+
+		$parsed = parse_blocks( $post->post_content );
+		$blocks = $this->format_parsed_blocks( $parsed );
+
+		return new WP_REST_Response(
+			array(
+				'post_id' => $post_id,
+				'blocks'  => $blocks,
+			),
+			200
+		);
+	}
+
+	/**
+	 * Format parsed blocks recursively for API response.
+	 *
+	 * Filters out empty/whitespace-only blocks (null blockName)
+	 * and includes innerBlocks recursively.
+	 *
+	 * @param array $parsed_blocks Array from parse_blocks().
+	 * @return array Formatted block list.
+	 */
+	private function format_parsed_blocks( $parsed_blocks ) {
+		$blocks = array();
+
+		foreach ( $parsed_blocks as $block ) {
+			// Skip empty/whitespace blocks (null blockName).
+			if ( empty( $block['blockName'] ) ) {
+				continue;
+			}
+
+			$formatted = array(
+				'blockName'  => $block['blockName'],
+				'attrs'      => ! empty( $block['attrs'] ) ? $block['attrs'] : new \stdClass(),
+			);
+
+			// Include innerHTML for content inspection.
+			if ( ! empty( $block['innerHTML'] ) ) {
+				$formatted['innerHTML'] = $block['innerHTML'];
+			}
+
+			// Recurse into innerBlocks.
+			if ( ! empty( $block['innerBlocks'] ) ) {
+				$formatted['innerBlocks'] = $this->format_parsed_blocks( $block['innerBlocks'] );
+			}
+
+			$blocks[] = $formatted;
+		}
+
+		return $blocks;
+	}
+
+	/**
 	 * Delete a post.
 	 *
 	 * @param WP_REST_Request $request The request.
