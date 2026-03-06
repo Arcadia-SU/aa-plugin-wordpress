@@ -151,8 +151,14 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 
 			switch ( $type ) {
 				case 'image':
-					// Sideload image URL to get attachment ID.
-					$data[ $field_name ] = self::sideload_image_field( $value );
+					// After H1.2 pre-processing, value is typically already an int.
+					// Guard: only sideload if still a URL string.
+					if ( is_string( $value ) ) {
+						$sideloaded          = self::sideload_image_field( $value );
+						$data[ $field_name ] = is_wp_error( $sideloaded ) ? 0 : $sideloaded;
+					} else {
+						$data[ $field_name ] = $value;
+					}
 					break;
 
 				case 'repeater':
@@ -182,11 +188,11 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	/**
 	 * Sideload an image URL and return the attachment ID.
 	 *
-	 * Falls back to the URL string if sideloading fails or
-	 * required functions are not available.
+	 * Returns WP_Error on failure so callers can surface the error
+	 * to the agent instead of silently falling back to a URL string.
 	 *
 	 * @param string $url The image URL.
-	 * @return int|string Attachment ID or original URL.
+	 * @return int|WP_Error Attachment ID or WP_Error on failure.
 	 */
 	public static function sideload_image_field( $url ) {
 		if ( ! function_exists( 'media_sideload_image' ) ) {
@@ -196,13 +202,16 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 		}
 
 		if ( ! function_exists( 'media_sideload_image' ) ) {
-			return $url;
+			return new WP_Error(
+				'sideload_unavailable',
+				__( 'media_sideload_image() is not available.', 'arcadia-agents' )
+			);
 		}
 
 		$attachment_id = media_sideload_image( $url, 0, null, 'id' );
 
 		if ( is_wp_error( $attachment_id ) ) {
-			return $url;
+			return $attachment_id;
 		}
 
 		return $attachment_id;

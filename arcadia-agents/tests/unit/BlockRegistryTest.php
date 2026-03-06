@@ -27,8 +27,21 @@ class BlockRegistryTest extends TestCase {
 
 	/**
 	 * Set up test fixtures.
+	 *
+	 * Resets singletons to avoid state leakage from other test classes
+	 * (e.g. AcfValidatorTest registers ACF block types that would persist).
 	 */
 	protected function setUp(): void {
+		// Reset Block_Registry singleton.
+		$ref = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+
+		// Clear any ACF block types registered by other tests.
+		global $_test_acf_block_types;
+		$_test_acf_block_types = array();
+
 		$this->registry = \Arcadia_Block_Registry::get_instance();
 	}
 

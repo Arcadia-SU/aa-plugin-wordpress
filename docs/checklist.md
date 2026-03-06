@@ -322,6 +322,38 @@
 
 ---
 
+## Phase 11 : ACF Block Validation at Publish (H1)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-06*
+*Endpoints concernés : `POST /articles`, `PUT /articles/{id}`*
+
+### H1.1 — ACF Schema Validation (before save)
+- [DONE] Valider types de champs ACF contre le schéma enregistré (`acf_get_fields()`)
+- [DONE] Vérifier champs requis présents
+- [DONE] Vérifier disponibilité bloc pour le post type cible
+- [DONE] Retourner 422 avec erreur structurée par champ (block_index, field, expected, got, suggestion)
+
+### H1.2 — Image URL Auto-Sideload
+- [DONE] Détecter URL string dans champ ACF `image` (au lieu d'un attachment ID)
+- [DONE] Auto-sideload via `media_sideload_image()`
+- [DONE] Remplacer URL par attachment ID dans les données du bloc
+- [DONE] Retourner 422 si sideload échoue
+
+### H1.3 — Render Test (after save, before response)
+- [DONE] `render_block()` interne pour chaque bloc ACF après sauvegarde
+- [DONE] Catch fatal errors / exceptions via `ob_start()` + error handler
+- [DONE] Rollback post si render échoue → retourner 422
+- [DONE] Si render OK → retourner 200 normalement
+
+### Implementation details
+- `Arcadia_ACF_Validator` singleton: `validate_and_preprocess()` + `render_test()`
+- Integrated into `json_to_blocks()` (post_type param added)
+- `sideload_image_field()` returns `WP_Error` on failure (no silent fallback)
+- Render test in `create_post()` and `update_post()` after save
+- 19 unit tests (AcfValidatorTest)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

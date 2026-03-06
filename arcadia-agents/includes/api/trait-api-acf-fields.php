@@ -175,7 +175,11 @@ trait Arcadia_API_ACF_Fields_Handler {
 
 				case 'image':
 					if ( is_string( $value ) && ! empty( $value ) ) {
-						$value = Arcadia_ACF_Adapter::sideload_image_field( $value );
+						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value );
+						if ( is_wp_error( $sideloaded ) ) {
+							return $sideloaded;
+						}
+						$value = $sideloaded;
 					}
 					break;
 

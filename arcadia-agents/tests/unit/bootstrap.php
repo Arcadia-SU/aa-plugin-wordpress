@@ -896,6 +896,51 @@ if ( ! function_exists( 'hash_equals' ) ) {
     }
 }
 
+// ACF class stub — enables Arcadia_Blocks::is_acf_available() in tests.
+if ( ! class_exists( 'ACF' ) ) {
+    class ACF {}
+}
+
+// acf_get_block_types() stub — used by Block Registry introspection.
+if ( ! function_exists( 'acf_get_block_types' ) ) {
+    global $_test_acf_block_types;
+    $_test_acf_block_types = array();
+
+    function acf_get_block_types() {
+        global $_test_acf_block_types;
+        return $_test_acf_block_types;
+    }
+}
+
+// media_sideload_image() stub — configurable result for validator tests.
+if ( ! function_exists( 'media_sideload_image' ) ) {
+    global $_test_media_sideload_result;
+    $_test_media_sideload_result = null;
+
+    function media_sideload_image( $url, $post_id = 0, $desc = null, $return_type = 'html' ) {
+        global $_test_media_sideload_result;
+        if ( null !== $_test_media_sideload_result ) {
+            return $_test_media_sideload_result;
+        }
+        // Default: return an attachment ID.
+        return 999;
+    }
+}
+
+// render_block() stub — configurable callback for render test.
+if ( ! function_exists( 'render_block' ) ) {
+    global $_test_render_block_callback;
+    $_test_render_block_callback = null;
+
+    function render_block( $block ) {
+        global $_test_render_block_callback;
+        if ( is_callable( $_test_render_block_callback ) ) {
+            return call_user_func( $_test_render_block_callback, $block );
+        }
+        return '<div>rendered</div>';
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

@@ -276,7 +276,7 @@ trait Arcadia_API_Posts_Handler {
 
 		// Check for structured content (h1 + sections/children).
 		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $content_data );
+			$content = $this->blocks->json_to_blocks( $content_data, $post_type );
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}
@@ -368,6 +368,15 @@ trait Arcadia_API_Posts_Handler {
 		// Tag post as created by Arcadia (source tracking).
 		if ( taxonomy_exists( 'arcadia_source' ) ) {
 			wp_set_object_terms( $post_id, 'arcadia', 'arcadia_source' );
+		}
+
+		// H1.3 — Render test: catch template-level errors after full setup.
+		if ( Arcadia_Blocks::is_acf_available() && function_exists( 'render_block' ) ) {
+			$acf_validator = Arcadia_ACF_Validator::get_instance();
+			$render_result = $acf_validator->render_test( $post_id );
+			if ( is_wp_error( $render_result ) ) {
+				return $render_result;
+			}
 		}
 
 		$post = get_post( $post_id );
@@ -475,7 +484,7 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update content.
 		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $body );
+			$content = $this->blocks->json_to_blocks( $body, $post->post_type );
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}
@@ -567,6 +576,15 @@ trait Arcadia_API_Posts_Handler {
 		// Trigger ACF save hook to create field reference entries (finding 023).
 		if ( function_exists( 'update_field' ) ) {
 			do_action( 'acf/save_post', $post_id );
+		}
+
+		// H1.3 — Render test: catch template-level errors after full setup.
+		if ( Arcadia_Blocks::is_acf_available() && function_exists( 'render_block' ) ) {
+			$acf_validator = Arcadia_ACF_Validator::get_instance();
+			$render_result = $acf_validator->render_test( $post_id );
+			if ( is_wp_error( $render_result ) ) {
+				return $render_result;
+			}
 		}
 
 		$post = get_post( $post_id );

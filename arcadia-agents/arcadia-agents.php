@@ -94,6 +94,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-acf-validator.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-redirects.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-preview.php';

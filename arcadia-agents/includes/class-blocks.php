@@ -145,14 +145,24 @@ class Arcadia_Blocks {
 	 * Validates all blocks before rendering. Returns WP_Error (422)
 	 * if an unknown block type or missing required field is detected.
 	 *
-	 * @param array $json The JSON content structure from the agent.
+	 * @param array  $json      The JSON content structure from the agent.
+	 * @param string $post_type Target post type (passed to ACF validator).
 	 * @return string|WP_Error Block content for post_content, or WP_Error on validation failure.
 	 */
-	public function json_to_blocks( $json ) {
+	public function json_to_blocks( $json, $post_type = 'post' ) {
 		// Validate all blocks before rendering (fail fast).
 		$validation = $this->validate_blocks( $json );
 		if ( is_wp_error( $validation ) ) {
 			return $validation;
+		}
+
+		// ACF schema validation + image pre-processing (H1.1 + H1.2).
+		if ( self::is_acf_available() ) {
+			$acf_validator = Arcadia_ACF_Validator::get_instance();
+			$acf_result    = $acf_validator->validate_and_preprocess( $json, $post_type );
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
 		}
 
 		$content = '';
