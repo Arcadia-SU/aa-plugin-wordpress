@@ -282,6 +282,46 @@
 
 ---
 
+## Phase 10 : Backlog G1-G3 + Bugfix
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-06*
+
+### Bug: `featured_image_alt` not set during sideload (P2)
+- [DONE] Ajouter param `$alt = ''` à `sideload_and_set_featured_image()`
+- [DONE] `update_post_meta($attachment_id, '_wp_attachment_image_alt', $alt)` après sideload
+- [DONE] Passer `$meta['featured_image_alt'] ?? ''` dans `create_post()` et `update_post()`
+- [DONE] Tests unitaires alt text sideload (3 tests)
+
+### G1 — Preview URL endpoint (P1)
+- [DONE] `GET /articles/{id}/preview-url` (scope `articles:read`)
+- [DONE] Token stocké en `wp_postmeta` (`_aa_preview_token` + `_aa_preview_expires`)
+- [DONE] Token valide 24h, accessible sans auth
+- [DONE] Hook `template_redirect` : vérifier token + rendre avec template thème
+- [DONE] Cron cleanup tokens expirés
+- [DONE] Tests unitaires preview URL (10 tests)
+
+### G2 — Excerpt support POST/PUT articles (P1)
+- [DONE] Accepter `excerpt` top-level dans `POST /articles`
+- [DONE] Accepter `excerpt` top-level dans `PUT /articles/{id}`
+- [DONE] Mapper vers `post_excerpt`
+- [DONE] Retourner `excerpt` dans `GET /articles`
+- [DONE] Tests unitaires excerpt (5 tests)
+
+### G3 — Enriched response fields GET /articles (P2)
+- [DONE] `excerpt` dans format_post()
+- [DONE] `featured_image_url` dans format_post()
+- [DONE] `featured_image_alt` dans format_post()
+- [DONE] `post_type` dans format_post()
+- [DONE] `author` (display name) dans format_post()
+- [DONE] `categories` (noms) dans format_post()
+- [DONE] `tags` (noms) dans format_post()
+- [DONE] `last_modified` (ISO 8601) dans format_post()
+- [DONE] `word_count` dans format_post()
+- [DONE] `has_blocks` dans format_post()
+- [DONE] Tests unitaires enriched fields (FormattersTest updated: 19 fields)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

@@ -24,6 +24,7 @@ require_once __DIR__ . '/api/trait-api-blocks.php';
 require_once __DIR__ . '/api/trait-api-acf-fields.php';
 require_once __DIR__ . '/api/trait-api-site.php';
 require_once __DIR__ . '/api/trait-api-redirects.php';
+require_once __DIR__ . '/api/trait-api-preview.php';
 
 /**
  * Class Arcadia_API
@@ -41,6 +42,7 @@ class Arcadia_API {
 	use Arcadia_API_ACF_Fields_Handler;
 	use Arcadia_API_Site_Handler;
 	use Arcadia_API_Redirects_Handler;
+	use Arcadia_API_Preview_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -144,6 +146,17 @@ class Arcadia_API {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_article_blocks' ),
+				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+			)
+		);
+
+		// Preview URL endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/articles/(?P<id>\d+)/preview-url',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_preview_url' ),
 				'permission_callback' => array( $this, 'check_articles_read_permission' ),
 			)
 		);

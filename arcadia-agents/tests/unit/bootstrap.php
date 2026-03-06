@@ -796,6 +796,106 @@ if ( ! function_exists( 'wp_set_post_tags' ) ) {
     }
 }
 
+// add_query_arg() stub.
+if ( ! function_exists( 'add_query_arg' ) ) {
+    function add_query_arg( $args, $url = '' ) {
+        $query = http_build_query( $args );
+        $sep   = ( false === strpos( $url, '?' ) ) ? '?' : '&';
+        return $url . $sep . $query;
+    }
+}
+
+// setup_postdata() stub.
+if ( ! function_exists( 'setup_postdata' ) ) {
+    function setup_postdata( $post ) {
+        return true;
+    }
+}
+
+// get_single_template() stub.
+if ( ! function_exists( 'get_single_template' ) ) {
+    function get_single_template() {
+        return '/tmp/single.php';
+    }
+}
+
+// get_index_template() stub.
+if ( ! function_exists( 'get_index_template' ) ) {
+    function get_index_template() {
+        return '/tmp/index.php';
+    }
+}
+
+// download_url() stub.
+if ( ! function_exists( 'download_url' ) ) {
+    function download_url( $url, $timeout = 300 ) {
+        return '/tmp/downloaded-image.jpg';
+    }
+}
+
+// media_handle_sideload() stub.
+if ( ! function_exists( 'media_handle_sideload' ) ) {
+    global $_test_next_attachment_id;
+    $_test_next_attachment_id = 5000;
+
+    function media_handle_sideload( $file_array, $post_id = 0, $desc = '' ) {
+        global $_test_next_attachment_id;
+        return $_test_next_attachment_id++;
+    }
+}
+
+// set_post_thumbnail() stub.
+if ( ! function_exists( 'set_post_thumbnail' ) ) {
+    function set_post_thumbnail( $post_id, $thumbnail_id ) {
+        global $_test_post_meta;
+        $_test_post_meta[ $post_id ]['_thumbnail_id'] = $thumbnail_id;
+        return true;
+    }
+}
+
+// wp_http_validate_url() stub.
+if ( ! function_exists( 'wp_http_validate_url' ) ) {
+    function wp_http_validate_url( $url ) {
+        return $url;
+    }
+}
+
+// wp_next_scheduled() stub.
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+    global $_test_scheduled_events;
+    $_test_scheduled_events = array();
+
+    function wp_next_scheduled( $hook ) {
+        global $_test_scheduled_events;
+        return isset( $_test_scheduled_events[ $hook ] ) ? $_test_scheduled_events[ $hook ] : false;
+    }
+}
+
+// wp_schedule_event() stub.
+if ( ! function_exists( 'wp_schedule_event' ) ) {
+    function wp_schedule_event( $timestamp, $recurrence, $hook ) {
+        global $_test_scheduled_events;
+        $_test_scheduled_events[ $hook ] = $timestamp;
+        return true;
+    }
+}
+
+// wp_unschedule_event() stub.
+if ( ! function_exists( 'wp_unschedule_event' ) ) {
+    function wp_unschedule_event( $timestamp, $hook ) {
+        global $_test_scheduled_events;
+        unset( $_test_scheduled_events[ $hook ] );
+        return true;
+    }
+}
+
+// hash_equals() is built into PHP >= 5.6.0 — guard just in case.
+if ( ! function_exists( 'hash_equals' ) ) {
+    function hash_equals( $known_string, $user_string ) {
+        return $known_string === $user_string;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

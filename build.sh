@@ -147,6 +147,7 @@ if zip -r "$ZIP_NAME" "$PLUGIN_DIR/" \
 	-x "${PLUGIN_DIR}/.git/*" \
 	-x "${PLUGIN_DIR}/.env" \
 	-x "${PLUGIN_DIR}/CLAUDE.md" \
+	-x "${PLUGIN_DIR}/wp-admin/*" \
 	> /dev/null; then
 	pass "Zip created: ${ZIP_NAME}"
 else

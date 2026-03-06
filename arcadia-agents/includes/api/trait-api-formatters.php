@@ -33,6 +33,7 @@ trait Arcadia_API_Formatters {
 	private function format_post( $post ) {
 		$featured_image_id  = get_post_thumbnail_id( $post->ID );
 		$featured_image_url = $featured_image_id ? wp_get_attachment_url( $featured_image_id ) : null;
+		$featured_image_alt = $featured_image_id ? (string) get_post_meta( $featured_image_id, '_wp_attachment_image_alt', true ) : '';
 
 		// Resolve author display name.
 		$author_data = get_userdata( (int) $post->post_author );
@@ -56,6 +57,7 @@ trait Arcadia_API_Formatters {
 			'id'                 => $post->ID,
 			'title'              => $post->post_title,
 			'slug'               => $post->post_name,
+			'post_type'          => $post->post_type,
 			'status'             => $post->post_status,
 			'url'                => get_permalink( $post->ID ),
 			'excerpt'            => $post->post_excerpt,
@@ -67,6 +69,7 @@ trait Arcadia_API_Formatters {
 			'has_blocks'         => $has_blocks,
 			'featured_image_id'  => $featured_image_id ? (int) $featured_image_id : null,
 			'featured_image_url' => $featured_image_url,
+			'featured_image_alt' => $featured_image_alt,
 			'categories'         => is_array( $categories ) ? $categories : array(),
 			'tags'               => is_array( $tags ) ? $tags : array(),
 			'seo'                => $seo,

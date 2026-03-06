@@ -245,6 +245,11 @@ trait Arcadia_API_Posts_Handler {
 			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
 		}
 
+		// Top-level excerpt overrides meta.description (allows empty string to clear).
+		if ( isset( $body['excerpt'] ) ) {
+			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
+		}
+
 		// Content: convert JSON structure to blocks if present.
 		// Support both top-level structure and nested in 'content' key.
 		$content_data = $body;
@@ -320,7 +325,11 @@ trait Arcadia_API_Posts_Handler {
 
 		// Handle featured image from URL.
 		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$this->sideload_and_set_featured_image( $post_id, $meta['featured_image_url'] );
+			$this->sideload_and_set_featured_image(
+				$post_id,
+				$meta['featured_image_url'],
+				$meta['featured_image_alt'] ?? ''
+			);
 		}
 
 		// Store SEO meta if Yoast or similar is available.
@@ -438,6 +447,11 @@ trait Arcadia_API_Posts_Handler {
 			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
 		}
 
+		// Top-level excerpt overrides meta.description (allows empty string to clear).
+		if ( isset( $body['excerpt'] ) ) {
+			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
+		}
+
 		// Update status.
 		$force_draft_applied = false;
 		if ( ! empty( $body['status'] ) ) {
@@ -511,7 +525,11 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update featured image.
 		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$this->sideload_and_set_featured_image( $post_id, $meta['featured_image_url'] );
+			$this->sideload_and_set_featured_image(
+				$post_id,
+				$meta['featured_image_url'],
+				$meta['featured_image_alt'] ?? ''
+			);
 		}
 
 		// Update SEO meta.

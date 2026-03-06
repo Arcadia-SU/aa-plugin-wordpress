@@ -235,9 +235,10 @@ trait Arcadia_API_Media_Handler {
 	 *
 	 * @param int    $post_id The post ID.
 	 * @param string $url     The image URL.
+	 * @param string $alt     Optional alt text for the image.
 	 * @return int|WP_Error Attachment ID or error.
 	 */
-	private function sideload_and_set_featured_image( $post_id, $url ) {
+	private function sideload_and_set_featured_image( $post_id, $url, $alt = '' ) {
 		$attachment_id = $this->sideload_image( $url );
 
 		if ( is_wp_error( $attachment_id ) ) {
@@ -245,6 +246,10 @@ trait Arcadia_API_Media_Handler {
 		}
 
 		set_post_thumbnail( $post_id, $attachment_id );
+
+		if ( '' !== $alt ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $alt ) );
+		}
 
 		return $attachment_id;
 	}

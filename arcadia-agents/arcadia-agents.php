@@ -96,6 +96,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-redirects.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-preview.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
@@ -117,6 +118,11 @@ class Arcadia_Agents {
 		// Register redirects CPT and handler.
 		add_action( 'init', array( $this, 'register_redirect_post_type' ) );
 		add_action( 'template_redirect', array( $this, 'handle_arcadia_redirects' ) );
+
+		// Preview URL: public template_redirect handler + daily cron cleanup.
+		add_action( 'template_redirect', array( $this, 'handle_arcadia_preview' ) );
+		add_action( 'arcadia_preview_cleanup', array( $this, 'run_preview_cleanup' ) );
+		add_action( 'init', array( 'Arcadia_Preview', 'schedule_cleanup' ) );
 
 		// Admin menu.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -172,6 +178,20 @@ class Arcadia_Agents {
 	 */
 	public function handle_arcadia_redirects() {
 		Arcadia_Redirects::get_instance()->handle_redirect();
+	}
+
+	/**
+	 * Handle arcadia preview requests on template_redirect hook.
+	 */
+	public function handle_arcadia_preview() {
+		Arcadia_Preview::get_instance()->handle_preview();
+	}
+
+	/**
+	 * Run preview token cleanup (cron callback).
+	 */
+	public function run_preview_cleanup() {
+		Arcadia_Preview::get_instance()->cleanup_expired_tokens();
 	}
 
 	/**
