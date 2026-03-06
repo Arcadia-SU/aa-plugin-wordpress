@@ -9,27 +9,33 @@ Cocher les cases au fur et à mesure de l'avancement.
 
 ## Documentation
 
-- `docs/specs.md` - Spécifications techniques (copie locale)
-- `docs/checklist.md` - Liste des tâches à faire
+- `docs/checklist.md` - Liste des tâches à faire (suivi local)
 - `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
 
 ### Source de vérité des specs
 
 **Dossier maître :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/`
 
+Cette session lit directement les fichiers maîtres (pas de copie locale).
+
 | Fichier | Contenu |
 |---------|---------|
-| `plugin-wp-specs.md` | Spécifications techniques (fichier principal) |
-| `plugin-wp-decisions-log.md` | Historique des décisions validées |
-| `plugin-wp-dev-guide.md` | Guide dev, repo, CI/CD, publication WP.org |
-| `plugin-wp-code-review.md` | Audit code v2.0.1 (33 issues) |
+| `README.md` | Hub : purpose, protocole, liens vers tous les fichiers |
+| `backlog.md` | File d'attente actionnelle (vidée après intégration plugin) |
+| `api-contract.md` | Endpoints, params, réponses (28 endpoints: 15 MVP + 13 v2) |
+| `auth.md` | JWT RS256, handshake, scopes |
+| `content-model.md` | JSON schema blocs (ADR-013), mapping ACF, multi-builder |
+| `code-review.md` | Audit code v2.0.1 (33 issues) |
+| `decisions.md` | Historique des décisions validées |
+| `dev-guide.md` | Guide dev, repo, CI/CD, publication WP.org |
 
-**Après toute modification des specs :**
-```bash
-cp /Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/plugin-wp-specs.md docs/specs.md
-```
+### Protocole backlog (inter-repo)
 
-Cela permet aux sessions Claude Code sans accès au repo ArcadiaAgents d'avoir le contexte complet.
+Communication **pull-based** entre les sessions AA et Plugin :
+1. AA écrit des items dans `backlog.md`
+2. Plugin lit `backlog.md`, intègre dans `docs/checklist.md`
+3. Plugin vide `backlog.md`
+4. **Backlog vide = plugin à jour**
 
 ## Conventions
 
@@ -94,6 +100,8 @@ Le script exécute 11 checks avant de créer le zip :
 | 11 | Restauration dev deps (trap EXIT) | - |
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
+
+**RÈGLE : Toujours lancer `./build.sh` après tout changement de code.** Le zip doit rester à jour.
 
 ## Tests
 

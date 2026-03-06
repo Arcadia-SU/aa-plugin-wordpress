@@ -159,7 +159,7 @@
 
 ## Phase 6b : Code Review Fixes
 
-*Ref: [plugin-wp-code-review.md](../../docs/tasks_backlog/agent-seo/plugin-wp-specs/plugin-wp-code-review.md) — Audit v2.0.1, 33 issues*
+*Ref: [code-review.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/code-review.md) — Audit v2.0.1, 33 issues*
 
 ### CRITICAL + HIGH (specs item 16)
 - [DONE] #1 — `do_action('acf/save_post')` manquant (finding 023)
