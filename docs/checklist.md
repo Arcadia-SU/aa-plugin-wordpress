@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-03-04
+**Dernière mise à jour :** 2026-03-06
 
 ---
 
@@ -251,6 +251,34 @@
 - [DONE] RedirectsTest (11 tests)
 - [DONE] Updated FormattersTest (17 fields)
 - [DONE] Updated AuthTest (12 scopes)
+
+---
+
+## Phase 9 : Backlog items #26, #27, #29
+
+### Vérification sideload image ACF (#26)
+- [DONE] Vérifier que `sideload_image_field()` est implémenté pour les champs ACF image (confirmé dans `class-adapter-acf.php` et `trait-api-acf-fields.php`)
+
+### Force Draft (#29)
+- [DONE] Option WP `aa_force_draft` (boolean, default `false`)
+- [DONE] Checkbox "Force Draft" dans la page admin (section Settings)
+- [DONE] Override `status` → `draft` dans `create_post()` quand activé
+- [DONE] Override `status` → `draft` dans `update_post()` quand activé
+- [DONE] `force_draft_applied: true` dans les réponses POST/PUT quand override actif
+- [DONE] Exposer dans `GET /site-info` → `settings.force_draft`
+- [DONE] Tests unitaires Force Draft (7 tests)
+
+### Support core/* en mode ACF (#27)
+- [DONE] `is_registered('core/*')` accepte tous les blocs core/* dans le Block Registry
+- [DONE] Normalisation `core/paragraph` → `paragraph` dans `process_block()` et `validate_block_recursive()`
+- [DONE] Fallback `core/*` → Gutenberg adapter dans `custom_block()` de l'ACF adapter
+- [DONE] Tests unitaires : registry accepte core/* (6 assertions)
+- [DONE] Tests unitaires : core/paragraph et core/heading produisent le même output que paragraph/heading
+- [DONE] Tests unitaires : core/* blocks ne sont pas rejetés (pas de 422)
+
+### Specs mises à jour
+- [DONE] `api-contract.md` : ajout `force_draft_applied` dans réponses POST/PUT
+- [DONE] `decisions.md` : ajout sous-entrée double canal (site-info + réponse POST/PUT)
 
 ---
 

@@ -575,6 +575,9 @@ class Arcadia_API {
 					'version' => ARCADIA_AGENTS_VERSION,
 					'adapter' => $this->blocks->get_adapter_name(),
 				),
+				'settings'         => array(
+					'force_draft' => (bool) get_option( 'aa_force_draft', false ),
+				),
 				'acf_available'    => Arcadia_Blocks::is_acf_available(),
 				'acf_field_groups' => $this->get_acf_field_groups_for_post_types(),
 				'permalink'        => get_option( 'permalink_structure' ),

@@ -214,4 +214,83 @@ class BlocksTest extends TestCase {
         $this->assertEquals( 2, $heading_block['level'] );
         $this->assertEquals( 'Heading Text', $heading_block['content'] );
     }
+
+    // =========================================================================
+    // core/* prefix normalization tests
+    // =========================================================================
+
+    /**
+     * Test json_to_blocks accepts core/paragraph and produces same output as paragraph.
+     */
+    public function test_core_paragraph_produces_same_output(): void {
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json_short = array(
+            'children' => array(
+                array( 'type' => 'paragraph', 'content' => 'Hello' ),
+            ),
+        );
+
+        $json_core = array(
+            'children' => array(
+                array( 'type' => 'core/paragraph', 'content' => 'Hello' ),
+            ),
+        );
+
+        $output_short = $blocks->json_to_blocks( $json_short );
+        $output_core  = $blocks->json_to_blocks( $json_core );
+
+        $this->assertEquals( $output_short, $output_core );
+    }
+
+    /**
+     * Test json_to_blocks accepts core/heading and produces same output as heading.
+     */
+    public function test_core_heading_produces_same_output(): void {
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json_short = array(
+            'children' => array(
+                array( 'type' => 'heading', 'content' => 'Title', 'level' => 2 ),
+            ),
+        );
+
+        $json_core = array(
+            'children' => array(
+                array( 'type' => 'core/heading', 'content' => 'Title', 'level' => 2 ),
+            ),
+        );
+
+        $output_short = $blocks->json_to_blocks( $json_short );
+        $output_core  = $blocks->json_to_blocks( $json_core );
+
+        $this->assertEquals( $output_short, $output_core );
+    }
+
+    /**
+     * Test json_to_blocks does NOT reject core/* blocks (no 422 error).
+     */
+    public function test_core_blocks_not_rejected(): void {
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json = array(
+            'children' => array(
+                array( 'type' => 'core/paragraph', 'content' => 'text' ),
+                array( 'type' => 'core/heading', 'content' => 'title', 'level' => 2 ),
+                array(
+                    'type'     => 'core/list',
+                    'ordered'  => false,
+                    'children' => array(
+                        array( 'type' => 'text', 'content' => 'item 1' ),
+                    ),
+                ),
+            ),
+        );
+
+        $result = $blocks->json_to_blocks( $json );
+
+        // Should return string content, not WP_Error.
+        $this->assertIsString( $result );
+        $this->assertNotEmpty( $result );
+    }
 }

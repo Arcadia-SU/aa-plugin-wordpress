@@ -204,7 +204,11 @@ class Arcadia_Blocks {
 			return true;
 		}
 
+		// Normalize core/* prefix for validation (same as process_block).
 		$type = $block['type'];
+		if ( str_starts_with( $type, 'core/' ) ) {
+			$type = substr( $type, 5 );
+		}
 
 		// Check if the block type is registered.
 		if ( ! $this->registry->is_registered( $type ) ) {
@@ -253,6 +257,14 @@ class Arcadia_Blocks {
 	private function process_block( $block ) {
 		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
 			return '';
+		}
+
+		// Normalize core/* prefix → strip to short name for builtin dispatch.
+		// e.g. core/paragraph → paragraph, core/heading → heading.
+		$type = $block['type'];
+		if ( str_starts_with( $type, 'core/' ) ) {
+			$type  = substr( $type, 5 );
+			$block = array_merge( $block, array( 'type' => $type ) );
 		}
 
 		switch ( $block['type'] ) {

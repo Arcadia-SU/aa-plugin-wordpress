@@ -743,6 +743,59 @@ if ( ! function_exists( 'wp_redirect' ) ) {
     }
 }
 
+// wp_slash() stub.
+if ( ! function_exists( 'wp_slash' ) ) {
+    function wp_slash( $value ) {
+        if ( is_array( $value ) ) {
+            return array_map( 'wp_slash', $value );
+        }
+        if ( is_string( $value ) ) {
+            return addslashes( $value );
+        }
+        return $value;
+    }
+}
+
+// wp_kses_post() stub.
+if ( ! function_exists( 'wp_kses_post' ) ) {
+    function wp_kses_post( $data ) {
+        return $data;
+    }
+}
+
+// wp_set_current_user() stub.
+if ( ! function_exists( 'wp_set_current_user' ) ) {
+    global $_test_current_user_id;
+    $_test_current_user_id = 0;
+
+    function wp_set_current_user( $id ) {
+        global $_test_current_user_id;
+        $_test_current_user_id = $id;
+    }
+}
+
+// get_current_user_id() stub.
+if ( ! function_exists( 'get_current_user_id' ) ) {
+    function get_current_user_id() {
+        global $_test_current_user_id;
+        return isset( $_test_current_user_id ) ? $_test_current_user_id : 0;
+    }
+}
+
+// wp_set_post_categories() stub.
+if ( ! function_exists( 'wp_set_post_categories' ) ) {
+    function wp_set_post_categories( $post_id, $categories, $append = false ) {
+        return true;
+    }
+}
+
+// wp_set_post_tags() stub.
+if ( ! function_exists( 'wp_set_post_tags' ) ) {
+    function wp_set_post_tags( $post_id, $tags, $append = false ) {
+        return true;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 

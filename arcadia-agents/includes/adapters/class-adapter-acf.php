@@ -122,6 +122,11 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function custom_block( $block_name, $properties ) {
+		// Fallback: core/* blocks delegate to Gutenberg adapter (not ACF format).
+		if ( str_starts_with( $block_name, 'core/' ) ) {
+			return $this->gutenberg->custom_block( $block_name, $properties );
+		}
+
 		$data = array();
 
 		// Get field schema from registry to determine types and keys.

@@ -87,6 +87,18 @@ class BlockRegistryTest extends TestCase {
 	}
 
 	/**
+	 * Test is_registered returns true for core/* block types.
+	 */
+	public function test_is_registered_core_prefix_returns_true(): void {
+		$this->assertTrue( $this->registry->is_registered( 'core/paragraph' ) );
+		$this->assertTrue( $this->registry->is_registered( 'core/heading' ) );
+		$this->assertTrue( $this->registry->is_registered( 'core/image' ) );
+		$this->assertTrue( $this->registry->is_registered( 'core/list' ) );
+		$this->assertTrue( $this->registry->is_registered( 'core/unknown' ) );
+		$this->assertTrue( $this->registry->is_registered( 'core/table' ) );
+	}
+
+	/**
 	 * Test is_registered returns false for unknown types.
 	 */
 	public function test_is_registered_unknown_returns_false(): void {

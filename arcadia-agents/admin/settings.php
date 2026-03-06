@@ -57,6 +57,10 @@ function arcadia_agents_settings_page() {
 		$selected_scopes = array_intersect( $selected_scopes, $all_scopes );
 		update_option( 'arcadia_agents_scopes', $selected_scopes, false );
 
+		// Save Force Draft setting.
+		$force_draft = ! empty( $_POST['aa_force_draft'] );
+		update_option( 'aa_force_draft', $force_draft, false );
+
 		$notice      = __( 'Settings saved.', 'arcadia-agents' );
 		$notice_type = 'success';
 	}
@@ -249,7 +253,27 @@ function arcadia_agents_settings_page() {
 				<?php endforeach; ?>
 			</div>
 
-			<?php submit_button( __( 'Save Permissions', 'arcadia-agents' ), 'primary', 'arcadia_agents_save' ); ?>
+			<hr style="margin: 30px 0;">
+
+		<h2><?php esc_html_e( 'Settings', 'arcadia-agents' ); ?></h2>
+		<p class="description" style="margin-bottom: 15px;"><?php esc_html_e( 'Plugin behavior settings.', 'arcadia-agents' ); ?></p>
+
+		<div class="arcadia-settings" style="background: #fff; padding: 15px 20px; border: 1px solid #c3c4c7; max-width: 500px;">
+			<?php $force_draft = get_option( 'aa_force_draft', false ); ?>
+			<label style="display: flex; align-items: center; padding: 6px 0; gap: 10px; cursor: pointer;">
+				<input type="checkbox"
+					name="aa_force_draft"
+					value="1"
+					<?php checked( $force_draft ); ?>
+				/>
+				<span style="min-width: 140px;"><strong><?php esc_html_e( 'Force Draft', 'arcadia-agents' ); ?></strong></span>
+			</label>
+			<p class="description" style="margin: 5px 0 0 30px;">
+				<?php esc_html_e( 'When enabled, all articles created or updated via the API will be saved as drafts, regardless of the requested status. This prevents direct publication by the agent.', 'arcadia-agents' ); ?>
+			</p>
+		</div>
+
+		<?php submit_button( __( 'Save Settings', 'arcadia-agents' ), 'primary', 'arcadia_agents_save' ); ?>
 		</form>
 
 		<hr style="margin: 30px 0;">

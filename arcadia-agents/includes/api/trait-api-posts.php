@@ -214,6 +214,13 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
+		// Force Draft override (aa_force_draft admin setting).
+		$force_draft_applied = false;
+		if ( get_option( 'aa_force_draft', false ) ) {
+			$status              = 'draft';
+			$force_draft_applied = true;
+		}
+
 		// Build post data.
 		$post_data = array(
 			'post_type'   => $post_type,
@@ -370,6 +377,10 @@ trait Arcadia_API_Posts_Handler {
 			'post'    => $this->format_post( $post ),
 		);
 
+		if ( $force_draft_applied ) {
+			$response_data['force_draft_applied'] = true;
+		}
+
 		if ( ! empty( $taxonomy_warnings ) ) {
 			$response_data['warnings'] = $taxonomy_warnings;
 		}
@@ -428,6 +439,7 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		// Update status.
+		$force_draft_applied = false;
 		if ( ! empty( $body['status'] ) ) {
 			$status           = sanitize_text_field( $body['status'] );
 			$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
@@ -439,6 +451,12 @@ trait Arcadia_API_Posts_Handler {
 				);
 			}
 			$post_data['post_status'] = $status;
+		}
+
+		// Force Draft override (aa_force_draft admin setting).
+		if ( get_option( 'aa_force_draft', false ) ) {
+			$post_data['post_status'] = 'draft';
+			$force_draft_applied      = true;
 		}
 
 		// Update content.
@@ -547,6 +565,10 @@ trait Arcadia_API_Posts_Handler {
 			'success' => true,
 			'post'    => $this->format_post( $post ),
 		);
+
+		if ( $force_draft_applied ) {
+			$response_data['force_draft_applied'] = true;
+		}
 
 		if ( ! empty( $taxonomy_warnings ) ) {
 			$response_data['warnings'] = $taxonomy_warnings;

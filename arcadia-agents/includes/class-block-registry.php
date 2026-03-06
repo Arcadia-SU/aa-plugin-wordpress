@@ -126,6 +126,11 @@ class Arcadia_Block_Registry {
 	 * @return bool
 	 */
 	public function is_registered( $type ) {
+		// Core/* blocks are always accepted (pass-through to Gutenberg native).
+		if ( str_starts_with( $type, 'core/' ) ) {
+			return true;
+		}
+
 		// Builtin blocks.
 		if ( isset( self::BUILTIN_BLOCKS[ $type ] ) ) {
 			return true;
