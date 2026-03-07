@@ -345,9 +345,25 @@ class Arcadia_ACF_Validator {
 			// Rollback: delete the post entirely.
 			wp_delete_post( $post_id, true );
 
+			// Build descriptive message listing each failed block.
+			$details = array();
+			foreach ( $render_errors as $err ) {
+				$details[] = sprintf(
+					'Block #%d (%s): %s',
+					$err['block_index'],
+					$err['block_type'],
+					$err['error']
+				);
+			}
+			$message = sprintf(
+				'Block render test failed — %d block(s) threw errors. Post has been rolled back. %s',
+				count( $render_errors ),
+				implode( ' | ', $details )
+			);
+
 			return new WP_Error(
 				'render_test_failed',
-				__( 'Block render test failed. Post has been rolled back.', 'arcadia-agents' ),
+				$message,
 				array(
 					'status' => 422,
 					'errors' => $render_errors,
