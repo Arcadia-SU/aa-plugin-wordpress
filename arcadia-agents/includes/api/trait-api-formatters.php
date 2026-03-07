@@ -53,6 +53,17 @@ trait Arcadia_API_Formatters {
 		// SEO metadata via multi-plugin detection.
 		$seo = Arcadia_SEO_Meta::get_seo_meta( $post->ID );
 
+		// Preview URL (reuses existing valid token).
+		$preview      = Arcadia_Preview::get_instance();
+		$token        = $preview->get_or_create_token( $post->ID );
+		$preview_url  = add_query_arg(
+			array(
+				'p'          => $post->ID,
+				'aa_preview' => $token,
+			),
+			home_url( '/' )
+		);
+
 		return array(
 			'id'                 => $post->ID,
 			'title'              => $post->post_title,
@@ -73,6 +84,7 @@ trait Arcadia_API_Formatters {
 			'categories'         => is_array( $categories ) ? $categories : array(),
 			'tags'               => is_array( $tags ) ? $tags : array(),
 			'seo'                => $seo,
+			'preview_url'        => $preview_url,
 		);
 	}
 

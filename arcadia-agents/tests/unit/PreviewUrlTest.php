@@ -93,6 +93,46 @@ class PreviewUrlTest extends TestCase {
 	}
 
 	// =========================================================================
+	// get_or_create_token
+	// =========================================================================
+
+	/**
+	 * Test that get_or_create_token generates a new token when none exists.
+	 */
+	public function test_get_or_create_token_generates_when_none(): void {
+		$token = $this->preview->get_or_create_token( 50 );
+
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $token );
+	}
+
+	/**
+	 * Test that get_or_create_token reuses a valid existing token.
+	 */
+	public function test_get_or_create_token_reuses_valid(): void {
+		$token1 = $this->preview->generate_token( 50 );
+		$token2 = $this->preview->get_or_create_token( 50 );
+
+		$this->assertEquals( $token1, $token2 );
+	}
+
+	/**
+	 * Test that get_or_create_token regenerates when expired.
+	 */
+	public function test_get_or_create_token_regenerates_expired(): void {
+		global $_test_post_meta;
+
+		$token1 = $this->preview->generate_token( 50 );
+
+		// Force expiry.
+		$_test_post_meta[50]['_aa_preview_expires'] = time() - 1;
+
+		$token2 = $this->preview->get_or_create_token( 50 );
+
+		$this->assertNotEquals( $token1, $token2 );
+		$this->assertMatchesRegularExpression( '/^[a-f0-9]{32}$/', $token2 );
+	}
+
+	// =========================================================================
 	// Token validation
 	// =========================================================================
 

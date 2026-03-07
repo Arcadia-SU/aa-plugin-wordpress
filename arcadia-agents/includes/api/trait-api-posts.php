@@ -100,6 +100,12 @@ trait Arcadia_API_Posts_Handler {
 			$args['date_query']     = array( $date_query );
 		}
 
+		// Filter by specific article ID.
+		$id = $request->get_param( 'id' );
+		if ( $id ) {
+			$args['p'] = (int) $id;
+		}
+
 		// Search.
 		$search = $request->get_param( 'search' );
 		if ( $search ) {

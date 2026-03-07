@@ -46,6 +46,26 @@ class Arcadia_Preview {
 	private function __construct() {}
 
 	/**
+	 * Get an existing valid token or generate a new one.
+	 *
+	 * Reuses a valid (non-expired) token if one exists, avoiding
+	 * unnecessary DB writes when listing multiple articles.
+	 *
+	 * @param int $post_id The post ID.
+	 * @return string The token (existing or newly generated).
+	 */
+	public function get_or_create_token( $post_id ) {
+		$stored_token = get_post_meta( $post_id, '_aa_preview_token', true );
+		$expires      = (int) get_post_meta( $post_id, '_aa_preview_expires', true );
+
+		if ( ! empty( $stored_token ) && ! empty( $expires ) && time() < $expires ) {
+			return $stored_token;
+		}
+
+		return $this->generate_token( $post_id );
+	}
+
+	/**
 	 * Generate a preview token for a post.
 	 *
 	 * Creates a random token, stores it in post meta with an expiry timestamp.

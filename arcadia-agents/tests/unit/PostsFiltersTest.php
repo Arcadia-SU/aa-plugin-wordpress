@@ -204,6 +204,36 @@ class PostsFiltersTest extends TestCase {
     }
 
     /**
+     * Test id filter maps to WP_Query 'p' arg.
+     */
+    public function test_id_filter_maps_to_p_arg(): void {
+        $id   = '42';
+        $args = array();
+
+        if ( $id ) {
+            $args['p'] = (int) $id;
+        }
+
+        $this->assertArrayHasKey( 'p', $args );
+        $this->assertEquals( 42, $args['p'] );
+    }
+
+    /**
+     * Test search filter maps to WP_Query 's' arg.
+     */
+    public function test_search_filter_maps_to_s_arg(): void {
+        $search = 'test query';
+        $args   = array();
+
+        if ( $search ) {
+            $args['s'] = $search;
+        }
+
+        $this->assertArrayHasKey( 's', $args );
+        $this->assertEquals( 'test query', $args['s'] );
+    }
+
+    /**
      * Test source=all does not add tax_query.
      */
     public function test_source_all_no_tax_query(): void {

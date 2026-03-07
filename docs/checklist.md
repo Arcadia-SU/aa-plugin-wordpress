@@ -384,6 +384,22 @@
 
 ---
 
+## Phase 14 : Backlog K1-K2
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+
+### K1 — Include `preview_url` in GET /articles response
+- [DONE] `get_or_create_token()` sur `Arcadia_Preview` (réutilise tokens valides, évite DB writes inutiles)
+- [DONE] Ajouter `preview_url` dans `format_post()` (20 champs au lieu de 19)
+- [DONE] Tests unitaires : get_or_create_token (3 tests) + FormattersTest updated (20 fields)
+
+### K2 — `search` et `id` query params sur GET /articles
+- [DONE] Param `search` (string) — déjà implémenté (Phase 8, lignes 104-107 trait-api-posts.php)
+- [DONE] Param `id` (int) — filtre par article ID via `WP_Query` arg `p`
+- [DONE] Tests unitaires : id_filter + search_filter (PostsFiltersTest, 2 tests)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*
