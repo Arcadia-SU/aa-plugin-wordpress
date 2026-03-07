@@ -15,28 +15,32 @@ use PHPUnit\Framework\TestCase;
 class SeoMetaTest extends TestCase {
 
     /**
+     * Define WPSEO_VERSION once before any test in this class.
+     *
+     * Must be in setUpBeforeClass() — not in a test method — because
+     * phpunit.xml uses executionOrder="depends,defects" which can reorder
+     * tests within a class. If the define lived in a specific test, defect
+     * ordering could run other tests first (before the constant exists).
+     */
+    public static function setUpBeforeClass(): void {
+        if ( ! defined( 'WPSEO_VERSION' ) ) {
+            define( 'WPSEO_VERSION', '22.0' );
+        }
+    }
+
+    /**
      * Reset state before each test.
      */
     protected function setUp(): void {
         global $_test_post_meta, $_test_posts;
         $_test_post_meta = array();
         $_test_posts     = array();
-
-        // Clear any previously defined constants — not possible in PHP,
-        // so we use class method checks instead. Reset detection state
-        // by ensuring no SEO-related constants/classes are set.
-        // (Constants set in individual tests will persist for the process,
-        // so tests are ordered by priority: Yoast first.)
     }
 
     /**
      * Test that Yoast meta is read when WPSEO_VERSION is defined.
      */
     public function test_yoast_detection_reads_yoast_meta(): void {
-        if ( ! defined( 'WPSEO_VERSION' ) ) {
-            define( 'WPSEO_VERSION', '22.0' );
-        }
-
         global $_test_post_meta;
         $_test_post_meta[1] = array(
             '_yoast_wpseo_title'                       => 'Yoast Title',
