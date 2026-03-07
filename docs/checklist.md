@@ -367,6 +367,23 @@
 
 ---
 
+## Phase 13 : ACF Bugfixes (J1-J2)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+
+### J1 — Conversion markdown → HTML sur champs wysiwyg ACF
+- [DONE] Fix root cause: schema lookup in `custom_block()` passait le nom sans prefix (`bouton`) au lieu du nom complet (`acf/bouton`)
+- [DONE] Appliquer conversion markdown → HTML sur les champs `wysiwyg` dans `custom_block()` (blocs ACF dans `post_content`)
+- [DONE] Appliquer conversion markdown → HTML sur les champs `wysiwyg` dans `process_acf_fields()` (champs ACF top-level)
+- [DONE] Ne pas affecter les champs non-wysiwyg (text, url, select)
+- [DONE] Tests unitaires : AcfAdapterTest (5 tests) + AcfFieldsTest wysiwyg markdown (1 test)
+
+### J2 — Image ACF : `get_field()` retourne int au lieu d'array
+- [DONE] Même root cause que J1 : fix schema lookup restaure l'injection des paires `_fieldname` → `field_key`
+- [DONE] Tests unitaires : field key references injectées (AcfAdapterTest), image field key reference (AcfAdapterTest)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

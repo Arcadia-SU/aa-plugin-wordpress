@@ -9,7 +9,8 @@ namespace ArcadiaAgents\Tests;
 
 use PHPUnit\Framework\TestCase;
 
-// Load the trait under test.
+// Load dependencies.
+require_once dirname( __DIR__, 2 ) . '/includes/class-blocks.php';
 require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-acf-fields.php';
 
 // Load ACF adapter for sideload_image_field reference.
@@ -412,6 +413,39 @@ class AcfFieldsTest extends TestCase {
 
 		$this->assertEquals( 'acf_unavailable', $error->get_error_code() );
 		$this->assertEquals( 400, $error->get_error_data()['status'] );
+	}
+
+	/**
+	 * Test process_acf_fields converts markdown in wysiwyg fields.
+	 */
+	public function test_wysiwyg_converts_markdown_to_html(): void {
+		global $_test_acf_update_field_calls, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		$_test_acf_field_groups = array(
+			array(
+				'key'   => 'group_1',
+				'title' => 'Test',
+			),
+		);
+
+		$_test_acf_fields_by_group = array(
+			'group_1' => array(
+				array( 'name' => 'contenu', 'type' => 'wysiwyg' ),
+			),
+		);
+
+		$result = $this->harness->test_process_acf_fields(
+			50,
+			array( 'contenu' => 'This is **bold** and *italic* text.' ),
+			'article',
+			''
+		);
+
+		$this->assertTrue( $result );
+		$this->assertCount( 1, $_test_acf_update_field_calls );
+		$this->assertStringContainsString( '<strong>bold</strong>', $_test_acf_update_field_calls[0]['value'] );
+		$this->assertStringContainsString( '<em>italic</em>', $_test_acf_update_field_calls[0]['value'] );
+		$this->assertStringNotContainsString( '**bold**', $_test_acf_update_field_calls[0]['value'] );
 	}
 
 	/**

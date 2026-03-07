@@ -131,8 +131,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 
 		// Get field schema from registry to determine types and keys.
 		$registry   = Arcadia_Block_Registry::get_instance();
-		$short_name = preg_replace( '/^acf\//', '', $block_name );
-		$schema     = $registry->get_block_schema( $short_name );
+		$schema = $registry->get_block_schema( $block_name );
 
 		// Build field type and key lookups.
 		$field_types = array();
@@ -177,8 +176,12 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					}
 					break;
 
+				case 'wysiwyg':
+					$data[ $field_name ] = Arcadia_Blocks::parse_markdown( $value );
+					break;
+
 				default:
-					// Passthrough for text, textarea, wysiwyg, url, select, radio.
+					// Passthrough for text, textarea, url, select, radio.
 					$data[ $field_name ] = $value;
 					break;
 			}

@@ -170,6 +170,8 @@ trait Arcadia_API_ACF_Fields_Handler {
 					if ( null === $value ) {
 						// Copy rendered post_content into this wysiwyg field.
 						$value = $post_content;
+					} else {
+						$value = \Arcadia_Blocks::parse_markdown( $value );
 					}
 					break;
 
