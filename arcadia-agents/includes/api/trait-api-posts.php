@@ -198,7 +198,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $this->is_allowed_post_type( $post_type ) ) {
 			return new WP_Error(
 				'invalid_post_type',
-				__( 'Post type is not allowed.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %s: post type slug */
+					__( "Post type '%s' is not allowed. Must be a public, non-hierarchical type (e.g. post).", 'arcadia-agents' ),
+					$post_type
+				),
 				array( 'status' => 400 )
 			);
 		}
@@ -209,7 +213,12 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! in_array( $status, $allowed_statuses, true ) ) {
 			return new WP_Error(
 				'invalid_status',
-				__( 'Invalid post status.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: 1: received status, 2: allowed statuses */
+					__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
+					$status,
+					implode( ', ', $allowed_statuses )
+				),
 				array( 'status' => 400 )
 			);
 		}
@@ -384,7 +393,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $post ) {
 			return new WP_Error(
 				'post_read_failed',
-				__( 'Failed to read post after creation.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Failed to read post %d after creation.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -419,7 +432,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
 			return new WP_Error(
 				'post_not_found',
-				__( 'Post not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Post with ID %d not found.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -469,7 +486,12 @@ trait Arcadia_API_Posts_Handler {
 			if ( ! in_array( $status, $allowed_statuses, true ) ) {
 				return new WP_Error(
 					'invalid_status',
-					__( 'Invalid post status.', 'arcadia-agents' ),
+					sprintf(
+						/* translators: 1: received status, 2: allowed statuses */
+						__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
+						$status,
+						implode( ', ', $allowed_statuses )
+					),
 					array( 'status' => 400 )
 				);
 			}
@@ -592,7 +614,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $post ) {
 			return new WP_Error(
 				'post_read_failed',
-				__( 'Failed to read post after update.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Failed to read post %d after update.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -628,7 +654,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
 			return new WP_Error(
 				'post_not_found',
-				__( 'Post not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Post with ID %d not found.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -707,7 +737,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $post || ! $this->is_allowed_post_type( $post->post_type ) ) {
 			return new WP_Error(
 				'post_not_found',
-				__( 'Post not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Post with ID %d not found.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -720,7 +754,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $result ) {
 			return new WP_Error(
 				'delete_failed',
-				__( 'Failed to delete post.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Failed to delete post %d.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -784,7 +822,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $page || 'page' !== $page->post_type ) {
 			return new WP_Error(
 				'page_not_found',
-				__( 'Page not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: page ID */
+					__( 'Page with ID %d not found.', 'arcadia-agents' ),
+					$page_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -813,7 +855,12 @@ trait Arcadia_API_Posts_Handler {
 			if ( ! in_array( $status, $allowed_statuses, true ) ) {
 				return new WP_Error(
 					'invalid_status',
-					__( 'Invalid post status.', 'arcadia-agents' ),
+					sprintf(
+						/* translators: 1: received status, 2: allowed statuses */
+						__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
+						$status,
+						implode( ', ', $allowed_statuses )
+					),
 					array( 'status' => 400 )
 				);
 			}
@@ -862,7 +909,11 @@ trait Arcadia_API_Posts_Handler {
 		if ( ! $page ) {
 			return new WP_Error(
 				'page_read_failed',
-				__( 'Failed to read page after update.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: page ID */
+					__( 'Failed to read page %d after update.', 'arcadia-agents' ),
+					$page_id
+				),
 				array( 'status' => 500 )
 			);
 		}

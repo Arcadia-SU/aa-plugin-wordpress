@@ -69,7 +69,11 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $attachment ) {
 			return new WP_Error(
 				'attachment_read_failed',
-				__( 'Failed to read attachment after upload.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: attachment ID */
+					__( 'Failed to read attachment %d after upload.', 'arcadia-agents' ),
+					$attachment_id
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -99,7 +103,11 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $post ) {
 			return new WP_Error(
 				'post_not_found',
-				__( 'Post not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Post with ID %d not found.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -137,7 +145,12 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $result ) {
 			return new WP_Error(
 				'set_thumbnail_failed',
-				__( 'Failed to set featured image.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: 1: post ID, 2: attachment ID */
+					__( 'Failed to set featured image on post %1$d (attachment %2$d).', 'arcadia-agents' ),
+					$post_id,
+					$attachment_id
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -343,7 +356,11 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
 			return new WP_Error(
 				'media_not_found',
-				__( 'Media not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: attachment ID */
+					__( 'Media with ID %d not found.', 'arcadia-agents' ),
+					$attachment_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -374,7 +391,7 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $updated ) {
 			return new WP_Error(
 				'nothing_to_update',
-				__( 'No fields to update.', 'arcadia-agents' ),
+				__( 'No updateable fields provided. Allowed: title, caption, alt_text.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -403,7 +420,11 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $attachment || 'attachment' !== $attachment->post_type ) {
 			return new WP_Error(
 				'media_not_found',
-				__( 'Media not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: attachment ID */
+					__( 'Media with ID %d not found.', 'arcadia-agents' ),
+					$attachment_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -416,7 +437,11 @@ trait Arcadia_API_Media_Handler {
 		if ( ! $result ) {
 			return new WP_Error(
 				'delete_failed',
-				__( 'Failed to delete media.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: attachment ID */
+					__( 'Failed to delete media %d.', 'arcadia-agents' ),
+					$attachment_id
+				),
 				array( 'status' => 500 )
 			);
 		}

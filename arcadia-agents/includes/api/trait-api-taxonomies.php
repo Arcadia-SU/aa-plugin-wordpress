@@ -70,7 +70,7 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( empty( $body['name'] ) ) {
 			return new WP_Error(
 				'missing_name',
-				__( 'Category name is required.', 'arcadia-agents' ),
+				__( 'Category name is required. Provide a non-empty "name" field.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -100,7 +100,11 @@ trait Arcadia_API_Taxonomies_Handler {
 				if ( ! $term || is_wp_error( $term ) ) {
 					return new WP_Error(
 						'term_read_failed',
-						__( 'Failed to read existing category.', 'arcadia-agents' ),
+						sprintf(
+							/* translators: %s: category name */
+							__( "Failed to read existing category '%s'.", 'arcadia-agents' ),
+							sanitize_text_field( $body['name'] )
+						),
 						array( 'status' => 500 )
 					);
 				}
@@ -122,7 +126,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_read_failed',
-				__( 'Failed to read category after creation.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Failed to read category (ID %d) after creation.', 'arcadia-agents' ),
+					$result['term_id']
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -149,7 +157,7 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( empty( $body['name'] ) ) {
 			return new WP_Error(
 				'missing_name',
-				__( 'Tag name is required.', 'arcadia-agents' ),
+				__( 'Tag name is required. Provide a non-empty "name" field.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -175,7 +183,11 @@ trait Arcadia_API_Taxonomies_Handler {
 				if ( ! $term || is_wp_error( $term ) ) {
 					return new WP_Error(
 						'term_read_failed',
-						__( 'Failed to read existing tag.', 'arcadia-agents' ),
+						sprintf(
+							/* translators: %s: tag name */
+							__( "Failed to read existing tag '%s'.", 'arcadia-agents' ),
+							sanitize_text_field( $body['name'] )
+						),
 						array( 'status' => 500 )
 					);
 				}
@@ -197,7 +209,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_read_failed',
-				__( 'Failed to read tag after creation.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Failed to read tag (ID %d) after creation.', 'arcadia-agents' ),
+					$result['term_id']
+				),
 				array( 'status' => 500 )
 			);
 		}
@@ -225,7 +241,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_not_found',
-				__( 'Category not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Category with ID %d not found.', 'arcadia-agents' ),
+					$term_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -252,7 +272,7 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( empty( $args ) ) {
 			return new WP_Error(
 				'nothing_to_update',
-				__( 'No fields to update.', 'arcadia-agents' ),
+				__( 'No updateable fields provided. Allowed: name, slug, description, parent.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -287,7 +307,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_not_found',
-				__( 'Tag not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Tag with ID %d not found.', 'arcadia-agents' ),
+					$term_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -310,7 +334,7 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( empty( $args ) ) {
 			return new WP_Error(
 				'nothing_to_update',
-				__( 'No fields to update.', 'arcadia-agents' ),
+				__( 'No updateable fields provided. Allowed: name, slug, description.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
 		}
@@ -345,7 +369,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_not_found',
-				__( 'Category not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Category with ID %d not found.', 'arcadia-agents' ),
+					$term_id
+				),
 				array( 'status' => 404 )
 			);
 		}
@@ -378,7 +406,11 @@ trait Arcadia_API_Taxonomies_Handler {
 		if ( ! $term || is_wp_error( $term ) ) {
 			return new WP_Error(
 				'term_not_found',
-				__( 'Tag not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: term ID */
+					__( 'Tag with ID %d not found.', 'arcadia-agents' ),
+					$term_id
+				),
 				array( 'status' => 404 )
 			);
 		}

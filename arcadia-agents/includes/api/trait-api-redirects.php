@@ -141,7 +141,11 @@ trait Arcadia_API_Redirects_Handler {
 		if ( ! $post || 'arcadia_redirect' !== $post->post_type ) {
 			return new WP_Error(
 				'redirect_not_found',
-				__( 'Redirect not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: redirect ID */
+					__( 'Redirect with ID %d not found.', 'arcadia-agents' ),
+					$id
+				),
 				array( 'status' => 404 )
 			);
 		}

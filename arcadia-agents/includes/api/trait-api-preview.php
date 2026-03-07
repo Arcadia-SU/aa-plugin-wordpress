@@ -36,7 +36,11 @@ trait Arcadia_API_Preview_Handler {
 		if ( ! $post ) {
 			return new WP_Error(
 				'post_not_found',
-				__( 'Post not found.', 'arcadia-agents' ),
+				sprintf(
+					/* translators: %d: post ID */
+					__( 'Post with ID %d not found.', 'arcadia-agents' ),
+					$post_id
+				),
 				array( 'status' => 404 )
 			);
 		}
