@@ -144,6 +144,8 @@ if zip -r "$ZIP_NAME" "$PLUGIN_DIR/" \
 	-x "${PLUGIN_DIR}/phpunit.xml" \
 	-x "${PLUGIN_DIR}/composer.json" \
 	-x "${PLUGIN_DIR}/composer.lock" \
+	-x "*/composer.json" \
+	-x "*/composer.lock" \
 	-x "${PLUGIN_DIR}/.git/*" \
 	-x "${PLUGIN_DIR}/.env" \
 	-x "${PLUGIN_DIR}/CLAUDE.md" \

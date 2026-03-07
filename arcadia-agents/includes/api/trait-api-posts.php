@@ -317,6 +317,15 @@ trait Arcadia_API_Posts_Handler {
 			return $post_id;
 		}
 
+		// Re-attach sideloaded images from H1.2 validation (created with post_parent=0).
+		if ( Arcadia_Blocks::is_acf_available() ) {
+			$acf_validator  = Arcadia_ACF_Validator::get_instance();
+			$sideloaded_ids = $acf_validator->get_and_clear_sideloaded_ids();
+			foreach ( $sideloaded_ids as $att_id ) {
+				wp_update_post( array( 'ID' => $att_id, 'post_parent' => $post_id ) );
+			}
+		}
+
 		// Set categories and tags, collecting any creation warnings.
 		$taxonomy_warnings = array();
 
@@ -534,6 +543,15 @@ trait Arcadia_API_Posts_Handler {
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
+		}
+
+		// Re-attach sideloaded images from H1.2 validation (created with post_parent=0).
+		if ( Arcadia_Blocks::is_acf_available() ) {
+			$acf_validator  = Arcadia_ACF_Validator::get_instance();
+			$sideloaded_ids = $acf_validator->get_and_clear_sideloaded_ids();
+			foreach ( $sideloaded_ids as $att_id ) {
+				wp_update_post( array( 'ID' => $att_id, 'post_parent' => $post_id ) );
+			}
 		}
 
 		// Append mode: add taxonomies instead of replacing (finding #22).

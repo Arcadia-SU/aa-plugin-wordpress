@@ -175,7 +175,18 @@ trait Arcadia_API_ACF_Fields_Handler {
 
 				case 'image':
 					if ( is_string( $value ) && ! empty( $value ) ) {
-						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value );
+						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
+						if ( is_wp_error( $sideloaded ) ) {
+							return $sideloaded;
+						}
+						$value = $sideloaded;
+					} elseif ( is_array( $value ) && ! empty( $value['url'] ) ) {
+						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field(
+							$value['url'],
+							$post_id,
+							$value['title'] ?? null,
+							$value['alt'] ?? ''
+						);
 						if ( is_wp_error( $sideloaded ) ) {
 							return $sideloaded;
 						}

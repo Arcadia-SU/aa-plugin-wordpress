@@ -152,9 +152,17 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 			switch ( $type ) {
 				case 'image':
 					// After H1.2 pre-processing, value is typically already an int.
-					// Guard: only sideload if still a URL string.
+					// Guard: only sideload if still a URL string or object.
 					if ( is_string( $value ) ) {
 						$sideloaded          = self::sideload_image_field( $value );
+						$data[ $field_name ] = is_wp_error( $sideloaded ) ? 0 : $sideloaded;
+					} elseif ( is_array( $value ) && ! empty( $value['url'] ) ) {
+						$sideloaded          = self::sideload_image_field(
+							$value['url'],
+							0,
+							$value['title'] ?? null,
+							$value['alt'] ?? ''
+						);
 						$data[ $field_name ] = is_wp_error( $sideloaded ) ? 0 : $sideloaded;
 					} else {
 						$data[ $field_name ] = $value;
@@ -191,10 +199,13 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 * Returns WP_Error on failure so callers can surface the error
 	 * to the agent instead of silently falling back to a URL string.
 	 *
-	 * @param string $url The image URL.
+	 * @param string      $url     The image URL.
+	 * @param int         $post_id Parent post ID for the attachment (default 0).
+	 * @param string|null $title   Attachment title (default null = derive from filename).
+	 * @param string      $alt     Alt text to store as _wp_attachment_image_alt (default '').
 	 * @return int|WP_Error Attachment ID or WP_Error on failure.
 	 */
-	public static function sideload_image_field( $url ) {
+	public static function sideload_image_field( $url, $post_id = 0, $title = null, $alt = '' ) {
 		if ( ! function_exists( 'media_sideload_image' ) ) {
 			require_once ABSPATH . 'wp-admin/includes/media.php';
 			require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -208,10 +219,15 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 			);
 		}
 
-		$attachment_id = media_sideload_image( $url, 0, null, 'id' );
+		$attachment_id = media_sideload_image( $url, $post_id, $title, 'id' );
 
 		if ( is_wp_error( $attachment_id ) ) {
 			return $attachment_id;
+		}
+
+		// Store alt text if provided.
+		if ( '' !== $alt ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $alt ) );
 		}
 
 		return $attachment_id;

@@ -77,8 +77,9 @@ class AcfValidatorTest extends TestCase {
 	 *
 	 * @param string $block_name Full block name (e.g. 'acf/image').
 	 * @param array  $fields     Array of ACF field descriptors.
+	 * @param array  $post_types Optional post_type restrictions. Empty = no restriction.
 	 */
-	private function register_acf_block( $block_name, $fields ) {
+	private function register_acf_block( $block_name, $fields, $post_types = array() ) {
 		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
 
 		$short_name = preg_replace( '/^acf\//', '', $block_name );
@@ -89,9 +90,27 @@ class AcfValidatorTest extends TestCase {
 
 		$group_key = 'group_' . $short_name;
 
+		// Build location rules: always include a block rule.
+		$location = array();
+		if ( empty( $post_types ) ) {
+			// Block-only rule (no post_type restriction).
+			$location[] = array(
+				array( 'param' => 'block', 'operator' => '==', 'value' => $block_name ),
+			);
+		} else {
+			// One OR-group per post_type, each AND-ed with the block rule.
+			foreach ( $post_types as $pt ) {
+				$location[] = array(
+					array( 'param' => 'block', 'operator' => '==', 'value' => $block_name ),
+					array( 'param' => 'post_type', 'operator' => '==', 'value' => $pt ),
+				);
+			}
+		}
+
 		$_test_acf_field_groups[] = array(
-			'key'   => $group_key,
-			'title' => ucfirst( $short_name ) . ' Fields',
+			'key'      => $group_key,
+			'title'    => ucfirst( $short_name ) . ' Fields',
+			'location' => $location,
 		);
 
 		$_test_acf_fields_by_group[ $group_key ] = $fields;
@@ -570,6 +589,288 @@ class AcfValidatorTest extends TestCase {
 
 		$this->assertTrue( $result );
 	}
+
+	// =========================================================================
+	// H1.2 — Image Object Format Tests
+	// =========================================================================
+
+	/**
+	 * Test: image object with URL, alt, and title is sideloaded with metadata.
+	 */
+	public function test_image_object_sideloaded_with_metadata(): void {
+		global $_test_media_sideload_result, $_test_post_meta;
+		$_test_media_sideload_result = 101;
+
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'photo', 'type' => 'image', 'required' => false, 'label' => 'Photo', 'key' => 'field_photo' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/hero',
+				'properties' => array(
+					'photo' => array(
+						'url'   => 'https://example.com/hero.jpg',
+						'alt'   => 'A beautiful sunset',
+						'title' => 'Sunset Photo',
+					),
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertEquals( 101, $json['children'][0]['properties']['photo'] );
+		$this->assertEquals(
+			'A beautiful sunset',
+			$_test_post_meta[101]['_wp_attachment_image_alt'] ?? ''
+		);
+	}
+
+	/**
+	 * Test: image object with only URL (no alt/title) sideloads OK.
+	 */
+	public function test_image_object_without_alt_sideloaded(): void {
+		global $_test_media_sideload_result;
+		$_test_media_sideload_result = 102;
+
+		$this->register_acf_block( 'acf/image', array(
+			array( 'name' => 'photo', 'type' => 'image', 'required' => false, 'label' => 'Photo', 'key' => 'field_photo' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/image',
+				'properties' => array(
+					'photo' => array( 'url' => 'https://example.com/minimal.jpg' ),
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertEquals( 102, $json['children'][0]['properties']['photo'] );
+	}
+
+	/**
+	 * Test: image object sideload failure returns 422 error.
+	 */
+	public function test_image_object_sideload_failure_returns_error(): void {
+		global $_test_media_sideload_result;
+		$_test_media_sideload_result = new \WP_Error( 'download_failed', 'Could not download image.' );
+
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'photo', 'type' => 'image', 'required' => false, 'label' => 'Photo', 'key' => 'field_photo' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/hero',
+				'properties' => array(
+					'photo' => array(
+						'url' => 'https://example.com/broken.jpg',
+						'alt' => 'Broken',
+					),
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 422, $result->get_error_data()['status'] );
+
+		$errors = $result->get_error_data()['errors'];
+		$this->assertCount( 1, $errors );
+		$this->assertEquals( 'photo', $errors[0]['field'] );
+		$this->assertStringContainsString( 'object (URL + metadata)', $errors[0]['got'] );
+		$this->assertStringContainsString( 'sideload failed', $errors[0]['suggestion'] );
+	}
+
+	/**
+	 * Test: image object value is replaced with int in block properties.
+	 */
+	public function test_image_object_replaces_value_with_int(): void {
+		global $_test_media_sideload_result;
+		$_test_media_sideload_result = 103;
+
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'cover', 'type' => 'image', 'required' => false, 'label' => 'Cover', 'key' => 'field_cover' ),
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_title' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array(
+					'cover' => array( 'url' => 'https://example.com/cover.jpg', 'alt' => 'Cover' ),
+					'title' => 'Test Card',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertIsInt( $json['children'][0]['properties']['cover'] );
+		$this->assertEquals( 103, $json['children'][0]['properties']['cover'] );
+		$this->assertEquals( 'Test Card', $json['children'][0]['properties']['title'] );
+	}
+
+	/**
+	 * Test: sideloaded IDs are tracked and cleared.
+	 */
+	public function test_sideloaded_ids_tracked(): void {
+		global $_test_media_sideload_result;
+		$_test_media_sideload_result = 200;
+
+		$this->register_acf_block( 'acf/image', array(
+			array( 'name' => 'photo', 'type' => 'image', 'required' => false, 'label' => 'Photo', 'key' => 'field_photo' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/image',
+				'properties' => array(
+					'photo' => array( 'url' => 'https://example.com/tracked.jpg' ),
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+
+		$ids = $validator->get_and_clear_sideloaded_ids();
+		$this->assertCount( 1, $ids );
+		$this->assertEquals( 200, $ids[0] );
+
+		$ids2 = $validator->get_and_clear_sideloaded_ids();
+		$this->assertEmpty( $ids2 );
+	}
+
+	// =========================================================================
+	// H1.1 — Post Type Filtering Tests
+	// =========================================================================
+
+	/**
+	 * Test: block available for the target post type passes validation.
+	 */
+	public function test_block_available_for_post_type_passes(): void {
+		$this->register_acf_block( 'acf/article-hero', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_t' ),
+		), array( 'article' ) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/article-hero',
+				'properties' => array( 'title' => 'Hello' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'article' );
+
+		$this->assertTrue( $result );
+	}
+
+	/**
+	 * Test: block unavailable for the target post type returns 422 error.
+	 */
+	public function test_block_unavailable_for_post_type_returns_error(): void {
+		$this->register_acf_block( 'acf/page-hero', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_t' ),
+		), array( 'page' ) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/page-hero',
+				'properties' => array( 'title' => 'Hello' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertEquals( 422, $result->get_error_data()['status'] );
+
+		$errors = $result->get_error_data()['errors'];
+		$this->assertCount( 1, $errors );
+		$this->assertEquals( 'acf/page-hero', $errors[0]['block_type'] );
+		$this->assertStringContainsString( 'not registered for this post_type', $errors[0]['got'] );
+	}
+
+	/**
+	 * Test: block with no post_type restriction passes for any post type.
+	 */
+	public function test_block_with_no_post_type_restriction_passes(): void {
+		$this->register_acf_block( 'acf/universal', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_t' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/universal',
+				'properties' => array( 'title' => 'Works everywhere' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+		$this->assertTrue( $result );
+
+		$json2 = $this->make_json( array(
+			array(
+				'type'       => 'acf/universal',
+				'properties' => array( 'title' => 'Still works' ),
+			),
+		) );
+		$result2 = $validator->validate_and_preprocess( $json2, 'article' );
+		$this->assertTrue( $result2 );
+	}
+
+	/**
+	 * Test: post_type check error format matches spec.
+	 */
+	public function test_post_type_check_error_format(): void {
+		$this->register_acf_block( 'acf/restricted', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_t' ),
+		), array( 'page' ) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/restricted',
+				'properties' => array( 'title' => 'Hello' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+
+		$error = $result->get_error_data()['errors'][0];
+		$this->assertArrayHasKey( 'block_index', $error );
+		$this->assertArrayHasKey( 'block_type', $error );
+		$this->assertArrayHasKey( 'expected', $error );
+		$this->assertArrayHasKey( 'got', $error );
+		$this->assertArrayHasKey( 'suggestion', $error );
+		$this->assertEquals( 0, $error['block_index'] );
+		$this->assertEquals( 'acf/restricted', $error['block_type'] );
+		$this->assertStringContainsString( 'post_type', $error['expected'] );
+	}
+
+	// =========================================================================
+	// H1.3 — Render Test Tests
+	// =========================================================================
 
 	/**
 	 * Test: render error contains block details.

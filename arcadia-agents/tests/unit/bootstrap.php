@@ -185,6 +185,35 @@ if ( ! function_exists( 'acf_get_field_groups' ) ) {
 
     function acf_get_field_groups( $args = array() ) {
         global $_test_acf_field_groups;
+
+        // Filter by 'block' arg: return only groups whose location rules target this block.
+        if ( ! empty( $args['block'] ) ) {
+            $block_name = $args['block'];
+            $matched    = array();
+            foreach ( $_test_acf_field_groups as $group ) {
+                if ( empty( $group['location'] ) || ! is_array( $group['location'] ) ) {
+                    continue;
+                }
+                foreach ( $group['location'] as $or_group ) {
+                    if ( ! is_array( $or_group ) ) {
+                        continue;
+                    }
+                    foreach ( $or_group as $rule ) {
+                        if (
+                            is_array( $rule )
+                            && isset( $rule['param'], $rule['value'] )
+                            && 'block' === $rule['param']
+                            && $block_name === $rule['value']
+                        ) {
+                            $matched[] = $group;
+                            break 2;
+                        }
+                    }
+                }
+            }
+            return $matched;
+        }
+
         return $_test_acf_field_groups;
     }
 }
