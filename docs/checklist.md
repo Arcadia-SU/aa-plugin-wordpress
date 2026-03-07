@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-03-06
+**Dernière mise à jour :** 2026-03-07
 
 ---
 
@@ -338,6 +338,8 @@
 - [DONE] Auto-sideload via `media_sideload_image()`
 - [DONE] Remplacer URL par attachment ID dans les données du bloc
 - [DONE] Retourner 422 si sideload échoue
+- [DONE] Support format objet `{url, alt, title}` avec propagation metadata (alt text, titre)
+- [DONE] Tracking sideloaded IDs + re-attach au post après `wp_insert_post`
 
 ### H1.3 — Render Test (after save, before response)
 - [DONE] `render_block()` interne pour chaque bloc ACF après sauvegarde
@@ -350,7 +352,18 @@
 - Integrated into `json_to_blocks()` (post_type param added)
 - `sideload_image_field()` returns `WP_Error` on failure (no silent fallback)
 - Render test in `create_post()` and `update_post()` after save
-- 19 unit tests (AcfValidatorTest)
+- 29 unit tests (AcfValidatorTest)
+
+---
+
+## Phase 12 : accepted_formats (I1)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+*Endpoint concerné : `GET /blocks`*
+
+### I1 — `GET /blocks` : exposer `accepted_formats` sur les champs image
+- [DONE] Ajouter `"accepted_formats": ["int", "url", "object"]` aux champs `image` dans `get_acf_block_fields()`
+- [DONE] Test unitaire : image fields include accepted_formats, text fields don't (BlockRegistryTest)
 
 ---
 

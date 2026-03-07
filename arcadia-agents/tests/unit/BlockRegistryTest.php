@@ -231,6 +231,72 @@ class BlockRegistryTest extends TestCase {
 	}
 
 	// =========================================================================
+	// accepted_formats tests (I1)
+	// =========================================================================
+
+	/**
+	 * Test that image fields include accepted_formats in GET /blocks response.
+	 */
+	public function test_image_fields_include_accepted_formats(): void {
+		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		// Register an ACF block with image and text fields.
+		$_test_acf_block_types = array(
+			'acf/hero' => array( 'name' => 'acf/hero', 'title' => 'Hero Section' ),
+		);
+
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_hero',
+				'title'    => 'Hero Fields',
+				'location' => array(
+					array(
+						array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/hero' ),
+					),
+				),
+			),
+		);
+
+		$_test_acf_fields_by_group = array(
+			'group_hero' => array(
+				array( 'name' => 'background', 'type' => 'image', 'required' => true, 'label' => 'Background Image', 'key' => 'field_bg' ),
+				array( 'name' => 'title', 'type' => 'text', 'required' => true, 'label' => 'Title', 'key' => 'field_title' ),
+				array( 'name' => 'logo', 'type' => 'image', 'required' => false, 'label' => 'Logo', 'key' => 'field_logo' ),
+			),
+		);
+
+		// Reset singleton to pick up new blocks.
+		$ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+
+		$registry = \Arcadia_Block_Registry::get_instance();
+		$custom   = $registry->get_custom_blocks();
+
+		$this->assertCount( 1, $custom );
+		$fields = $custom[0]['fields'];
+		$this->assertCount( 3, $fields );
+
+		// Image field 'background' has accepted_formats.
+		$bg = $fields[0];
+		$this->assertEquals( 'image', $bg['type'] );
+		$this->assertArrayHasKey( 'accepted_formats', $bg );
+		$this->assertEquals( array( 'int', 'url', 'object' ), $bg['accepted_formats'] );
+
+		// Text field 'title' does NOT have accepted_formats.
+		$title = $fields[1];
+		$this->assertEquals( 'text', $title['type'] );
+		$this->assertArrayNotHasKey( 'accepted_formats', $title );
+
+		// Image field 'logo' also has accepted_formats.
+		$logo = $fields[2];
+		$this->assertEquals( 'image', $logo['type'] );
+		$this->assertArrayHasKey( 'accepted_formats', $logo );
+		$this->assertEquals( array( 'int', 'url', 'object' ), $logo['accepted_formats'] );
+	}
+
+	// =========================================================================
 	// get_custom_blocks() tests (without ACF/Gutenberg available)
 	// =========================================================================
 

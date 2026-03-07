@@ -316,6 +316,11 @@ class Arcadia_Block_Registry {
 					$field_descriptor['choices'] = array_keys( $acf_field['choices'] );
 				}
 
+				// Add accepted_formats for image fields (I1).
+				if ( 'image' === $acf_field['type'] ) {
+					$field_descriptor['accepted_formats'] = array( 'int', 'url', 'object' );
+				}
+
 				$fields[] = $field_descriptor;
 			}
 		}
