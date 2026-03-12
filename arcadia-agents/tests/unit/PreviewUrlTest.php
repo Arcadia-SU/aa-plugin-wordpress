@@ -251,4 +251,239 @@ class PreviewUrlTest extends TestCase {
 
 		$this->assertArrayNotHasKey( 'arcadia_preview_cleanup', $_test_scheduled_events );
 	}
+
+	// =========================================================================
+	// fix_query_for_preview
+	// =========================================================================
+
+	/**
+	 * Test fix_query_for_preview skips secondary (non-main) queries.
+	 */
+	public function test_fix_query_skips_secondary_query(): void {
+		global $_test_posts;
+
+		$_test_posts[55] = (object) array(
+			'ID'           => 55,
+			'post_type'    => 'article',
+			'post_status'  => 'draft',
+			'post_name'    => '',
+			'post_title'   => '',
+			'post_content' => '',
+		);
+
+		$token              = $this->preview->generate_token( 55 );
+		$_GET['aa_preview'] = $token;
+		$_GET['p']          = '55';
+
+		$query          = new \WP_Query();
+		$query->is_main = false;
+
+		$this->preview->fix_query_for_preview( $query );
+
+		$this->assertEmpty( $query->query_vars );
+
+		unset( $_GET['aa_preview'], $_GET['p'] );
+	}
+
+	/**
+	 * Test fix_query_for_preview skips when token is invalid.
+	 */
+	public function test_fix_query_skips_invalid_token(): void {
+		global $_test_posts;
+
+		$_test_posts[55] = (object) array(
+			'ID'           => 55,
+			'post_type'    => 'article',
+			'post_status'  => 'draft',
+			'post_name'    => '',
+			'post_title'   => '',
+			'post_content' => '',
+		);
+
+		$this->preview->generate_token( 55 );
+		$_GET['aa_preview'] = 'deadbeefdeadbeefdeadbeefdeadbeef';
+		$_GET['p']          = '55';
+
+		$query          = new \WP_Query();
+		$query->is_main = true;
+
+		$this->preview->fix_query_for_preview( $query );
+
+		$this->assertEmpty( $query->query_vars );
+
+		unset( $_GET['aa_preview'], $_GET['p'] );
+	}
+
+	/**
+	 * Test fix_query_for_preview sets post_type for CPT posts.
+	 */
+	public function test_fix_query_sets_post_type_for_cpt(): void {
+		global $_test_posts;
+
+		$_test_posts[55] = (object) array(
+			'ID'           => 55,
+			'post_type'    => 'article',
+			'post_status'  => 'draft',
+			'post_name'    => '',
+			'post_title'   => '',
+			'post_content' => '',
+		);
+
+		$token              = $this->preview->generate_token( 55 );
+		$_GET['aa_preview'] = $token;
+		$_GET['p']          = '55';
+
+		$query          = new \WP_Query();
+		$query->is_main = true;
+
+		$this->preview->fix_query_for_preview( $query );
+
+		$this->assertEquals( 'article', $query->get( 'post_type' ) );
+		$this->assertEquals(
+			array( 'publish', 'draft', 'pending', 'private', 'future' ),
+			$query->get( 'post_status' )
+		);
+
+		unset( $_GET['aa_preview'], $_GET['p'] );
+	}
+
+	/**
+	 * Test fix_query_for_preview does NOT set post_type for standard posts.
+	 */
+	public function test_fix_query_skips_post_type_for_standard_post(): void {
+		global $_test_posts;
+
+		$_test_posts[56] = (object) array(
+			'ID'           => 56,
+			'post_type'    => 'post',
+			'post_status'  => 'draft',
+			'post_name'    => '',
+			'post_title'   => '',
+			'post_content' => '',
+		);
+
+		$token              = $this->preview->generate_token( 56 );
+		$_GET['aa_preview'] = $token;
+		$_GET['p']          = '56';
+
+		$query          = new \WP_Query();
+		$query->is_main = true;
+
+		$this->preview->fix_query_for_preview( $query );
+
+		// Should NOT set post_type for standard post.
+		$this->assertEquals( '', $query->get( 'post_type' ) );
+
+		// But should set post_status.
+		$this->assertEquals(
+			array( 'publish', 'draft', 'pending', 'private', 'future' ),
+			$query->get( 'post_status' )
+		);
+
+		unset( $_GET['aa_preview'], $_GET['p'] );
+	}
+
+	// =========================================================================
+	// get_preview_template_hierarchy (via reflection)
+	// =========================================================================
+
+	/**
+	 * Test template hierarchy for a CPT post.
+	 */
+	public function test_template_hierarchy_for_cpt(): void {
+		$post = (object) array(
+			'ID'        => 55,
+			'post_type' => 'article',
+			'post_name' => 'my-article-slug',
+		);
+
+		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
+		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
+		$method->setAccessible( true );
+
+		$result = $method->invoke( $this->preview, $post );
+
+		$expected = array(
+			'single-article-my-article-slug.php',
+			'single-article.php',
+			'single.php',
+			'singular.php',
+		);
+
+		$this->assertEquals( $expected, $result );
+	}
+
+	/**
+	 * Test template hierarchy for a standard post.
+	 */
+	public function test_template_hierarchy_for_standard_post(): void {
+		$post = (object) array(
+			'ID'        => 56,
+			'post_type' => 'post',
+			'post_name' => 'hello-world',
+		);
+
+		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
+		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
+		$method->setAccessible( true );
+
+		$result = $method->invoke( $this->preview, $post );
+
+		$expected = array(
+			'single-post-hello-world.php',
+			'single-post.php',
+			'single.php',
+			'singular.php',
+		);
+
+		$this->assertEquals( $expected, $result );
+	}
+
+	// =========================================================================
+	// handle_preview — status_header(200) for CPT draft
+	// =========================================================================
+
+	/**
+	 * Test handle_preview sets status_header(200) and fixes wp_query for a draft CPT.
+	 */
+	public function test_handle_preview_sets_status_200_for_cpt_draft(): void {
+		global $_test_posts, $_test_status_header_calls,
+			$_test_locate_template_result, $_test_index_template;
+
+		$_test_posts[57] = (object) array(
+			'ID'           => 57,
+			'post_type'    => 'article',
+			'post_title'   => 'Draft CPT Article',
+			'post_status'  => 'draft',
+			'post_name'    => 'draft-cpt-article',
+			'post_content' => '',
+		);
+
+		$token              = $this->preview->generate_token( 57 );
+		$_GET['aa_preview'] = $token;
+		$_GET['p']          = '57';
+
+		// Set up wp_query global.
+		$GLOBALS['wp_query'] = new \WP_Query();
+
+		// No templates found — prevents include/exit.
+		$_test_locate_template_result = '';
+		$_test_index_template         = '';
+		$_test_status_header_calls    = array();
+
+		$this->preview->handle_preview();
+
+		// Assert status_header(200) was called.
+		$this->assertContains( 200, $_test_status_header_calls );
+
+		// Assert wp_query was fixed.
+		$this->assertFalse( $GLOBALS['wp_query']->is_404 );
+		$this->assertTrue( $GLOBALS['wp_query']->is_single );
+		$this->assertTrue( $GLOBALS['wp_query']->is_singular );
+		$this->assertEquals( 57, $GLOBALS['wp_query']->queried_object_id );
+
+		// Clean up.
+		$_test_index_template = '/tmp/index.php';
+		unset( $_GET['aa_preview'], $_GET['p'], $GLOBALS['wp_query'] );
+	}
 }

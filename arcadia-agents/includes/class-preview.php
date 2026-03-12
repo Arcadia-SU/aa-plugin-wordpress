@@ -112,6 +112,43 @@ class Arcadia_Preview {
 	}
 
 	/**
+	 * Fix the main query for preview requests (pre_get_posts callback).
+	 *
+	 * Without this, `?p=ID` for a CPT draft resolves to 404 because
+	 * WordPress doesn't know which post_type to query. This hook tells
+	 * WP_Query to look for the correct type and to include non-published statuses.
+	 *
+	 * @param \WP_Query $query The main WP_Query instance.
+	 */
+	public function fix_query_for_preview( $query ) {
+		// Only modify the main query.
+		if ( ! $query->is_main_query() ) {
+			return;
+		}
+
+		// Only act on preview requests.
+		if ( empty( $_GET['aa_preview'] ) || empty( $_GET['p'] ) ) {
+			return;
+		}
+
+		$post_id = (int) $_GET['p'];
+		$token   = sanitize_text_field( $_GET['aa_preview'] );
+		$post    = get_post( $post_id );
+
+		if ( ! $post || ! $this->validate_token( $post_id, $token ) ) {
+			return;
+		}
+
+		// For CPTs (not post/page), tell WP_Query which post type to look for.
+		if ( ! in_array( $post->post_type, array( 'post', 'page' ), true ) ) {
+			$query->set( 'post_type', $post->post_type );
+		}
+
+		// Allow draft/pending/private/future posts to be found.
+		$query->set( 'post_status', array( 'publish', 'draft', 'pending', 'private', 'future' ) );
+	}
+
+	/**
 	 * Handle preview requests on template_redirect.
 	 *
 	 * Checks for `?aa_preview=TOKEN&p=ID` in the URL, validates the token,
@@ -134,12 +171,30 @@ class Arcadia_Preview {
 			return;
 		}
 
+		// Override 404 status that WordPress may have set for draft CPTs.
+		status_header( 200 );
+
 		// Force the post to appear published for rendering.
 		$post->post_status = 'publish';
+
+		// Set up global post data for theme template functions.
+		$GLOBALS['post'] = $post;
 		setup_postdata( $post );
 
-		// Use the theme's single post template.
-		$template = get_single_template();
+		// Fix the main query so theme functions (get_queried_object, etc.) work.
+		if ( isset( $GLOBALS['wp_query'] ) ) {
+			$GLOBALS['wp_query']->queried_object    = $post;
+			$GLOBALS['wp_query']->queried_object_id = $post->ID;
+			$GLOBALS['wp_query']->is_single         = true;
+			$GLOBALS['wp_query']->is_singular       = true;
+			$GLOBALS['wp_query']->is_404            = false;
+		}
+
+		// Build template hierarchy from the post object directly
+		// (not from get_queried_object() which may be null on 404).
+		$templates = $this->get_preview_template_hierarchy( $post );
+		$template  = locate_template( $templates );
+
 		if ( ! $template ) {
 			$template = get_index_template();
 		}
@@ -148,6 +203,29 @@ class Arcadia_Preview {
 			include $template;
 			exit;
 		}
+	}
+
+	/**
+	 * Build the template hierarchy for a preview post.
+	 *
+	 * Constructs the hierarchy from the post object directly, avoiding
+	 * get_queried_object() which may return null when WordPress is in 404 state.
+	 *
+	 * @param object $post The post object.
+	 * @return array Ordered list of template filenames to try.
+	 */
+	private function get_preview_template_hierarchy( $post ) {
+		$templates = array();
+		$type      = $post->post_type;
+
+		if ( ! empty( $post->post_name ) ) {
+			$templates[] = "single-{$type}-{$post->post_name}.php";
+		}
+		$templates[] = "single-{$type}.php";
+		$templates[] = 'single.php';
+		$templates[] = 'singular.php';
+
+		return $templates;
 	}
 
 	/**

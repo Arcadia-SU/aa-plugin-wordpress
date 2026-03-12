@@ -400,6 +400,20 @@
 
 ---
 
+## Phase 15 : Bugfix Preview URL CPT (L1)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-12*
+*Fichiers concernés : `includes/class-preview.php`, `arcadia-agents.php`, `tests/unit/PreviewUrlTest.php`, `tests/unit/bootstrap.php`*
+
+### L1 — Fix preview URL 404 pour CPT `article`
+- [DONE] `pre_get_posts` hook dans `class-preview.php` : `fix_query_for_preview($query)` — set `post_type` + `post_status` pour previews CPT
+- [DONE] Mise à jour `handle_preview()` : `status_header(200)`, `$GLOBALS['post']`, `$GLOBALS['wp_query']` fix, template hierarchy privée
+- [DONE] `arcadia-agents.php` : enregistrer `pre_get_posts` hook, changer priorité `template_redirect` preview à 1
+- [DONE] Tests unitaires `PreviewUrlTest.php` : fix_query_for_preview (4 tests), template hierarchy (2 tests), handle_preview status_header (1 test)
+- [DONE] Bootstrap `tests/unit/bootstrap.php` : stubs `status_header()`, `validate_file()`, `locate_template()`, `WP_Query` enrichi
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

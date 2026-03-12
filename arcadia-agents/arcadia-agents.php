@@ -120,8 +120,9 @@ class Arcadia_Agents {
 		add_action( 'init', array( $this, 'register_redirect_post_type' ) );
 		add_action( 'template_redirect', array( $this, 'handle_arcadia_redirects' ) );
 
-		// Preview URL: public template_redirect handler + daily cron cleanup.
-		add_action( 'template_redirect', array( $this, 'handle_arcadia_preview' ) );
+		// Preview URL: fix main query for CPT drafts, then render on template_redirect.
+		add_action( 'pre_get_posts', array( $this, 'fix_arcadia_preview_query' ) );
+		add_action( 'template_redirect', array( $this, 'handle_arcadia_preview' ), 1 );
 		add_action( 'arcadia_preview_cleanup', array( $this, 'run_preview_cleanup' ) );
 		add_action( 'init', array( 'Arcadia_Preview', 'schedule_cleanup' ) );
 
@@ -179,6 +180,15 @@ class Arcadia_Agents {
 	 */
 	public function handle_arcadia_redirects() {
 		Arcadia_Redirects::get_instance()->handle_redirect();
+	}
+
+	/**
+	 * Fix the main query for preview requests (pre_get_posts callback).
+	 *
+	 * @param \WP_Query $query The main WP_Query instance.
+	 */
+	public function fix_arcadia_preview_query( $query ) {
+		Arcadia_Preview::get_instance()->fix_query_for_preview( $query );
 	}
 
 	/**

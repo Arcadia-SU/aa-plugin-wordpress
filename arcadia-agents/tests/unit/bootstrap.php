@@ -278,6 +278,41 @@ if ( ! class_exists( 'WP_Query' ) ) {
         public $max_num_pages = 1;
 
         /**
+         * Query variables set via set().
+         */
+        public $query_vars = array();
+
+        /**
+         * Whether this is the main query.
+         */
+        public $is_main = false;
+
+        /**
+         * Queried object (post, term, etc.).
+         */
+        public $queried_object = null;
+
+        /**
+         * Queried object ID.
+         */
+        public $queried_object_id = 0;
+
+        /**
+         * Whether this is a single post query.
+         */
+        public $is_single = false;
+
+        /**
+         * Whether this is a singular query.
+         */
+        public $is_singular = false;
+
+        /**
+         * Whether this is a 404 query.
+         */
+        public $is_404 = false;
+
+        /**
          * Next result to return (set by tests).
          */
         private static $next_result = null;
@@ -304,6 +339,35 @@ if ( ! class_exists( 'WP_Query' ) ) {
                 $this->found_posts = count( self::$next_result );
                 self::$next_result = null;
             }
+        }
+
+        /**
+         * Whether this is the main query.
+         *
+         * @return bool
+         */
+        public function is_main_query() {
+            return $this->is_main;
+        }
+
+        /**
+         * Set a query variable.
+         *
+         * @param string $key   Query variable key.
+         * @param mixed  $value Query variable value.
+         */
+        public function set( $key, $value ) {
+            $this->query_vars[ $key ] = $value;
+        }
+
+        /**
+         * Get a query variable.
+         *
+         * @param string $key Query variable key.
+         * @return mixed
+         */
+        public function get( $key ) {
+            return isset( $this->query_vars[ $key ] ) ? $this->query_vars[ $key ] : '';
         }
     }
 }
@@ -848,10 +912,14 @@ if ( ! function_exists( 'get_single_template' ) ) {
     }
 }
 
-// get_index_template() stub.
+// get_index_template() stub — configurable via global.
 if ( ! function_exists( 'get_index_template' ) ) {
+    global $_test_index_template;
+    $_test_index_template = '/tmp/index.php';
+
     function get_index_template() {
-        return '/tmp/index.php';
+        global $_test_index_template;
+        return $_test_index_template;
     }
 }
 
@@ -915,6 +983,35 @@ if ( ! function_exists( 'wp_unschedule_event' ) ) {
         global $_test_scheduled_events;
         unset( $_test_scheduled_events[ $hook ] );
         return true;
+    }
+}
+
+// status_header() stub — tracks calls for assertions.
+if ( ! function_exists( 'status_header' ) ) {
+    global $_test_status_header_calls;
+    $_test_status_header_calls = array();
+
+    function status_header( $code, $description = '' ) {
+        global $_test_status_header_calls;
+        $_test_status_header_calls[] = $code;
+    }
+}
+
+// validate_file() stub.
+if ( ! function_exists( 'validate_file' ) ) {
+    function validate_file( $file, $allowed_files = array() ) {
+        return 0; // 0 = valid.
+    }
+}
+
+// locate_template() stub — configurable via global.
+if ( ! function_exists( 'locate_template' ) ) {
+    global $_test_locate_template_result;
+    $_test_locate_template_result = '';
+
+    function locate_template( $template_names, $load = false, $load_once = true ) {
+        global $_test_locate_template_result;
+        return $_test_locate_template_result;
     }
 }
 
