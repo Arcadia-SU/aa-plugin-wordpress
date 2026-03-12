@@ -414,6 +414,23 @@
 
 ---
 
+## Phase 16 : SEO Meta-Title Separation (M1)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-12*
+*Fichiers concernés : `includes/api/trait-api-posts.php`, `tests/unit/TitleSeoSeparationTest.php`, `api-contract.md`*
+
+### M1 — Fix: `body.title` = H1, `meta.title` = SEO meta-title
+- [DONE] Séparer `post_title` (← `body.title` en priorité) et `_yoast_wpseo_title` (← `meta.title`)
+- [DONE] Swap priorité dans `create_post()` : `body.title` > `meta.title` pour `post_title`
+- [DONE] Swap priorité dans `update_post()` : idem
+- [DONE] Swap priorité dans `update_page()` : idem
+- [DONE] `meta.title` continue de set `_yoast_wpseo_title` indépendamment
+- [DONE] Backward compat : si seul `meta.title` est fourni, il sert de fallback pour `post_title`
+- [DONE] Tests unitaires (7 tests) : create/update/update_page × title priority + SEO meta separation
+- [DONE] `api-contract.md` mis à jour : documentation `body.title` = H1, `meta.title` = SEO meta-title
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

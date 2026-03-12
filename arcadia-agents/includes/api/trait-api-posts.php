@@ -243,11 +243,12 @@ trait Arcadia_API_Posts_Handler {
 			'post_author' => $post_author,
 		);
 
-		// Title from meta or direct.
-		if ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		} elseif ( ! empty( $body['title'] ) ) {
+		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
+		// body.title takes priority for post_title; meta.title is only a fallback.
+		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );
+		} elseif ( ! empty( $meta['title'] ) ) {
+			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
 		}
 
 		// Slug.
@@ -356,7 +357,7 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Store SEO meta if Yoast or similar is available.
+		// Store SEO meta: meta.title = SEO meta-title (distinct from post_title/H1).
 		if ( ! empty( $meta['title'] ) ) {
 			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
 		}
@@ -471,11 +472,12 @@ trait Arcadia_API_Posts_Handler {
 
 		$post_data = array( 'ID' => $post_id );
 
-		// Update title.
-		if ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		} elseif ( ! empty( $body['title'] ) ) {
+		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
+		// body.title takes priority for post_title; meta.title is only a fallback.
+		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );
+		} elseif ( ! empty( $meta['title'] ) ) {
+			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
 		}
 
 		// Update slug.
@@ -860,11 +862,12 @@ trait Arcadia_API_Posts_Handler {
 
 		$post_data = array( 'ID' => $page_id );
 
-		// Update title.
-		if ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		} elseif ( ! empty( $body['title'] ) ) {
+		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
+		// body.title takes priority for post_title; meta.title is only a fallback.
+		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );
+		} elseif ( ! empty( $meta['title'] ) ) {
+			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
 		}
 
 		// Update slug.
@@ -920,7 +923,7 @@ trait Arcadia_API_Posts_Handler {
 			return $result;
 		}
 
-		// Update SEO meta.
+		// Store SEO meta: meta.title = SEO meta-title (distinct from post_title/H1).
 		if ( ! empty( $meta['title'] ) ) {
 			update_post_meta( $page_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
 		}
