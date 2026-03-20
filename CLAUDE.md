@@ -83,7 +83,7 @@ composer require firebase/php-jwt
 ./build.sh
 ```
 
-Le script exécute 11 checks avant de créer le zip :
+Le script exécute 12 checks avant de créer le zip :
 
 | # | Check | Bloquant |
 |---|-------|----------|
@@ -94,10 +94,11 @@ Le script exécute 11 checks avant de créer le zip :
 | 5 | Autoloader audit (pas de phpunit/myclabs) | Oui |
 | 6 | Vendor completeness (firebase/php-jwt) | Oui |
 | 7 | Boot test (autoloader charge) | Oui |
-| 8 | Création du zip | Oui |
-| 9 | Zip content audit (pas de tests/dev deps) | Oui |
-| 10 | Zip size (warning si > 500KB) | Warning |
-| 11 | Restauration dev deps (trap EXIT) | - |
+| 8 | Version bump (auto-increment patch X.Y.**Z**) | Oui |
+| 9 | Création du zip | Oui |
+| 10 | Zip content audit (pas de tests/dev deps) | Oui |
+| 11 | Zip size (warning si > 500KB) | Warning |
+| 12 | Restauration dev deps (trap EXIT) | - |
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
 

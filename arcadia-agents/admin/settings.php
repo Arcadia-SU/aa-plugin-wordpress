@@ -39,6 +39,7 @@ function arcadia_agents_settings_page() {
 		'site:read',
 		'redirects:read',
 		'redirects:write',
+		'settings:write',
 	);
 
 	$notice        = '';

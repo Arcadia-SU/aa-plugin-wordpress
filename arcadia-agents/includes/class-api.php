@@ -25,6 +25,7 @@ require_once __DIR__ . '/api/trait-api-acf-fields.php';
 require_once __DIR__ . '/api/trait-api-site.php';
 require_once __DIR__ . '/api/trait-api-redirects.php';
 require_once __DIR__ . '/api/trait-api-preview.php';
+require_once __DIR__ . '/api/trait-api-field-schema.php';
 
 /**
  * Class Arcadia_API
@@ -43,6 +44,7 @@ class Arcadia_API {
 	use Arcadia_API_Site_Handler;
 	use Arcadia_API_Redirects_Handler;
 	use Arcadia_API_Preview_Handler;
+	use Arcadia_API_Field_Schema_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -358,6 +360,24 @@ class Arcadia_API {
 			)
 		);
 
+		// Field schema endpoints (FS-2, FS-3).
+		register_rest_route(
+			$this->namespace,
+			'/field-schema',
+			array(
+				array(
+					'methods'             => 'GET',
+					'callback'            => array( $this, 'get_field_schema' ),
+					'permission_callback' => array( $this, 'check_site_read_permission' ),
+				),
+				array(
+					'methods'             => 'PUT',
+					'callback'            => array( $this, 'update_field_schema' ),
+					'permission_callback' => array( $this, 'check_settings_write_permission' ),
+				),
+			)
+		);
+
 		// Blocks discovery endpoint.
 		register_rest_route(
 			$this->namespace,
@@ -533,6 +553,20 @@ class Arcadia_API {
 	 */
 	public function check_redirects_write_permission( $request ) {
 		$result = $this->auth->authenticate_request( $request, 'redirects:write' );
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+		return true;
+	}
+
+	/**
+	 * Check settings:write permission.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool|WP_Error
+	 */
+	public function check_settings_write_permission( $request ) {
+		$result = $this->auth->authenticate_request( $request, 'settings:write' );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}

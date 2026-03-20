@@ -431,6 +431,39 @@
 
 ---
 
+## Phase 17 : Field Schema & Calibration (FS-1→FS-4)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-20*
+*Ref: [content-model.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/content-model.md) section 6*
+
+### FS-1 — `field_values` dans format_post()
+- [DONE] `get_fields($post->ID)` si ACF actif, sinon `{}`
+- [DONE] Retourné comme objet dans `format_post()` (21 champs au lieu de 20)
+- [DONE] Tests unitaires (2 tests) : field_values présent, vide sans ACF
+
+### FS-2 — `GET /field-schema` (scope `site:read`)
+- [DONE] Endpoint retourne pour chaque post type les champs ACF avec type, label, semantic
+- [DONE] Lecture `aa_field_schema` WP option pour les mappings stockés
+- [DONE] `semantic: null` si champ non calibré
+- [DONE] Tests unitaires (2 tests) : retour avec mappings, vide sans ACF
+
+### FS-3 — `PUT /field-schema` (scope `settings:write`)
+- [DONE] Nouveau scope `settings:write` (13 scopes au total)
+- [DONE] Validation structure : type `mapping` ou `generation` uniquement
+- [DONE] Merge partiel (patch) avec schéma existant
+- [DONE] Stockage dans WP option `aa_field_schema`
+- [DONE] Tests unitaires (4 tests) : store, merge, reject invalid type, reject missing type, reject empty
+
+### FS-4 — Application automatique des mappings à l'écriture
+- [DONE] `apply_field_schema_mappings()` appelé dans `create_post()` et `update_post()`
+- [DONE] Sources mappables : `excerpt`, `h1`, `meta_title`, `meta_description`, `featured_image_url`
+- [DONE] `type: mapping` → copie valeur source via `update_field()`
+- [DONE] `semantic: null` → ignoré (non calibré)
+- [DONE] Rétro-compatible : sans schéma = comportement inchangé
+- [DONE] Tests unitaires (4 tests) : mapping appliqué, null skippé, noop sans schéma, source h1
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

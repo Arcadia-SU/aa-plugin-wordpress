@@ -14,6 +14,7 @@ use PHPUnit\Framework\TestCase;
 // Load the posts trait for format_parsed_blocks testing.
 require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-formatters.php';
 require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-posts.php';
+require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-field-schema.php';
 
 /**
  * Minimal class to expose trait methods for testing.
@@ -21,6 +22,7 @@ require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-posts.php';
 class ArticleBlocksTestHelper {
     use \Arcadia_API_Formatters;
     use \Arcadia_API_Posts_Handler;
+    use \Arcadia_API_Field_Schema_Handler;
 
     /**
      * Expose the private format_parsed_blocks method for testing.

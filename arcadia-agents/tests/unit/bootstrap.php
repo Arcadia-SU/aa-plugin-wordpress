@@ -403,9 +403,22 @@ if ( ! function_exists( 'get_post' ) ) {
 // get_post_types() stub.
 if ( ! function_exists( 'get_post_types' ) ) {
     function get_post_types( $args = array(), $output = 'names' ) {
-        // Return a minimal set of public post types.
+        $types = array(
+            'post'       => (object) array( 'name' => 'post', 'label' => 'Posts', 'public' => true, 'hierarchical' => false ),
+            'page'       => (object) array( 'name' => 'page', 'label' => 'Pages', 'public' => true, 'hierarchical' => true ),
+            'attachment' => (object) array( 'name' => 'attachment', 'label' => 'Media', 'public' => true, 'hierarchical' => false ),
+        );
+
         if ( ! empty( $args['public'] ) ) {
+            if ( 'objects' === $output ) {
+                return $types;
+            }
             return array( 'post' => 'post', 'page' => 'page', 'attachment' => 'attachment' );
+        }
+
+        if ( 'objects' === $output ) {
+            unset( $types['attachment'] );
+            return $types;
         }
         return array( 'post' => 'post', 'page' => 'page' );
     }
@@ -1019,6 +1032,20 @@ if ( ! function_exists( 'locate_template' ) ) {
 if ( ! function_exists( 'hash_equals' ) ) {
     function hash_equals( $known_string, $user_string ) {
         return $known_string === $user_string;
+    }
+}
+
+// get_fields() stub — configurable per post ID for FS-1 tests.
+if ( ! function_exists( 'get_fields' ) ) {
+    global $_test_get_fields_results;
+    $_test_get_fields_results = array();
+
+    function get_fields( $post_id = 0 ) {
+        global $_test_get_fields_results;
+        if ( isset( $_test_get_fields_results[ $post_id ] ) ) {
+            return $_test_get_fields_results[ $post_id ];
+        }
+        return false;
     }
 }
 

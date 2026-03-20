@@ -64,6 +64,15 @@ trait Arcadia_API_Formatters {
 			home_url( '/' )
 		);
 
+		// ACF field values for calibration (FS-1).
+		$field_values = new stdClass();
+		if ( function_exists( 'get_fields' ) ) {
+			$raw = get_fields( $post->ID );
+			if ( is_array( $raw ) ) {
+				$field_values = (object) $raw;
+			}
+		}
+
 		return array(
 			'id'                 => $post->ID,
 			'title'              => $post->post_title,
@@ -85,6 +94,7 @@ trait Arcadia_API_Formatters {
 			'tags'               => is_array( $tags ) ? $tags : array(),
 			'seo'                => $seo,
 			'preview_url'        => $preview_url,
+			'field_values'       => $field_values,
 		);
 	}
 

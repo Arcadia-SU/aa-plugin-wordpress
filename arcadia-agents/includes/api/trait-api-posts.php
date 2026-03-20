@@ -380,6 +380,9 @@ trait Arcadia_API_Posts_Handler {
 			$this->auto_populate_acf_fields( $post_id, $post_type );
 		}
 
+		// FS-4: Auto-apply field schema mappings.
+		$this->apply_field_schema_mappings( $post_id, $post_type, $body, $meta );
+
 		// Always set _acf_changed when ACF is active (finding 023).
 		if ( function_exists( 'update_field' ) ) {
 			update_post_meta( $post_id, '_acf_changed', 1 );
@@ -615,6 +618,9 @@ trait Arcadia_API_Posts_Handler {
 			// No explicit acf_fields — create safe ACF references.
 			$this->auto_populate_acf_fields( $post_id, $post->post_type );
 		}
+
+		// FS-4: Auto-apply field schema mappings.
+		$this->apply_field_schema_mappings( $post_id, $post->post_type, $body, $meta );
 
 		// Always set _acf_changed when ACF is active (finding 023).
 		if ( function_exists( 'update_field' ) ) {

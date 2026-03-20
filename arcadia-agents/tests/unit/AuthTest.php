@@ -254,10 +254,11 @@ class AuthTest extends TestCase {
             'site:read',
             'redirects:read',
             'redirects:write',
+            'settings:write',
         );
 
-        // These are the scopes the plugin should support (v2: 12 scopes).
-        $this->assertCount( 12, $expected_scopes );
+        // These are the scopes the plugin should support (v2 + FS: 13 scopes).
+        $this->assertCount( 13, $expected_scopes );
         $this->assertContains( 'articles:read', $expected_scopes );
         $this->assertContains( 'articles:write', $expected_scopes );
         $this->assertContains( 'articles:delete', $expected_scopes );
@@ -270,5 +271,6 @@ class AuthTest extends TestCase {
         $this->assertContains( 'site:read', $expected_scopes );
         $this->assertContains( 'redirects:read', $expected_scopes );
         $this->assertContains( 'redirects:write', $expected_scopes );
+        $this->assertContains( 'settings:write', $expected_scopes );
     }
 }

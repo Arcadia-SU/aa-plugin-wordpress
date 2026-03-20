@@ -23,6 +23,7 @@ if ( ! trait_exists( 'Arcadia_API_Posts_Handler' ) ) {
 	require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-acf-fields.php';
 	require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-taxonomies.php';
 	require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-media.php';
+	require_once dirname( __DIR__, 2 ) . '/includes/api/trait-api-field-schema.php';
 }
 
 /**
@@ -34,6 +35,7 @@ class ExcerptHelper {
 	use \Arcadia_API_ACF_Fields_Handler;
 	use \Arcadia_API_Taxonomies_Handler;
 	use \Arcadia_API_Media_Handler;
+	use \Arcadia_API_Field_Schema_Handler;
 
 	/** @var object */
 	public $blocks;

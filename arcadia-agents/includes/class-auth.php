@@ -229,6 +229,7 @@ class Arcadia_Auth {
 			'site:read',
 			'redirects:read',
 			'redirects:write',
+			'settings:write',
 		);
 		$enabled_scopes = get_option( 'arcadia_agents_scopes', $all_scopes );
 

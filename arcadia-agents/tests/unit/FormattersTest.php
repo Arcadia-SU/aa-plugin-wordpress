@@ -25,7 +25,7 @@ class FormattersTest extends TestCase {
      * Full integration testing would require WordPress environment.
      */
     public function test_format_post_structure(): void {
-        // Expected fields in a formatted post (v2 enriched + Phase 10 + K1).
+        // Expected fields in a formatted post (v2 enriched + Phase 10 + K1 + FS-1).
         $expected_fields = array(
             'id',
             'title',
@@ -47,11 +47,12 @@ class FormattersTest extends TestCase {
             'tags',
             'seo',
             'preview_url',
+            'field_values',
         );
 
         // This test documents the expected structure.
         // Actual formatting is tested via integration tests.
-        $this->assertCount( 20, $expected_fields, 'format_post should return 20 fields' );
+        $this->assertCount( 21, $expected_fields, 'format_post should return 21 fields' );
         $this->assertContains( 'id', $expected_fields );
         $this->assertContains( 'title', $expected_fields );
         $this->assertContains( 'content', $expected_fields );

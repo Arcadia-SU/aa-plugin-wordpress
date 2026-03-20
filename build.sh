@@ -133,7 +133,27 @@ else
 	fail "Autoloader fails to boot. A required class/file is missing."
 fi
 
-# ─── 8. Create zip ─────────────────────────────────────────────────────────
+# ─── 8. Version bump (auto-increment patch) ───────────────────────────────
+
+check "Version bump"
+MAIN_FILE="${PLUGIN_DIR}/arcadia-agents.php"
+CURRENT_VERSION=$(sed -n "s/.*define( 'ARCADIA_AGENTS_VERSION', '\([0-9]*\.[0-9]*\.[0-9]*\)' ).*/\1/p" "$MAIN_FILE")
+if [ -z "$CURRENT_VERSION" ]; then
+	fail "Could not read current version from ${MAIN_FILE}."
+fi
+MAJOR_MINOR="${CURRENT_VERSION%.*}"
+PATCH="${CURRENT_VERSION##*.}"
+NEW_PATCH=$((PATCH + 1))
+NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
+
+# Update define() constant
+sed -i '' "s/define( 'ARCADIA_AGENTS_VERSION', '${CURRENT_VERSION}' )/define( 'ARCADIA_AGENTS_VERSION', '${NEW_VERSION}' )/" "$MAIN_FILE"
+# Update plugin header
+sed -i '' "s/ \* Version: ${CURRENT_VERSION}/ * Version: ${NEW_VERSION}/" "$MAIN_FILE"
+
+pass "Version: ${CURRENT_VERSION} → ${NEW_VERSION}"
+
+# ─── 9. Create zip ────────────────────────────────────────────────────────
 
 check "Create zip"
 rm -f "$ZIP_NAME"
@@ -156,7 +176,7 @@ else
 	fail "Failed to create zip."
 fi
 
-# ─── 9. Zip content audit ──────────────────────────────────────────────────
+# ─── 10. Zip content audit ─────────────────────────────────────────────────
 
 check "Zip content audit"
 zip_issues=0
@@ -203,7 +223,7 @@ else
 	pass "Zip content is clean."
 fi
 
-# ─── 10. Zip size ──────────────────────────────────────────────────────────
+# ─── 11. Zip size ──────────────────────────────────────────────────────────
 
 check "Zip size"
 zip_size_kb=$(du -k "$ZIP_NAME" | cut -f1)
