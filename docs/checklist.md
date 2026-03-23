@@ -470,10 +470,10 @@
 *Découvert: Test calibration e2e (aa-kfe) — 403 `scope_denied` sur `PUT /field-schema`*
 
 ### aa-xs3 — Ajouter `settings:write` dans les checkboxes admin
-- [ ] Ajouter `settings:write` dans la liste des scopes avec checkbox dans la page admin
-- [ ] Activer par défaut pour les nouvelles installations
-- [ ] Valider que `PUT /field-schema` fonctionne quand le scope est activé
-- [ ] Tests
+- [DONE] Ajouter `settings:write` dans la liste des scopes avec checkbox dans la page admin
+- [DONE] Activer par défaut pour les nouvelles installations (déjà dans `$all_scopes` default)
+- [DONE] Valider que `PUT /field-schema` fonctionne quand le scope est activé (scope was already functional in auth, only UI label was missing)
+- [DONE] Tests (227 tests pass, AuthTest already covers 13 scopes including settings:write)
 
 ---
 
