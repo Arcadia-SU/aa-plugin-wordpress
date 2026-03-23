@@ -161,8 +161,9 @@ class Arcadia_Preview {
 	 * (redirect_canonical, caching plugins, SEO plugins) can interfere
 	 * with draft CPT rendering if we don't take control early.
 	 *
-	 * Debug mode: add `&aa_debug=1` to the preview URL when WP_DEBUG is
-	 * enabled to get a JSON diagnostic report instead of the rendered page.
+	 * Debug mode: add `&aa_debug=1` to the preview URL to get a JSON
+	 * diagnostic report instead of the rendered page. No additional gate
+	 * beyond the preview token — the diagnostic contains no secrets.
 	 */
 	public function handle_preview() {
 		if ( empty( $_GET['aa_preview'] ) || empty( $_GET['p'] ) ) {
@@ -265,14 +266,14 @@ class Arcadia_Preview {
 	/**
 	 * Check if this is a debug request.
 	 *
-	 * Debug mode is only available when WP_DEBUG is enabled.
+	 * No additional gate beyond the preview token: the debug output
+	 * contains only theme/template/query diagnostics (no secrets),
+	 * and the token already proves authorized access.
 	 *
 	 * @return bool
 	 */
 	private function is_debug_request() {
-		return ! empty( $_GET['aa_debug'] )
-			&& defined( 'WP_DEBUG' )
-			&& WP_DEBUG;
+		return ! empty( $_GET['aa_debug'] );
 	}
 
 	/**
