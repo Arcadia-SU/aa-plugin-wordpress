@@ -152,7 +152,12 @@ class Arcadia_Preview {
 	 * Handle preview requests on template_redirect.
 	 *
 	 * Checks for `?aa_preview=TOKEN&p=ID` in the URL, validates the token,
-	 * and renders the post using the theme's single template.
+	 * and sets up the global state so WordPress renders the post normally.
+	 *
+	 * Instead of manually including a template (which bypasses the
+	 * template_include filter, FSE compatibility, and theme hooks),
+	 * this method fixes the global wp_query state and returns, letting
+	 * WordPress's own template-loader.php handle rendering.
 	 */
 	public function handle_preview() {
 		if ( empty( $_GET['aa_preview'] ) || empty( $_GET['p'] ) ) {
@@ -174,6 +179,12 @@ class Arcadia_Preview {
 		// Override 404 status that WordPress may have set for draft CPTs.
 		status_header( 200 );
 
+		// Prevent caching of preview pages.
+		nocache_headers();
+
+		// Tell search engines not to index preview URLs.
+		header( 'X-Robots-Tag: noindex, nofollow' );
+
 		// Force the post to appear published for rendering.
 		$post->post_status = 'publish';
 
@@ -181,8 +192,13 @@ class Arcadia_Preview {
 		$GLOBALS['post'] = $post;
 		setup_postdata( $post );
 
-		// Fix the main query so theme functions (get_queried_object, etc.) work.
+		// Fix the main query so theme template loops (have_posts / the_post)
+		// and query functions (get_queried_object, is_single, etc.) all work.
 		if ( isset( $GLOBALS['wp_query'] ) ) {
+			$GLOBALS['wp_query']->post              = $post;
+			$GLOBALS['wp_query']->posts             = array( $post );
+			$GLOBALS['wp_query']->post_count        = 1;
+			$GLOBALS['wp_query']->found_posts       = 1;
 			$GLOBALS['wp_query']->queried_object    = $post;
 			$GLOBALS['wp_query']->queried_object_id = $post->ID;
 			$GLOBALS['wp_query']->is_single         = true;
@@ -190,42 +206,8 @@ class Arcadia_Preview {
 			$GLOBALS['wp_query']->is_404            = false;
 		}
 
-		// Build template hierarchy from the post object directly
-		// (not from get_queried_object() which may be null on 404).
-		$templates = $this->get_preview_template_hierarchy( $post );
-		$template  = locate_template( $templates );
-
-		if ( ! $template ) {
-			$template = get_index_template();
-		}
-
-		if ( $template ) {
-			include $template;
-			exit;
-		}
-	}
-
-	/**
-	 * Build the template hierarchy for a preview post.
-	 *
-	 * Constructs the hierarchy from the post object directly, avoiding
-	 * get_queried_object() which may return null when WordPress is in 404 state.
-	 *
-	 * @param object $post The post object.
-	 * @return array Ordered list of template filenames to try.
-	 */
-	private function get_preview_template_hierarchy( $post ) {
-		$templates = array();
-		$type      = $post->post_type;
-
-		if ( ! empty( $post->post_name ) ) {
-			$templates[] = "single-{$type}-{$post->post_name}.php";
-		}
-		$templates[] = "single-{$type}.php";
-		$templates[] = 'single.php';
-		$templates[] = 'singular.php';
-
-		return $templates;
+		// Don't include a template manually — let WordPress's
+		// template-loader.php handle it after template_redirect returns.
 	}
 
 	/**

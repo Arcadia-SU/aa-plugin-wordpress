@@ -3,7 +3,7 @@
  * Plugin Name: Arcadia Agents
  * Plugin URI: https://arcadia-agents.com
  * Description: Connect your WordPress site to Arcadia Agents for autonomous SEO content management.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Arcadia
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ARCADIA_AGENTS_VERSION', '0.1.4' );
+define( 'ARCADIA_AGENTS_VERSION', '0.1.5' );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 

@@ -477,6 +477,21 @@
 
 ---
 
+## Phase 19 : Bugfix Preview Body Vide (aa-preview)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-23*
+*Découvert: Calibration visuelle e2e (Step 5) — ScreenshotOne reçoit une page blanche*
+*Fichiers concernés : `includes/class-preview.php`*
+
+### aa-preview — Fix `aa_preview` returns empty body (Content-Length: 0)
+- [DONE] Diagnostiquer pourquoi `handle_preview()` envoie HTTP 200 mais 0 bytes de HTML
+- [DONE] Fix : remplacer le `include $template; exit;` manuel par un fix complet de `wp_query` (posts, post_count, found_posts) et laisser WordPress charger le template normalement
+- [DONE] Ajouter `nocache_headers()` + `X-Robots-Tag: noindex, nofollow`
+- [DONE] Tests unitaires preview body rendering (18 tests, assertions wp_query->posts populé)
+- [ ] Valider sur `preprod-iselection.vertuelle.com` post ID 57824
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

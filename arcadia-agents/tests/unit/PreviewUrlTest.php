@@ -384,71 +384,18 @@ class PreviewUrlTest extends TestCase {
 	}
 
 	// =========================================================================
-	// get_preview_template_hierarchy (via reflection)
+	// handle_preview — state setup for CPT draft
 	// =========================================================================
 
 	/**
-	 * Test template hierarchy for a CPT post.
-	 */
-	public function test_template_hierarchy_for_cpt(): void {
-		$post = (object) array(
-			'ID'        => 55,
-			'post_type' => 'article',
-			'post_name' => 'my-article-slug',
-		);
-
-		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
-		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
-		$method->setAccessible( true );
-
-		$result = $method->invoke( $this->preview, $post );
-
-		$expected = array(
-			'single-article-my-article-slug.php',
-			'single-article.php',
-			'single.php',
-			'singular.php',
-		);
-
-		$this->assertEquals( $expected, $result );
-	}
-
-	/**
-	 * Test template hierarchy for a standard post.
-	 */
-	public function test_template_hierarchy_for_standard_post(): void {
-		$post = (object) array(
-			'ID'        => 56,
-			'post_type' => 'post',
-			'post_name' => 'hello-world',
-		);
-
-		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
-		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
-		$method->setAccessible( true );
-
-		$result = $method->invoke( $this->preview, $post );
-
-		$expected = array(
-			'single-post-hello-world.php',
-			'single-post.php',
-			'single.php',
-			'singular.php',
-		);
-
-		$this->assertEquals( $expected, $result );
-	}
-
-	// =========================================================================
-	// handle_preview — status_header(200) for CPT draft
-	// =========================================================================
-
-	/**
-	 * Test handle_preview sets status_header(200) and fixes wp_query for a draft CPT.
+	 * Test handle_preview sets status 200 and fully populates wp_query for a draft CPT.
+	 *
+	 * The handler must populate posts, post_count, and found_posts so that
+	 * theme template loops (have_posts / the_post) render content instead
+	 * of producing an empty body.
 	 */
 	public function test_handle_preview_sets_status_200_for_cpt_draft(): void {
-		global $_test_posts, $_test_status_header_calls,
-			$_test_locate_template_result, $_test_index_template;
+		global $_test_posts, $_test_status_header_calls;
 
 		$_test_posts[57] = (object) array(
 			'ID'           => 57,
@@ -466,24 +413,28 @@ class PreviewUrlTest extends TestCase {
 		// Set up wp_query global.
 		$GLOBALS['wp_query'] = new \WP_Query();
 
-		// No templates found — prevents include/exit.
-		$_test_locate_template_result = '';
-		$_test_index_template         = '';
-		$_test_status_header_calls    = array();
+		$_test_status_header_calls = array();
 
 		$this->preview->handle_preview();
 
 		// Assert status_header(200) was called.
 		$this->assertContains( 200, $_test_status_header_calls );
 
-		// Assert wp_query was fixed.
+		// Assert wp_query was fixed — queried_object and flags.
 		$this->assertFalse( $GLOBALS['wp_query']->is_404 );
 		$this->assertTrue( $GLOBALS['wp_query']->is_single );
 		$this->assertTrue( $GLOBALS['wp_query']->is_singular );
 		$this->assertEquals( 57, $GLOBALS['wp_query']->queried_object_id );
 
+		// Assert wp_query posts array is populated (root cause of empty body).
+		$this->assertCount( 1, $GLOBALS['wp_query']->posts );
+		$this->assertEquals( 57, $GLOBALS['wp_query']->posts[0]->ID );
+		$this->assertEquals( 'publish', $GLOBALS['wp_query']->posts[0]->post_status );
+		$this->assertEquals( 1, $GLOBALS['wp_query']->post_count );
+		$this->assertEquals( 1, $GLOBALS['wp_query']->found_posts );
+		$this->assertEquals( 57, $GLOBALS['wp_query']->post->ID );
+
 		// Clean up.
-		$_test_index_template = '/tmp/index.php';
 		unset( $_GET['aa_preview'], $_GET['p'], $GLOBALS['wp_query'] );
 	}
 }

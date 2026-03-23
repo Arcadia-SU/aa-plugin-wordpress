@@ -263,9 +263,19 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 if ( ! class_exists( 'WP_Query' ) ) {
     class WP_Query {
         /**
+         * Current post object.
+         */
+        public $post = null;
+
+        /**
          * Queried posts. Set via static set_next_result().
          */
         public $posts = array();
+
+        /**
+         * Number of posts in current query.
+         */
+        public $post_count = 0;
 
         /**
          * Total found posts.
@@ -1015,6 +1025,11 @@ if ( ! function_exists( 'validate_file' ) ) {
     function validate_file( $file, $allowed_files = array() ) {
         return 0; // 0 = valid.
     }
+}
+
+// nocache_headers() stub — no-op in tests.
+if ( ! function_exists( 'nocache_headers' ) ) {
+    function nocache_headers() {}
 }
 
 // locate_template() stub — configurable via global.
