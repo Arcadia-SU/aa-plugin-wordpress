@@ -464,6 +464,19 @@
 
 ---
 
+## Phase 18 : Admin Scope Fix (aa-xs3)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-23*
+*Découvert: Test calibration e2e (aa-kfe) — 403 `scope_denied` sur `PUT /field-schema`*
+
+### aa-xs3 — Ajouter `settings:write` dans les checkboxes admin
+- [ ] Ajouter `settings:write` dans la liste des scopes avec checkbox dans la page admin
+- [ ] Activer par défaut pour les nouvelles installations
+- [ ] Valider que `PUT /field-schema` fonctionne quand le scope est activé
+- [ ] Tests
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

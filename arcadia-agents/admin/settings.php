@@ -134,6 +134,7 @@ function arcadia_agents_settings_page() {
 		'site:read'         => __( 'Read site info & pages', 'arcadia-agents' ),
 		'redirects:read'    => __( 'Read redirects', 'arcadia-agents' ),
 		'redirects:write'   => __( 'Create/delete redirects', 'arcadia-agents' ),
+		'settings:write'    => __( 'Update plugin settings (calibration)', 'arcadia-agents' ),
 	);
 
 	?>
