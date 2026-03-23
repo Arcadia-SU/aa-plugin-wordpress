@@ -278,6 +278,11 @@ if ( ! class_exists( 'WP_Query' ) ) {
         public $post_count = 0;
 
         /**
+         * Index of current post in the loop (-1 = before first).
+         */
+        public $current_post = -1;
+
+        /**
          * Total found posts.
          */
         public $found_posts = 0;

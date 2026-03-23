@@ -152,12 +152,14 @@ class Arcadia_Preview {
 	 * Handle preview requests on template_redirect.
 	 *
 	 * Checks for `?aa_preview=TOKEN&p=ID` in the URL, validates the token,
-	 * and sets up the global state so WordPress renders the post normally.
+	 * then takes full control of rendering: populates wp_query so that
+	 * have_posts()/the_post() work inside the theme template, resolves
+	 * the template via WordPress's hierarchy, includes it, and exits.
 	 *
-	 * Instead of manually including a template (which bypasses the
-	 * template_include filter, FSE compatibility, and theme hooks),
-	 * this method fixes the global wp_query state and returns, letting
-	 * WordPress's own template-loader.php handle rendering.
+	 * We include the template ourselves (instead of returning and letting
+	 * template-loader.php do it) because other template_redirect handlers
+	 * (redirect_canonical, caching plugins, SEO plugins) can interfere
+	 * with draft CPT rendering if we don't take control early.
 	 */
 	public function handle_preview() {
 		if ( empty( $_GET['aa_preview'] ) || empty( $_GET['p'] ) ) {
@@ -192,13 +194,16 @@ class Arcadia_Preview {
 		$GLOBALS['post'] = $post;
 		setup_postdata( $post );
 
-		// Fix the main query so theme template loops (have_posts / the_post)
-		// and query functions (get_queried_object, is_single, etc.) all work.
+		// Fully populate wp_query so theme template loops work.
+		// Without posts/post_count, have_posts() returns false and
+		// the template renders an empty body (Content-Length: 0).
 		if ( isset( $GLOBALS['wp_query'] ) ) {
 			$GLOBALS['wp_query']->post              = $post;
 			$GLOBALS['wp_query']->posts             = array( $post );
 			$GLOBALS['wp_query']->post_count        = 1;
 			$GLOBALS['wp_query']->found_posts       = 1;
+			$GLOBALS['wp_query']->max_num_pages     = 1;
+			$GLOBALS['wp_query']->current_post      = -1;
 			$GLOBALS['wp_query']->queried_object    = $post;
 			$GLOBALS['wp_query']->queried_object_id = $post->ID;
 			$GLOBALS['wp_query']->is_single         = true;
@@ -206,8 +211,41 @@ class Arcadia_Preview {
 			$GLOBALS['wp_query']->is_404            = false;
 		}
 
-		// Don't include a template manually — let WordPress's
-		// template-loader.php handle it after template_redirect returns.
+		// Resolve template via WordPress hierarchy, then include and exit.
+		$templates = $this->get_preview_template_hierarchy( $post );
+		$template  = locate_template( $templates );
+
+		if ( ! $template ) {
+			$template = get_index_template();
+		}
+
+		if ( $template ) {
+			include $template;
+			exit;
+		}
+	}
+
+	/**
+	 * Build the template hierarchy for a preview post.
+	 *
+	 * Constructs the hierarchy from the post object directly, avoiding
+	 * get_queried_object() which may return null when WordPress is in 404 state.
+	 *
+	 * @param object $post The post object.
+	 * @return array Ordered list of template filenames to try.
+	 */
+	private function get_preview_template_hierarchy( $post ) {
+		$templates = array();
+		$type      = $post->post_type;
+
+		if ( ! empty( $post->post_name ) ) {
+			$templates[] = "single-{$type}-{$post->post_name}.php";
+		}
+		$templates[] = "single-{$type}.php";
+		$templates[] = 'single.php';
+		$templates[] = 'singular.php';
+
+		return $templates;
 	}
 
 	/**
