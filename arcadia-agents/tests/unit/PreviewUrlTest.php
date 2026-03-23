@@ -440,22 +440,20 @@ class PreviewUrlTest extends TestCase {
 	}
 
 	// =========================================================================
-	// handle_preview — state setup + template inclusion for CPT draft
+	// setup_preview_state — state setup for CPT draft
 	// =========================================================================
 
 	/**
-	 * Test handle_preview sets status 200, fully populates wp_query, and
-	 * attempts template inclusion for a draft CPT.
+	 * Test setup_preview_state sets status 200, fully populates wp_query.
 	 *
-	 * The handler must populate posts, post_count, found_posts, and
+	 * The method must populate posts, post_count, found_posts, and
 	 * current_post so that theme template loops (have_posts / the_post)
 	 * render content instead of producing an empty body.
 	 */
-	public function test_handle_preview_sets_status_200_for_cpt_draft(): void {
-		global $_test_posts, $_test_status_header_calls,
-			$_test_locate_template_result, $_test_index_template;
+	public function test_setup_preview_state_populates_wp_query(): void {
+		global $_test_posts, $_test_status_header_calls;
 
-		$_test_posts[57] = (object) array(
+		$post = (object) array(
 			'ID'           => 57,
 			'post_type'    => 'article',
 			'post_title'   => 'Draft CPT Article',
@@ -464,22 +462,17 @@ class PreviewUrlTest extends TestCase {
 			'post_content' => '',
 		);
 
-		$token              = $this->preview->generate_token( 57 );
-		$_GET['aa_preview'] = $token;
-		$_GET['p']          = '57';
-
 		// Set up wp_query global.
-		$GLOBALS['wp_query'] = new \WP_Query();
+		$GLOBALS['wp_query']       = new \WP_Query();
+		$_test_status_header_calls = array();
 
-		// No templates found — prevents include/exit in test env.
-		$_test_locate_template_result = '';
-		$_test_index_template         = '';
-		$_test_status_header_calls    = array();
-
-		$this->preview->handle_preview();
+		$this->preview->setup_preview_state( $post );
 
 		// Assert status_header(200) was called.
 		$this->assertContains( 200, $_test_status_header_calls );
+
+		// Assert post_status forced to publish.
+		$this->assertEquals( 'publish', $post->post_status );
 
 		// Assert wp_query was fixed — queried_object and flags.
 		$this->assertFalse( $GLOBALS['wp_query']->is_404 );
@@ -499,7 +492,6 @@ class PreviewUrlTest extends TestCase {
 		$this->assertEquals( -1, $GLOBALS['wp_query']->current_post );
 
 		// Clean up.
-		$_test_index_template = '/tmp/index.php';
-		unset( $_GET['aa_preview'], $_GET['p'], $GLOBALS['wp_query'] );
+		unset( $GLOBALS['wp_query'] );
 	}
 }

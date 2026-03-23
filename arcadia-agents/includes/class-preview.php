@@ -160,6 +160,9 @@ class Arcadia_Preview {
 	 * template-loader.php do it) because other template_redirect handlers
 	 * (redirect_canonical, caching plugins, SEO plugins) can interfere
 	 * with draft CPT rendering if we don't take control early.
+	 *
+	 * Debug mode: add `&aa_debug=1` to the preview URL when WP_DEBUG is
+	 * enabled to get a JSON diagnostic report instead of the rendered page.
 	 */
 	public function handle_preview() {
 		if ( empty( $_GET['aa_preview'] ) || empty( $_GET['p'] ) ) {
@@ -178,6 +181,53 @@ class Arcadia_Preview {
 			return;
 		}
 
+		// Set up rendering state (headers, post data, wp_query).
+		$this->setup_preview_state( $post );
+
+		// Resolve template via WordPress hierarchy.
+		$templates = $this->get_preview_template_hierarchy( $post );
+		$template  = locate_template( $templates );
+
+		if ( ! $template ) {
+			$template = get_index_template();
+		}
+
+		// Debug mode: return JSON diagnostic instead of rendering.
+		if ( $this->is_debug_request() ) {
+			$this->send_debug_report( $post, $templates, $template );
+			// send_debug_report calls exit.
+		}
+
+		if ( $template ) {
+			// Capture output to detect empty renders.
+			ob_start();
+			include $template;
+			$output = ob_get_clean();
+
+			if ( strlen( $output ) > 0 ) {
+				echo $output;
+			} else {
+				// Template produced nothing — render minimal fallback
+				// so the response is never Content-Length: 0.
+				$this->render_fallback( $post );
+			}
+			exit;
+		}
+
+		// No template found at all — render fallback.
+		$this->render_fallback( $post );
+		exit;
+	}
+
+	/**
+	 * Set up the global state for preview rendering.
+	 *
+	 * Separated from handle_preview() so unit tests can verify the state
+	 * setup without triggering template inclusion and exit.
+	 *
+	 * @param object $post The post object (modified in place: status → publish).
+	 */
+	public function setup_preview_state( $post ) {
 		// Override 404 status that WordPress may have set for draft CPTs.
 		status_header( 200 );
 
@@ -210,19 +260,143 @@ class Arcadia_Preview {
 			$GLOBALS['wp_query']->is_singular       = true;
 			$GLOBALS['wp_query']->is_404            = false;
 		}
+	}
 
-		// Resolve template via WordPress hierarchy, then include and exit.
-		$templates = $this->get_preview_template_hierarchy( $post );
-		$template  = locate_template( $templates );
+	/**
+	 * Check if this is a debug request.
+	 *
+	 * Debug mode is only available when WP_DEBUG is enabled.
+	 *
+	 * @return bool
+	 */
+	private function is_debug_request() {
+		return ! empty( $_GET['aa_debug'] )
+			&& defined( 'WP_DEBUG' )
+			&& WP_DEBUG;
+	}
 
-		if ( ! $template ) {
-			$template = get_index_template();
-		}
+	/**
+	 * Send a JSON diagnostic report and exit.
+	 *
+	 * Captures what the template would render (via ob_start) to report
+	 * the output size without actually sending it to the browser.
+	 *
+	 * @param object $post      The post object.
+	 * @param array  $templates Template candidates that were tried.
+	 * @param string $template  Resolved template path (empty if none found).
+	 */
+	private function send_debug_report( $post, $templates, $template ) {
+		// Try rendering the template to measure output.
+		$output_length = 0;
+		$output_sample = '';
+		$render_error  = null;
 
 		if ( $template ) {
-			include $template;
-			exit;
+			ob_start();
+			try {
+				include $template;
+			} catch ( \Throwable $e ) {
+				$render_error = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+			}
+			$output        = ob_get_clean();
+			$output_length = strlen( $output );
+			$output_sample = substr( $output, 0, 500 );
 		}
+
+		// List template files that exist in the theme directory.
+		$theme_dir   = get_stylesheet_directory();
+		$theme_files = array();
+		if ( is_dir( $theme_dir ) ) {
+			$iterator = new \RecursiveIteratorIterator(
+				new \RecursiveDirectoryIterator( $theme_dir, \RecursiveDirectoryIterator::SKIP_DOTS )
+			);
+			foreach ( $iterator as $file ) {
+				if ( $file->getExtension() === 'php' ) {
+					$relative = str_replace( $theme_dir . '/', '', $file->getPathname() );
+					// Only list template-like files (single*, singular*, index*, page*).
+					if ( preg_match( '/^(single|singular|index|page|archive|content|template)/i', $relative ) ) {
+						$theme_files[] = $relative;
+					}
+				}
+			}
+			sort( $theme_files );
+		}
+
+		$report = array(
+			'aa_preview_debug' => true,
+			'post'             => array(
+				'ID'           => $post->ID,
+				'post_type'    => $post->post_type,
+				'post_status'  => $post->post_status,
+				'post_name'    => $post->post_name,
+				'post_title'   => $post->post_title,
+			),
+			'theme'            => array(
+				'stylesheet'       => get_stylesheet(),
+				'template'         => get_template(),
+				'stylesheet_dir'   => get_stylesheet_directory(),
+				'is_child_theme'   => get_stylesheet() !== get_template(),
+			),
+			'template_resolution' => array(
+				'candidates'       => $templates,
+				'resolved'         => $template ? $template : null,
+				'resolved_exists'  => $template ? file_exists( $template ) : false,
+			),
+			'theme_template_files' => $theme_files,
+			'wp_query'           => array(
+				'is_single'   => isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query']->is_single : null,
+				'is_singular' => isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query']->is_singular : null,
+				'is_404'      => isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query']->is_404 : null,
+				'post_count'  => isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query']->post_count : null,
+				'found_posts' => isset( $GLOBALS['wp_query'] ) ? $GLOBALS['wp_query']->found_posts : null,
+			),
+			'render'             => array(
+				'output_length' => $output_length,
+				'output_sample' => $output_sample,
+				'render_error'  => $render_error,
+			),
+			'environment'        => array(
+				'ob_level'     => ob_get_level(),
+				'php_version'  => PHP_VERSION,
+				'wp_debug'     => defined( 'WP_DEBUG' ) && WP_DEBUG,
+			),
+		);
+
+		header( 'Content-Type: application/json; charset=utf-8' );
+		echo wp_json_encode( $report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		exit;
+	}
+
+	/**
+	 * Render a minimal fallback page when the theme template produces no output.
+	 *
+	 * Uses wp_head()/wp_footer() to load theme styles and scripts,
+	 * and the_content() filter to render blocks/shortcodes properly.
+	 *
+	 * @param object $post The post object.
+	 */
+	private function render_fallback( $post ) {
+		?><!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+<meta charset="<?php bloginfo( 'charset' ); ?>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<?php wp_head(); ?>
+</head>
+<body <?php body_class(); ?>>
+<?php wp_body_open(); ?>
+<main>
+	<article>
+		<h1><?php echo esc_html( $post->post_title ); ?></h1>
+		<div class="entry-content">
+			<?php echo apply_filters( 'the_content', $post->post_content ); ?>
+		</div>
+	</article>
+</main>
+<?php wp_footer(); ?>
+</body>
+</html>
+		<?php
 	}
 
 	/**
