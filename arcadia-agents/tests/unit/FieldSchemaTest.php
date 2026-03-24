@@ -208,6 +208,47 @@ class FieldSchemaTest extends TestCase {
 	}
 
 	/**
+	 * Test GET field-schema filters by post_type query param (aa-xp8).
+	 */
+	public function test_get_field_schema_filters_by_post_type(): void {
+		global $_test_acf_field_groups, $_test_acf_fields_by_group, $_test_options;
+
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_article',
+				'title'    => 'Article Fields',
+				'location' => array(
+					array(
+						array( 'param' => 'post_type', 'operator' => '==', 'value' => 'post' ),
+					),
+				),
+			),
+		);
+
+		$_test_acf_fields_by_group['group_article'] = array(
+			array( 'name' => 'chapo_1', 'type' => 'textarea', 'label' => 'Chapô' ),
+		);
+
+		// Without filter: returns both post and page (page gets the group too via stub).
+		$request  = new \WP_REST_Request();
+		$response = $this->helper->get_field_schema( $request );
+		$data     = $response->get_data();
+
+		// Should have multiple post types.
+		$this->assertGreaterThan( 1, count( $data ), 'Without filter, should return multiple post types' );
+
+		// With filter: only the requested post type.
+		$request_filtered = new \WP_REST_Request();
+		$request_filtered->set_param( 'post_type', 'post' );
+		$response_filtered = $this->helper->get_field_schema( $request_filtered );
+		$data_filtered     = $response_filtered->get_data();
+
+		$this->assertCount( 1, $data_filtered, 'With post_type filter, should return only one post type' );
+		$this->assertArrayHasKey( 'post', $data_filtered );
+		$this->assertArrayNotHasKey( 'page', $data_filtered );
+	}
+
+	/**
 	 * Test GET field-schema returns empty when no ACF.
 	 */
 	public function test_get_field_schema_empty_without_acf(): void {

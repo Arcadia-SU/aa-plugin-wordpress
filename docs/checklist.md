@@ -492,6 +492,19 @@
 
 ---
 
+## Phase 20 : Bugfix field-schema post_type filter (aa-xp8)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-24*
+*Découvert: Calibration E2E — traces Langfuse montrent `get_field_schema(post_type=article)` retournant le schéma de tous les post types*
+
+### aa-xp8 — `GET /field-schema` ignore le paramètre `?post_type`
+- [DONE] Lire `$request->get_param('post_type')` dans `get_field_schema()`
+- [DONE] Filtrer la boucle pour ne retourner que le post type demandé (si paramètre présent)
+- [DONE] Comportement inchangé sans paramètre (tous les post types)
+- [DONE] Test unitaire : filtre post_type retourne uniquement le type demandé (FieldSchemaTest)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

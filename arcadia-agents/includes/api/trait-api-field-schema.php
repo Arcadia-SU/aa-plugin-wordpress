@@ -45,12 +45,20 @@ trait Arcadia_API_Field_Schema_Handler {
 			return new WP_REST_Response( $schema, 200 );
 		}
 
+		// Filter by post_type if provided, otherwise return all.
+		$filter_post_type = $request->get_param( 'post_type' );
+
 		// Get all public post types.
 		$post_types = get_post_types( array( 'public' => true ), 'objects' );
 		$excluded   = array( 'attachment' );
 
 		foreach ( $post_types as $type ) {
 			if ( in_array( $type->name, $excluded, true ) ) {
+				continue;
+			}
+
+			// Skip if filtering by post_type and this isn't the requested one.
+			if ( $filter_post_type && $type->name !== $filter_post_type ) {
 				continue;
 			}
 
