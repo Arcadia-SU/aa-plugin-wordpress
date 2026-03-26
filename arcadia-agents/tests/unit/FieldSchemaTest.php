@@ -489,6 +489,74 @@ class FieldSchemaTest extends TestCase {
 		$this->assertEquals( 'My H1 Title', $call['value'] );
 	}
 
+	/**
+	 * Test auto-apply skips fields already handled by acf_fields.
+	 *
+	 * When acf_fields includes a field (e.g. "image"), process_acf_fields()
+	 * handles type-specific logic (sideload). apply_field_schema_mappings()
+	 * must not overwrite it with the raw source value (URL string).
+	 */
+	public function test_auto_apply_skips_fields_in_acf_fields(): void {
+		global $_test_options, $_test_acf_update_field_calls,
+			$_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		// Register ACF field group so process_acf_fields() knows 'image' is an image field.
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_hero',
+				'title'    => 'Hero',
+				'location' => array( array( array( 'param' => 'post_type', 'operator' => '==', 'value' => 'post' ) ) ),
+			),
+		);
+		$_test_acf_fields_by_group = array(
+			'group_hero' => array(
+				array( 'name' => 'image', 'type' => 'image', 'key' => 'field_image', 'required' => 0, 'label' => 'Image' ),
+				array( 'name' => 'chapo_1', 'type' => 'wysiwyg', 'key' => 'field_chapo', 'required' => 0, 'label' => 'Chapo' ),
+			),
+		);
+
+		$_test_options['aa_field_schema'] = array(
+			'post' => array(
+				'image'   => array( 'type' => 'mapping', 'source' => 'featured_image_url' ),
+				'chapo_1' => array( 'type' => 'mapping', 'source' => 'excerpt' ),
+			),
+		);
+
+		$request = new \WP_REST_Request();
+		$request->set_json_params( array(
+			'title'      => 'Test Article',
+			'excerpt'    => 'The excerpt',
+			'content'    => 'Content',
+			'meta'       => array(
+				'featured_image_url' => 'https://example.com/photo.jpg',
+			),
+			'acf_fields' => array(
+				'image' => 'https://example.com/photo.jpg',
+			),
+		) );
+
+		$_test_acf_update_field_calls = array();
+		$this->helper->create_post( $request );
+
+		// process_acf_fields() sideloads the URL → calls update_field('image', 999).
+		// apply_field_schema_mappings() must NOT overwrite with the raw URL string.
+		// Count how many times 'image' was written — should be exactly once (from process_acf_fields).
+		$image_calls = array_filter( $_test_acf_update_field_calls, function( $call ) {
+			return 'image' === $call['field_name'];
+		} );
+		// All image calls should have the sideloaded int (999), not the URL string.
+		foreach ( $image_calls as $call ) {
+			$this->assertIsInt( $call['value'], 'image field should have sideloaded attachment ID, not raw URL' );
+		}
+
+		// 'chapo_1' should still be mapped (not in acf_fields).
+		$chapo_calls = array_filter( $_test_acf_update_field_calls, function( $call ) {
+			return 'chapo_1' === $call['field_name'];
+		} );
+		$this->assertNotEmpty( $chapo_calls, 'chapo_1 should still be mapped by apply_field_schema_mappings' );
+		$this->assertEquals( 'The excerpt', array_values( $chapo_calls )[0]['value'] );
+	}
+
 	// =========================================================================
 	// Helpers
 	// =========================================================================

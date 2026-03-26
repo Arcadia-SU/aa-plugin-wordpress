@@ -213,6 +213,11 @@ trait Arcadia_API_Field_Schema_Handler {
 			return;
 		}
 
+		// Fields already handled by process_acf_fields() — don't overwrite.
+		// process_acf_fields() handles type-specific logic (image sideload,
+		// wysiwyg markdown parse, etc.) that we must not clobber with raw values.
+		$explicit_acf = ! empty( $body['acf_fields'] ) ? array_keys( $body['acf_fields'] ) : array();
+
 		// Build source values map.
 		$sources = array(
 			'excerpt'            => isset( $body['excerpt'] ) ? $body['excerpt'] : ( isset( $meta['description'] ) ? $meta['description'] : '' ),
@@ -223,6 +228,11 @@ trait Arcadia_API_Field_Schema_Handler {
 		);
 
 		foreach ( $stored[ $post_type ] as $field_name => $mapping ) {
+			// Skip fields explicitly set via acf_fields — already processed
+			// with proper type handling (sideload for images, etc.).
+			if ( in_array( $field_name, $explicit_acf, true ) ) {
+				continue;
+			}
 			// Skip null semantic (not calibrated).
 			if ( empty( $mapping ) || ! is_array( $mapping ) ) {
 				continue;

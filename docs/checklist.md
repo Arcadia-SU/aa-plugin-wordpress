@@ -581,6 +581,11 @@
 - [ ] Script one-shot ou passage WP-CLI pour nettoyer
 - [ ] Vérifier que `get_fields()` ne retourne plus de champs de blocs au post-level
 
+### Fix : `apply_field_schema_mappings()` écrasait les champs image avec URL brute
+- [DONE] Skip les champs déjà traités par `process_acf_fields()` (via `$body['acf_fields']` keys)
+- [DONE] `process_acf_fields()` gère le sideload (URL → attachment ID), `apply_field_schema_mappings()` ne ré-écrit plus
+- [DONE] Test unitaire : image sideloadée par process_acf_fields conserve l'attachment ID, chapo_1 toujours mappé (1 test)
+
 ### Note — Item 2 du backlog (warnings côté connector) → item ArcadiaAgents, pas plugin
 
 ---
