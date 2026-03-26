@@ -563,14 +563,25 @@
 
 ---
 
-## Phase 24 : Nettoyage post_meta polluées (post 63657)
+## Phase 24 : Repeaters flat format avec sub-field keys dans block comments
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
 
-### Nettoyage post_meta créées par le dual-write v0.1.12
+### Fix : repeaters dans les block comments — format flat ACF avec sub-field keys
+- [DONE] Registry (`get_acf_block_fields()`) expose `sub_fields` pour les champs repeater (récursif pour nested)
+- [DONE] Restaurer `flatten_repeater()` dans `custom_block()` pour les champs typés `repeater` dans le schema uniquement
+- [DONE] `flatten_repeater()` injecte les `_subfield → field_key` pairs pour chaque row (`_faq_0_title → field_key`)
+- [DONE] Support nested repeaters avec sub-field keys (table: row → cols → cell)
+- [DONE] Le default case ne fait PAS d'auto-détection de repeaters (seuls les champs schema-typés sont flattened)
+- [DONE] Tests unitaires : flat format + keys (simple), nested 2 niveaux + keys, sans schema = passthrough (3 tests)
+- [ ] Valider sur post client (FAQ bloc `acf/faq` identique en structure au post 56300)
+
+### Nettoyage post_meta polluées (post 63657)
 - [ ] Identifier les meta à supprimer sur post 63657 (faq, _faq, color, _color, link, _link, size, _size, block-id, _block-id, title si pollué, etc.)
 - [ ] Script one-shot ou passage WP-CLI pour nettoyer
 - [ ] Vérifier que `get_fields()` ne retourne plus de champs de blocs au post-level
+
+### Note — Item 2 du backlog (warnings côté connector) → item ArcadiaAgents, pas plugin
 
 ---
 

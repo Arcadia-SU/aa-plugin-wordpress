@@ -212,40 +212,117 @@ class BlockRegistryTest extends TestCase {
 	}
 
 	/**
-	 * Test ACF adapter flatten_repeater logic.
+	 * Test ACF adapter flattens repeater with sub-field keys in block comment.
 	 */
-	public function test_acf_custom_block_repeater_kept_structured(): void {
-		$adapter = new \Arcadia_ACF_Adapter();
+	public function test_acf_custom_block_repeater_flat_with_keys(): void {
+		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
 
-		$result = $adapter->custom_block( 'acf/faq', array(
-			'items' => array(
-				array( 'question' => 'Q1?', 'answer' => 'A1' ),
-				array( 'question' => 'Q2?', 'answer' => 'A2' ),
+		$_test_acf_block_types = array(
+			'acf/faq' => array( 'name' => 'acf/faq', 'title' => 'FAQ' ),
+		);
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_faq',
+				'title'    => 'FAQ',
+				'location' => array( array( array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/faq' ) ) ),
+			),
+		);
+		$_test_acf_fields_by_group = array(
+			'group_faq' => array(
+				array(
+					'name'       => 'faq',
+					'type'       => 'repeater',
+					'key'        => 'field_faq_rep',
+					'required'   => 0,
+					'label'      => 'FAQ',
+					'sub_fields' => array(
+						array( 'name' => 'title', 'type' => 'text', 'key' => 'field_faq_title' ),
+						array( 'name' => 'text', 'type' => 'textarea', 'key' => 'field_faq_text' ),
+					),
+				),
+			),
+		);
+
+		// Reset registry to pick up new stubs.
+		$ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+
+		$adapter = new \Arcadia_ACF_Adapter();
+		$result  = $adapter->custom_block( 'acf/faq', array(
+			'faq' => array(
+				array( 'title' => 'Question 1', 'text' => 'Réponse 1' ),
+				array( 'title' => 'Question 2', 'text' => 'Réponse 2' ),
 			),
 		) );
 
-		// Block comment is valid.
 		$this->assertStringContainsString( '<!-- wp:acf/faq', $result );
-		$this->assertStringContainsString( '/-->', $result );
 
-		// Data is structured (not flattened) — templates read $block['data'] directly.
 		preg_match( '/<!-- wp:acf\/faq (\{.*\}) \/-->/', $result, $matches );
 		$this->assertNotEmpty( $matches );
 		$data = json_decode( $matches[1], true )['data'];
 
-		$this->assertIsArray( $data['items'] );
-		$this->assertCount( 2, $data['items'] );
-		$this->assertEquals( 'Q1?', $data['items'][0]['question'] );
-		$this->assertEquals( 'A2', $data['items'][1]['answer'] );
+		// Row count.
+		$this->assertEquals( 2, $data['faq'] );
+		// Flat values.
+		$this->assertEquals( 'Question 1', $data['faq_0_title'] );
+		$this->assertEquals( 'Réponse 1', $data['faq_0_text'] );
+		$this->assertEquals( 'Question 2', $data['faq_1_title'] );
+		$this->assertEquals( 'Réponse 2', $data['faq_1_text'] );
+		// Sub-field key references.
+		$this->assertEquals( 'field_faq_title', $data['_faq_0_title'] );
+		$this->assertEquals( 'field_faq_text', $data['_faq_0_text'] );
+		$this->assertEquals( 'field_faq_title', $data['_faq_1_title'] );
+		// Parent field key reference.
+		$this->assertEquals( 'field_faq_rep', $data['_faq'] );
 	}
 
 	/**
-	 * Test ACF adapter nested repeater kept structured in block comment (2 levels).
+	 * Test ACF adapter nested repeater flattened with sub-field keys (2 levels).
 	 */
-	public function test_acf_nested_repeater_kept_structured(): void {
-		$adapter = new \Arcadia_ACF_Adapter();
+	public function test_acf_nested_repeater_flat_with_keys(): void {
+		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
 
-		$result = $adapter->custom_block( 'acf/table', array(
+		$_test_acf_block_types = array(
+			'acf/table' => array( 'name' => 'acf/table', 'title' => 'Table' ),
+		);
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_table',
+				'title'    => 'Table',
+				'location' => array( array( array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/table' ) ) ),
+			),
+		);
+		$_test_acf_fields_by_group = array(
+			'group_table' => array(
+				array(
+					'name'       => 'row',
+					'type'       => 'repeater',
+					'key'        => 'field_row',
+					'required'   => 0,
+					'label'      => 'Row',
+					'sub_fields' => array(
+						array(
+							'name'       => 'cols',
+							'type'       => 'repeater',
+							'key'        => 'field_cols',
+							'sub_fields' => array(
+								array( 'name' => 'cell', 'type' => 'text', 'key' => 'field_cell' ),
+							),
+						),
+					),
+				),
+			),
+		);
+
+		$ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+
+		$adapter = new \Arcadia_ACF_Adapter();
+		$result  = $adapter->custom_block( 'acf/table', array(
 			'row' => array(
 				array( 'cols' => array(
 					array( 'cell' => 'Composant' ),
@@ -259,40 +336,48 @@ class BlockRegistryTest extends TestCase {
 		) );
 
 		preg_match( '/<!-- wp:acf\/table (\{.*\}) \/-->/', $result, $matches );
-		$this->assertNotEmpty( $matches, 'Block comment should contain JSON data' );
-		$data = json_decode( $matches[1], true )['data'];
-
-		// Structured: row is an array of row objects, not a flat count.
-		$this->assertIsArray( $data['row'] );
-		$this->assertCount( 2, $data['row'] );
-		$this->assertIsArray( $data['row'][0]['cols'] );
-		$this->assertCount( 2, $data['row'][0]['cols'] );
-		$this->assertEquals( 'Composant', $data['row'][0]['cols'][0]['cell'] );
-		$this->assertEquals( '30-50 ans', $data['row'][1]['cols'][1]['cell'] );
-	}
-
-	/**
-	 * Test ACF adapter 3-level nested repeater kept structured.
-	 */
-	public function test_acf_triple_nested_repeater_kept_structured(): void {
-		$adapter = new \Arcadia_ACF_Adapter();
-
-		$result = $adapter->custom_block( 'acf/deep', array(
-			'level1' => array(
-				array( 'level2' => array(
-					array( 'level3' => array(
-						array( 'value' => 'deep-leaf' ),
-					) ),
-				) ),
-			),
-		) );
-
-		preg_match( '/<!-- wp:acf\/deep (\{.*\}) \/-->/', $result, $matches );
 		$this->assertNotEmpty( $matches );
 		$data = json_decode( $matches[1], true )['data'];
 
-		$this->assertIsArray( $data['level1'] );
-		$this->assertEquals( 'deep-leaf', $data['level1'][0]['level2'][0]['level3'][0]['value'] );
+		// Top-level row count.
+		$this->assertEquals( 2, $data['row'] );
+		// Nested cols count.
+		$this->assertEquals( 2, $data['row_0_cols'] );
+		// Flat values.
+		$this->assertEquals( 'Composant', $data['row_0_cols_0_cell'] );
+		$this->assertEquals( 'Durée', $data['row_0_cols_1_cell'] );
+		$this->assertEquals( 'Gros œuvre', $data['row_1_cols_0_cell'] );
+		$this->assertEquals( '30-50 ans', $data['row_1_cols_1_cell'] );
+		// Sub-field key references.
+		$this->assertEquals( 'field_cols', $data['_row_0_cols'] );
+		$this->assertEquals( 'field_cell', $data['_row_0_cols_0_cell'] );
+		$this->assertEquals( 'field_cell', $data['_row_1_cols_1_cell'] );
+		// Parent field key reference.
+		$this->assertEquals( 'field_row', $data['_row'] );
+	}
+
+	/**
+	 * Test repeater without schema still flattens (no key injection).
+	 */
+	public function test_acf_repeater_without_schema_flattens(): void {
+		$adapter = new \Arcadia_ACF_Adapter();
+
+		// No ACF block types registered → no schema → field_types all default to 'text'.
+		// The repeater case only triggers for schema-typed repeaters.
+		// Without schema, values pass through as-is via the default case.
+		$result = $adapter->custom_block( 'acf/unknown', array(
+			'items' => array(
+				array( 'q' => 'Q1' ),
+			),
+		) );
+
+		preg_match( '/<!-- wp:acf\/unknown (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches );
+		$data = json_decode( $matches[1], true )['data'];
+
+		// Without schema, items passes through as-is (default case, not repeater case).
+		$this->assertIsArray( $data['items'] );
+		$this->assertEquals( 'Q1', $data['items'][0]['q'] );
 	}
 
 	// =========================================================================

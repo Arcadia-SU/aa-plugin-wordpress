@@ -321,6 +321,32 @@ class Arcadia_Block_Registry {
 					$field_descriptor['accepted_formats'] = array( 'int', 'url', 'object' );
 				}
 
+				// Add sub_fields for repeater fields (needed for flat format + key injection).
+				if ( 'repeater' === $acf_field['type'] && ! empty( $acf_field['sub_fields'] ) ) {
+					$sub_fields = array();
+					foreach ( $acf_field['sub_fields'] as $sub ) {
+						$sub_descriptor = array(
+							'name' => $sub['name'],
+							'key'  => $sub['key'],
+							'type' => $sub['type'] ?? 'text',
+						);
+						// Recurse for nested repeaters.
+						if ( 'repeater' === ( $sub['type'] ?? '' ) && ! empty( $sub['sub_fields'] ) ) {
+							$nested_subs = array();
+							foreach ( $sub['sub_fields'] as $nested ) {
+								$nested_subs[] = array(
+									'name' => $nested['name'],
+									'key'  => $nested['key'],
+									'type' => $nested['type'] ?? 'text',
+								);
+							}
+							$sub_descriptor['sub_fields'] = $nested_subs;
+						}
+						$sub_fields[] = $sub_descriptor;
+					}
+					$field_descriptor['sub_fields'] = $sub_fields;
+				}
+
 				$fields[] = $field_descriptor;
 			}
 		}

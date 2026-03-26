@@ -133,14 +133,18 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 		$registry   = Arcadia_Block_Registry::get_instance();
 		$schema = $registry->get_block_schema( $block_name );
 
-		// Build field type and key lookups.
-		$field_types = array();
-		$field_keys  = array();
+		// Build field type, key, and sub_fields lookups.
+		$field_types      = array();
+		$field_keys       = array();
+		$field_sub_fields = array();
 		if ( is_array( $schema ) ) {
 			foreach ( $schema as $field ) {
 				$field_types[ $field['name'] ] = $field['type'];
 				if ( ! empty( $field['key'] ) ) {
 					$field_keys[ $field['name'] ] = $field['key'];
+				}
+				if ( ! empty( $field['sub_fields'] ) ) {
+					$field_sub_fields[ $field['name'] ] = $field['sub_fields'];
 				}
 			}
 		}
@@ -174,10 +178,13 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				case 'repeater':
-					// Block comment data is read directly by templates via $block['data'].
-					// Templates expect structured arrays, NOT flat ACF storage format.
-					// flatten_repeater() is for post_meta context only (update_field).
-					$data[ $field_name ] = $value;
+					// ACF block comments must use flat storage format with sub-field keys.
+					// get_fields() in block render callbacks reads $block['data'], identifies
+					// repeaters via _field → field_key, then looks for flat keys (field_0_sub).
+					// Structured arrays break this — get_fields() returns false.
+					$sub_fields = $field_sub_fields[ $field_name ] ?? array();
+					$flat       = $this->flatten_repeater( $field_name, $value, $sub_fields );
+					$data       = array_merge( $data, $flat );
 					break;
 
 				case 'wysiwyg':
@@ -185,8 +192,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				default:
-					// Passthrough for text, textarea, url, select, radio, and
-					// untyped repeaters (array of objects kept structured for templates).
+					// Passthrough for text, textarea, url, select, radio.
 					$data[ $field_name ] = $value;
 					break;
 			}
@@ -242,34 +248,60 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	}
 
 	/**
-	 * Flatten a repeater field array to ACF storage format.
+	 * Flatten a repeater field array to ACF block comment format.
 	 *
-	 * ACF stores repeater data as:
-	 * - field_name = row count
+	 * ACF stores repeater data in block comments as:
+	 * - field_name = row count (int)
 	 * - field_name_0_subfield = value
+	 * - _field_name_0_subfield = sub_field_key
 	 * - field_name_1_subfield = value
+	 * - _field_name_1_subfield = sub_field_key
+	 *
+	 * The sub-field key references (_key → field_key) are required for
+	 * get_fields() to correctly identify and reconstruct the repeater
+	 * from the flat data in $block['data'].
 	 *
 	 * @param string $field_name The repeater field name.
 	 * @param array  $rows       Array of row objects.
-	 * @return array Flattened key-value pairs.
+	 * @param array  $sub_fields Sub-field schema from registry [{name, key, type, sub_fields?}].
+	 * @return array Flattened key-value pairs with field key references.
 	 */
-	private function flatten_repeater( $field_name, $rows ) {
+	private function flatten_repeater( $field_name, $rows, $sub_fields = array() ) {
 		$result                = array();
 		$result[ $field_name ] = count( $rows );
+
+		// Build sub-field key and type lookups.
+		$sub_keys       = array();
+		$sub_types      = array();
+		$sub_sub_fields = array();
+		foreach ( $sub_fields as $sf ) {
+			$sub_keys[ $sf['name'] ]  = $sf['key'] ?? null;
+			$sub_types[ $sf['name'] ] = $sf['type'] ?? 'text';
+			if ( ! empty( $sf['sub_fields'] ) ) {
+				$sub_sub_fields[ $sf['name'] ] = $sf['sub_fields'];
+			}
+		}
 
 		foreach ( $rows as $index => $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}
 			foreach ( $row as $subfield => $value ) {
-				$key = sprintf( '%s_%d_%s', $field_name, $index, $subfield );
+				$key      = sprintf( '%s_%d_%s', $field_name, $index, $subfield );
+				$sub_type = $sub_types[ $subfield ] ?? 'text';
 
-				// Nested repeater: array of associative arrays → recurse.
-				if ( is_array( $value ) && ! empty( $value ) && is_array( reset( $value ) ) ) {
-					$nested  = $this->flatten_repeater( $key, $value );
-					$result  = array_merge( $result, $nested );
+				// Nested repeater: recurse with nested sub-field schema.
+				if ( 'repeater' === $sub_type && is_array( $value ) ) {
+					$nested_schema = $sub_sub_fields[ $subfield ] ?? array();
+					$nested        = $this->flatten_repeater( $key, $value, $nested_schema );
+					$result        = array_merge( $result, $nested );
 				} else {
 					$result[ $key ] = $value;
+				}
+
+				// Inject sub-field key reference.
+				if ( ! empty( $sub_keys[ $subfield ] ) ) {
+					$result[ '_' . $key ] = $sub_keys[ $subfield ];
 				}
 			}
 		}
