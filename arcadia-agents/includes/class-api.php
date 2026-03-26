@@ -399,6 +399,17 @@ class Arcadia_API {
 				'permission_callback' => array( $this, 'check_site_read_permission' ),
 			)
 		);
+
+		// Content dry-run validation endpoint.
+		register_rest_route(
+			$this->namespace,
+			'/validate-content',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'validate_content' ),
+				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+			)
+		);
 	}
 
 	// =========================================================================

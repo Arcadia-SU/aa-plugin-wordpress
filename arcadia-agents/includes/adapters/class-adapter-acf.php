@@ -150,6 +150,11 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 
 			switch ( $type ) {
 				case 'image':
+					// Empty values → no image. Store 0.
+					if ( empty( $value ) || 0 === $value || '0' === $value ) {
+						$data[ $field_name ] = 0;
+						break;
+					}
 					// After H1.2 pre-processing, value is typically already an int.
 					// Guard: only sideload if still a URL string or object.
 					if ( is_string( $value ) ) {
@@ -181,6 +186,12 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				default:
+					// Auto-detect repeater: array of associative arrays without schema.
+					if ( is_array( $value ) && ! empty( $value ) && is_array( reset( $value ) ) ) {
+						$flattened = $this->flatten_repeater( $field_name, $value );
+						$data      = array_merge( $data, $flattened );
+						break;
+					}
 					// Passthrough for text, textarea, url, select, radio.
 					$data[ $field_name ] = $value;
 					break;
@@ -257,8 +268,15 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 				continue;
 			}
 			foreach ( $row as $subfield => $value ) {
-				$key            = sprintf( '%s_%d_%s', $field_name, $index, $subfield );
-				$result[ $key ] = $value;
+				$key = sprintf( '%s_%d_%s', $field_name, $index, $subfield );
+
+				// Nested repeater: array of associative arrays → recurse.
+				if ( is_array( $value ) && ! empty( $value ) && is_array( reset( $value ) ) ) {
+					$nested  = $this->flatten_repeater( $key, $value );
+					$result  = array_merge( $result, $nested );
+				} else {
+					$result[ $key ] = $value;
+				}
 			}
 		}
 

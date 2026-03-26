@@ -230,6 +230,95 @@ class BlockRegistryTest extends TestCase {
 		$this->assertStringContainsString( '/-->', $result );
 	}
 
+	/**
+	 * Test ACF adapter nested repeater flattening (2 levels).
+	 */
+	public function test_acf_nested_repeater_flattening(): void {
+		$adapter = new \Arcadia_ACF_Adapter();
+
+		$result = $adapter->custom_block( 'acf/table', array(
+			'row' => array(
+				array( 'cols' => array(
+					array( 'cell' => 'Composant' ),
+					array( 'cell' => 'Durée' ),
+				) ),
+				array( 'cols' => array(
+					array( 'cell' => 'Gros œuvre' ),
+					array( 'cell' => '30-50 ans' ),
+				) ),
+			),
+		) );
+
+		// Extract JSON data from the block comment.
+		preg_match( '/<!-- wp:acf\/table (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches, 'Block comment should contain JSON data' );
+		$block = json_decode( $matches[1], true );
+		$data  = $block['data'];
+
+		// Top-level repeater count.
+		$this->assertEquals( 2, $data['row'] );
+
+		// Nested repeater counts.
+		$this->assertEquals( 2, $data['row_0_cols'] );
+		$this->assertEquals( 2, $data['row_1_cols'] );
+
+		// Leaf values.
+		$this->assertEquals( 'Composant', $data['row_0_cols_0_cell'] );
+		$this->assertEquals( 'Durée', $data['row_0_cols_1_cell'] );
+		$this->assertEquals( 'Gros œuvre', $data['row_1_cols_0_cell'] );
+		$this->assertEquals( '30-50 ans', $data['row_1_cols_1_cell'] );
+	}
+
+	/**
+	 * Test ACF adapter 3-level nested repeater flattening.
+	 */
+	public function test_acf_triple_nested_repeater_flattening(): void {
+		$adapter = new \Arcadia_ACF_Adapter();
+
+		$result = $adapter->custom_block( 'acf/deep', array(
+			'level1' => array(
+				array( 'level2' => array(
+					array( 'level3' => array(
+						array( 'value' => 'deep-leaf' ),
+					) ),
+				) ),
+			),
+		) );
+
+		preg_match( '/<!-- wp:acf\/deep (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches );
+		$data = json_decode( $matches[1], true )['data'];
+
+		$this->assertEquals( 1, $data['level1'] );
+		$this->assertEquals( 1, $data['level1_0_level2'] );
+		$this->assertEquals( 1, $data['level1_0_level2_0_level3'] );
+		$this->assertEquals( 'deep-leaf', $data['level1_0_level2_0_level3_0_value'] );
+	}
+
+	/**
+	 * Test simple repeater still works after nested repeater changes.
+	 */
+	public function test_acf_simple_repeater_still_works(): void {
+		$adapter = new \Arcadia_ACF_Adapter();
+
+		$result = $adapter->custom_block( 'acf/faq', array(
+			'items' => array(
+				array( 'question' => 'Q1?', 'answer' => 'A1' ),
+				array( 'question' => 'Q2?', 'answer' => 'A2' ),
+			),
+		) );
+
+		preg_match( '/<!-- wp:acf\/faq (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches );
+		$data = json_decode( $matches[1], true )['data'];
+
+		$this->assertEquals( 2, $data['items'] );
+		$this->assertEquals( 'Q1?', $data['items_0_question'] );
+		$this->assertEquals( 'A1', $data['items_0_answer'] );
+		$this->assertEquals( 'Q2?', $data['items_1_question'] );
+		$this->assertEquals( 'A2', $data['items_1_answer'] );
+	}
+
 	// =========================================================================
 	// accepted_formats tests (I1)
 	// =========================================================================

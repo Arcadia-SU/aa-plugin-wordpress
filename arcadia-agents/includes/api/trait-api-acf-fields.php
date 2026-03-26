@@ -176,6 +176,11 @@ trait Arcadia_API_ACF_Fields_Handler {
 					break;
 
 				case 'image':
+					// Empty values → no image. Normalize to 0.
+					if ( empty( $value ) || 0 === $value || '0' === $value ) {
+						$value = 0;
+						break;
+					}
 					if ( is_string( $value ) && ! empty( $value ) ) {
 						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
 						if ( is_wp_error( $sideloaded ) ) {

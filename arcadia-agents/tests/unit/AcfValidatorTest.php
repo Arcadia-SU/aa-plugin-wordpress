@@ -757,6 +757,120 @@ class AcfValidatorTest extends TestCase {
 	}
 
 	// =========================================================================
+	// N1 — Empty Image Values (Postel's Law)
+	// =========================================================================
+
+	/**
+	 * Test: empty string on image field → normalized to 0, no sideload.
+	 */
+	public function test_image_empty_string_normalized_to_zero(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'icon', 'type' => 'image', 'required' => false, 'label' => 'Icon', 'key' => 'field_icon' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array( 'icon' => '' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertSame( 0, $json['children'][0]['properties']['icon'] );
+	}
+
+	/**
+	 * Test: null on image field → normalized to 0, no sideload.
+	 */
+	public function test_image_null_normalized_to_zero(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'icon', 'type' => 'image', 'required' => false, 'label' => 'Icon', 'key' => 'field_icon' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array( 'icon' => null ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertSame( 0, $json['children'][0]['properties']['icon'] );
+	}
+
+	/**
+	 * Test: integer 0 on image field → accepted as "no image", no sideload.
+	 */
+	public function test_image_zero_accepted_as_no_image(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'icon', 'type' => 'image', 'required' => false, 'label' => 'Icon', 'key' => 'field_icon' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array( 'icon' => 0 ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertSame( 0, $json['children'][0]['properties']['icon'] );
+	}
+
+	/**
+	 * Test: string "0" on image field → normalized to 0, no sideload.
+	 */
+	public function test_image_string_zero_normalized(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'icon', 'type' => 'image', 'required' => false, 'label' => 'Icon', 'key' => 'field_icon' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array( 'icon' => '0' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertSame( 0, $json['children'][0]['properties']['icon'] );
+	}
+
+	/**
+	 * Test: absent image field → no error (not required).
+	 */
+	public function test_image_absent_no_error(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'icon', 'type' => 'image', 'required' => false, 'label' => 'Icon', 'key' => 'field_icon' ),
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_title' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array( 'title' => 'No icon' ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+	}
+
+	// =========================================================================
 	// H1.1 — Post Type Filtering Tests
 	// =========================================================================
 
@@ -866,6 +980,111 @@ class AcfValidatorTest extends TestCase {
 		$this->assertEquals( 0, $error['block_index'] );
 		$this->assertEquals( 'acf/restricted', $error['block_type'] );
 		$this->assertStringContainsString( 'post_type', $error['expected'] );
+	}
+
+	// =========================================================================
+	// N3 — Dry-run Validation (validate-content)
+	// =========================================================================
+
+	/**
+	 * Test: dry-run mode skips sideload but accepts image URLs as valid.
+	 */
+	public function test_dry_run_accepts_image_url_without_sideload(): void {
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'photo', 'type' => 'image', 'required' => false, 'label' => 'Photo', 'key' => 'field_photo' ),
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_title' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/hero',
+				'properties' => array(
+					'photo' => 'https://example.com/photo.jpg',
+					'title' => 'Hello',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post', true );
+
+		$this->assertTrue( $result );
+		// URL should NOT be replaced (no sideload in dry-run).
+		$this->assertEquals( 'https://example.com/photo.jpg', $json['children'][0]['properties']['photo'] );
+	}
+
+	/**
+	 * Test: dry-run mode still catches invalid types.
+	 */
+	public function test_dry_run_catches_type_errors(): void {
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => false, 'label' => 'Title', 'key' => 'field_title' ),
+			array( 'name' => 'count', 'type' => 'number', 'required' => false, 'label' => 'Count', 'key' => 'field_count' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/hero',
+				'properties' => array(
+					'title' => 123,   // Should be string.
+					'count' => 'abc', // Should be int.
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post', true );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$errors = $result->get_error_data()['errors'];
+		$this->assertCount( 2, $errors );
+	}
+
+	/**
+	 * Test: dry-run mode still catches required field errors.
+	 */
+	public function test_dry_run_catches_required_field_missing(): void {
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'title', 'type' => 'text', 'required' => true, 'label' => 'Title', 'key' => 'field_title' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/hero',
+				'properties' => array(),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post', true );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$errors = $result->get_error_data()['errors'];
+		$this->assertCount( 1, $errors );
+		$this->assertEquals( 'missing', $errors[0]['got'] );
+	}
+
+	/**
+	 * Test: dry-run accepts image object format without sideload.
+	 */
+	public function test_dry_run_accepts_image_object(): void {
+		$this->register_acf_block( 'acf/card', array(
+			array( 'name' => 'cover', 'type' => 'image', 'required' => false, 'label' => 'Cover', 'key' => 'field_cover' ),
+		) );
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/card',
+				'properties' => array(
+					'cover' => array( 'url' => 'https://example.com/img.jpg', 'alt' => 'Alt text' ),
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post', true );
+
+		$this->assertTrue( $result );
 	}
 
 	// =========================================================================

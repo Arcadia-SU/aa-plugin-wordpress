@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-03-07
+**Dernière mise à jour :** 2026-03-26
 
 ---
 
@@ -502,6 +502,32 @@
 - [DONE] Filtrer la boucle pour ne retourner que le post type demandé (si paramètre présent)
 - [DONE] Comportement inchangé sans paramètre (tous les post types)
 - [DONE] Test unitaire : filtre post_type retourne uniquement le type demandé (FieldSchemaTest)
+
+---
+
+## Phase 21 : Backlog robustesse ACF (N1-N3)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+
+### N1 — Robustesse champs image/file sur valeurs vides (P2)
+- [DONE] `""`, `null`, `0`, absent → ignorer (pas de sideload), stocker `0` ou vide en base
+- [DONE] URL valide (string `http*`) → sideload comme aujourd'hui
+- [DONE] Entier > 0 → attachment ID direct comme aujourd'hui
+- [DONE] Tests unitaires : valeurs vides ignorées (5 tests : empty string, null, 0, "0", absent)
+
+### N2 — Support écriture nested repeaters ACF (P2)
+- [DONE] Détecter repeater imbriqué (repeater dans repeater) — récursion dans `flatten_repeater()` + auto-détection dans `default` case
+- [DONE] Aplatir récursivement en meta ACF (`row_0_cols_0_cell = "..."`)
+- [DONE] Écrire les counts à chaque niveau (`row = 4`, `row_0_cols = 2`)
+- [DONE] Tests unitaires : simple repeater (regression), nested 2 niveaux (acf/table), nested 3 niveaux (acf/deep)
+- [ ] Valider sur bloc `acf/table` (row → cols → cell) — sur site client
+
+### N3 — `POST /validate-content` dry-run (P3)
+- [DONE] Endpoint `POST /arcadia/v1/validate-content` (scope `articles:read`)
+- [DONE] Accepte `post_type` + `content` (blocs JSON)
+- [DONE] Exécute la même validation que `POST /articles` sans écriture (dry-run mode sur ACF validator)
+- [DONE] Retourne `{valid: true, warnings: []}` ou `{valid: false, errors: [{block_index, field, error}]}`
+- [DONE] Tests unitaires dry-run : URL image acceptée sans sideload, erreurs type détectées, champ requis manquant, objet image accepté (4 tests)
 
 ---
 

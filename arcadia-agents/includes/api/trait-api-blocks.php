@@ -119,6 +119,64 @@ trait Arcadia_API_Blocks_Handler {
 	}
 
 	/**
+	 * Dry-run content validation (no side-effects).
+	 *
+	 * Validates block types, ACF schema, required fields — without writing
+	 * to the database or sideloading images.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response
+	 */
+	public function validate_content( $request ) {
+		$body      = $request->get_json_params();
+		$post_type = $body['post_type'] ?? 'post';
+		$content   = $body['content'] ?? null;
+
+		if ( empty( $content ) || ! is_array( $content ) ) {
+			return new WP_REST_Response(
+				array(
+					'valid'  => false,
+					'errors' => array(
+						array(
+							'field' => 'content',
+							'error' => 'content array is required.',
+						),
+					),
+				),
+				200
+			);
+		}
+
+		// Wrap in the block tree format expected by the validator.
+		$json = array( 'children' => $content );
+
+		$result = $this->blocks->validate_content( $json, $post_type );
+
+		if ( is_wp_error( $result ) ) {
+			$data = $result->get_error_data();
+			return new WP_REST_Response(
+				array(
+					'valid'  => false,
+					'errors' => $data['errors'] ?? array(
+						array(
+							'error' => $result->get_error_message(),
+						),
+					),
+				),
+				200
+			);
+		}
+
+		return new WP_REST_Response(
+			array(
+				'valid'    => true,
+				'warnings' => array(),
+			),
+			200
+		);
+	}
+
+	/**
 	 * Recursively collect block usage statistics.
 	 *
 	 * Walks through blocks (including nested innerBlocks) and aggregates

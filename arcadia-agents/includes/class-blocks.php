@@ -183,6 +183,34 @@ class Arcadia_Blocks {
 	}
 
 	/**
+	 * Dry-run validation: checks block types and ACF schema without side-effects.
+	 *
+	 * No sideloading, no database writes. Returns structured errors or true.
+	 *
+	 * @param array  $json      The JSON content structure.
+	 * @param string $post_type Target post type.
+	 * @return true|WP_Error True if valid, WP_Error with errors if not.
+	 */
+	public function validate_content( $json, $post_type = 'post' ) {
+		// Block type + required fields validation.
+		$validation = $this->validate_blocks( $json );
+		if ( is_wp_error( $validation ) ) {
+			return $validation;
+		}
+
+		// ACF schema validation (dry-run: skip sideload).
+		if ( self::is_acf_available() ) {
+			$acf_validator = Arcadia_ACF_Validator::get_instance();
+			$acf_result    = $acf_validator->validate_and_preprocess( $json, $post_type, true );
+			if ( is_wp_error( $acf_result ) ) {
+				return $acf_result;
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Validate all blocks recursively before rendering.
 	 *
 	 * Checks that every block type is registered and that custom blocks

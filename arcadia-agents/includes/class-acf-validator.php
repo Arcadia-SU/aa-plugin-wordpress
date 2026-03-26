@@ -39,6 +39,13 @@ class Arcadia_ACF_Validator {
 	private $sideloaded_ids = array();
 
 	/**
+	 * Whether current validation is dry-run (no side-effects).
+	 *
+	 * @var bool
+	 */
+	private $dry_run = false;
+
+	/**
 	 * Get single instance of the class.
 	 *
 	 * @return Arcadia_ACF_Validator
@@ -83,16 +90,18 @@ class Arcadia_ACF_Validator {
 	 * Collects ALL errors (not fail-fast) so the agent can fix everything
 	 * in one round-trip.
 	 *
-	 * @param array  &$blocks_json Block content structure (mutated: URLs → IDs).
+	 * @param array  &$blocks_json Block content structure (mutated: URLs → IDs unless dry_run).
 	 * @param string $post_type    Target post type (reserved for future use).
+	 * @param bool   $dry_run      If true, skip sideload — validate only, no side-effects.
 	 * @return true|WP_Error True if valid, WP_Error with 422 + structured errors if not.
 	 */
-	public function validate_and_preprocess( &$blocks_json, $post_type = 'post' ) {
+	public function validate_and_preprocess( &$blocks_json, $post_type = 'post', $dry_run = false ) {
 		$errors   = array();
 		$registry = Arcadia_Block_Registry::get_instance();
 
 		// Reset sideloaded IDs for this validation pass.
 		$this->sideloaded_ids = array();
+		$this->dry_run        = $dry_run;
 
 		if ( ! empty( $blocks_json['children'] ) && is_array( $blocks_json['children'] ) ) {
 			foreach ( $blocks_json['children'] as $index => &$block ) {
@@ -270,11 +279,19 @@ class Arcadia_ACF_Validator {
 			if ( 'image' !== $field_type ) {
 				continue;
 			}
-			if ( ! isset( $properties[ $field_name ] ) ) {
+			if ( ! array_key_exists( $field_name, $properties ) ) {
 				continue;
 			}
 
 			$value = $properties[ $field_name ];
+
+			// Empty values → no image. Normalize to 0 and skip sideload.
+			if ( empty( $value ) || 0 === $value || '0' === $value ) {
+				$block['properties'][ $field_name ] = 0;
+				$properties[ $field_name ]          = 0;
+				continue;
+			}
+
 			$url   = null;
 			$title = null;
 			$alt   = '';
@@ -287,6 +304,13 @@ class Arcadia_ACF_Validator {
 				$alt   = $value['alt'] ?? '';
 			} else {
 				continue; // int or unrecognized — skip sideload, let type validation handle.
+			}
+
+			// Dry-run: accept URL/object as valid image format, skip actual sideload.
+			if ( $this->dry_run ) {
+				// Mark as sideloaded so type validation doesn't reject the URL.
+				$sideload_failed[] = $field_name;
+				continue;
 			}
 
 			$attachment_id = Arcadia_ACF_Adapter::sideload_image_field( $url, 0, $title, $alt );
@@ -360,11 +384,15 @@ class Arcadia_ACF_Validator {
 	private function check_field_type( $value, $expected_type ) {
 		switch ( $expected_type ) {
 			case 'image':
-				if ( ! is_int( $value ) ) {
+				// 0 is valid: means "no image".
+				if ( 0 === $value ) {
+					break;
+				}
+				if ( ! is_int( $value ) || $value < 0 ) {
 					return array(
-						'expected'   => 'int (attachment ID)',
+						'expected'   => 'int (attachment ID) or 0 (no image)',
 						'got'        => gettype( $value ) . ( is_string( $value ) ? ' (URL)' : '' ),
-						'suggestion' => 'Upload via POST /media first.',
+						'suggestion' => 'Upload via POST /media first, or use 0 for no image.',
 					);
 				}
 				break;
