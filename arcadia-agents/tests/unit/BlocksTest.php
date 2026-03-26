@@ -293,4 +293,205 @@ class BlocksTest extends TestCase {
         $this->assertIsString( $result );
         $this->assertNotEmpty( $result );
     }
+
+    // =========================================================================
+    // Dual-write: ACF block data collected for post_meta (P22)
+    // =========================================================================
+
+    /**
+     * Test json_to_blocks collects ACF block properties for dual-write.
+     */
+    public function test_acf_block_data_collected_after_json_to_blocks(): void {
+        global $_test_acf_block_types;
+        $_test_acf_block_types = array(
+            'acf/faq' => array( 'title' => 'FAQ Block' ),
+        );
+
+        // Reset singletons so they pick up the new ACF block type.
+        $ref = new \ReflectionClass( \Arcadia_Block_Registry::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        $ref = new \ReflectionClass( \Arcadia_Blocks::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json = array(
+            'children' => array(
+                array(
+                    'type'       => 'acf/faq',
+                    'properties' => array(
+                        'faq' => array(
+                            array( 'title' => 'Q1', 'text' => 'A1' ),
+                        ),
+                        'title' => 'FAQ',
+                    ),
+                ),
+                array(
+                    'type'    => 'paragraph',
+                    'content' => 'Regular paragraph',
+                ),
+            ),
+        );
+
+        $blocks->json_to_blocks( $json );
+
+        // Use reflection to check collected acf_block_data.
+        $ref  = new \ReflectionClass( $blocks );
+        $prop = $ref->getProperty( 'acf_block_data' );
+        $prop->setAccessible( true );
+        $data = $prop->getValue( $blocks );
+
+        $this->assertCount( 1, $data );
+        $this->assertEquals( 'acf/faq', $data[0]['block_name'] );
+        $this->assertIsArray( $data[0]['properties']['faq'] );
+        $this->assertEquals( 'FAQ', $data[0]['properties']['title'] );
+    }
+
+    /**
+     * Test write_acf_block_meta writes properties to post_meta.
+     */
+    public function test_write_acf_block_meta_calls_update_field(): void {
+        global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
+        global $_test_acf_update_field_calls;
+
+        $_test_acf_update_field_calls = array();
+
+        // Register an ACF block with known field keys.
+        $_test_acf_block_types = array(
+            'acf/faq' => array( 'title' => 'FAQ Block' ),
+        );
+        $_test_acf_field_groups = array(
+            array(
+                'key'      => 'group_faq',
+                'title'    => 'FAQ Fields',
+                'location' => array(
+                    array(
+                        array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/faq' ),
+                    ),
+                ),
+            ),
+        );
+        $_test_acf_fields_by_group = array(
+            'group_faq' => array(
+                array( 'name' => 'faq', 'type' => 'repeater', 'key' => 'field_faq_rep', 'required' => 0, 'label' => 'FAQ' ),
+                array( 'name' => 'title', 'type' => 'text', 'key' => 'field_faq_title', 'required' => 0, 'label' => 'Title' ),
+            ),
+        );
+
+        // Reset registry to pick up new stubs.
+        $ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        // Reset Blocks singleton.
+        $ref  = new \ReflectionClass( \Arcadia_Blocks::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json = array(
+            'children' => array(
+                array(
+                    'type'       => 'acf/faq',
+                    'properties' => array(
+                        'faq'   => array( array( 'title' => 'Q1', 'text' => 'A1' ) ),
+                        'title' => 'FAQ Section',
+                    ),
+                ),
+            ),
+        );
+
+        $blocks->json_to_blocks( $json );
+        $blocks->write_acf_block_meta( 12345 );
+
+        // Verify update_field was called with correct field keys.
+        $this->assertNotEmpty( $_test_acf_update_field_calls );
+
+        $field_keys_written = array_column( $_test_acf_update_field_calls, 'field_name' );
+        $this->assertContains( 'field_faq_rep', $field_keys_written );
+        $this->assertContains( 'field_faq_title', $field_keys_written );
+
+        // Verify post_id was correct.
+        foreach ( $_test_acf_update_field_calls as $call ) {
+            $this->assertEquals( 12345, $call['post_id'] );
+        }
+    }
+
+    /**
+     * Test non-ACF blocks are not collected.
+     */
+    public function test_non_acf_blocks_not_collected(): void {
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json = array(
+            'children' => array(
+                array( 'type' => 'paragraph', 'content' => 'text' ),
+                array( 'type' => 'heading', 'content' => 'title', 'level' => 2 ),
+            ),
+        );
+
+        $blocks->json_to_blocks( $json );
+
+        $ref  = new \ReflectionClass( $blocks );
+        $prop = $ref->getProperty( 'acf_block_data' );
+        $prop->setAccessible( true );
+        $data = $prop->getValue( $blocks );
+
+        $this->assertEmpty( $data );
+    }
+
+    /**
+     * Test nested ACF blocks in sections are collected.
+     */
+    public function test_nested_acf_blocks_collected(): void {
+        global $_test_acf_block_types;
+        $_test_acf_block_types = array(
+            'acf/hero' => array( 'title' => 'Hero Block' ),
+        );
+
+        $ref = new \ReflectionClass( \Arcadia_Block_Registry::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        $ref = new \ReflectionClass( \Arcadia_Blocks::class );
+        $prop = $ref->getProperty( 'instance' );
+        $prop->setAccessible( true );
+        $prop->setValue( null, null );
+
+        $blocks = \Arcadia_Blocks::get_instance();
+
+        $json = array(
+            'children' => array(
+                array(
+                    'type'     => 'section',
+                    'heading'  => 'Section 1',
+                    'children' => array(
+                        array(
+                            'type'       => 'acf/hero',
+                            'properties' => array( 'image' => 42, 'text' => 'Hello' ),
+                        ),
+                    ),
+                ),
+            ),
+        );
+
+        $blocks->json_to_blocks( $json );
+
+        $ref  = new \ReflectionClass( $blocks );
+        $prop = $ref->getProperty( 'acf_block_data' );
+        $prop->setAccessible( true );
+        $data = $prop->getValue( $blocks );
+
+        $this->assertCount( 1, $data );
+        $this->assertEquals( 'acf/hero', $data[0]['block_name'] );
+    }
 }

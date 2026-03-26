@@ -549,6 +549,22 @@
 
 ---
 
+## Phase 23 : Dual-write ACF block data to post_meta (P1)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+
+### P1 — Dual-write: block comment + post_meta pour blocs ACF
+- [DONE] Collecter les propriétés des blocs ACF pendant `json_to_blocks()` (`collect_acf_block_data()`)
+- [DONE] Écrire via `update_field($field_key, $value, $post_id)` après `wp_insert_post` / `wp_update_post`
+- [DONE] Supporté dans `create_post()` et `update_post()`
+- [DONE] ACF gère nativement le format flat pour les repeaters via `update_field()`
+- [DONE] `do_action('acf/save_post')` exécuté après le dual-write pour créer les field references
+- [DONE] Tests unitaires : collecte ACF blocks, write_acf_block_meta appelle update_field, non-ACF ignorés, blocs imbriqués collectés (4 tests)
+
+### Note — Item 2 du backlog (warnings côté connector) → item ArcadiaAgents, pas plugin
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

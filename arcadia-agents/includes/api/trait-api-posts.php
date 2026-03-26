@@ -389,6 +389,10 @@ trait Arcadia_API_Posts_Handler {
 		// FS-4: Auto-apply field schema mappings.
 		$this->apply_field_schema_mappings( $post_id, $post_type, $body, $meta );
 
+		// Dual-write: ACF block properties to post_meta (P22-O1).
+		// Themes read via get_fields() (post_meta), not just $block['data'].
+		$this->blocks->write_acf_block_meta( $post_id );
+
 		// Always set _acf_changed when ACF is active (finding 023).
 		if ( function_exists( 'update_field' ) ) {
 			update_post_meta( $post_id, '_acf_changed', 1 );
@@ -633,6 +637,9 @@ trait Arcadia_API_Posts_Handler {
 
 		// FS-4: Auto-apply field schema mappings.
 		$this->apply_field_schema_mappings( $post_id, $post->post_type, $body, $meta );
+
+		// Dual-write: ACF block properties to post_meta (P22-O1).
+		$this->blocks->write_acf_block_meta( $post_id );
 
 		// Always set _acf_changed when ACF is active (finding 023).
 		if ( function_exists( 'update_field' ) ) {
