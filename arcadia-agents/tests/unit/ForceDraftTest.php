@@ -50,7 +50,7 @@ class ForceDraftHelper {
 			public function json_to_blocks( $json ) {
 				return '<!-- wp:paragraph --><p>test</p><!-- /wp:paragraph -->';
 			}
-			public function write_acf_block_meta( $post_id ) {}
+
 		};
 	}
 }

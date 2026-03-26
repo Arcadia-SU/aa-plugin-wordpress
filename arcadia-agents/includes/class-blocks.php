@@ -50,14 +50,6 @@ class Arcadia_Blocks {
 	private $registry;
 
 	/**
-	 * ACF block properties collected during json_to_blocks().
-	 * Used for dual-write: block comment (post_content) + post_meta.
-	 *
-	 * @var array[] Array of { block_name, properties }.
-	 */
-	private $acf_block_data = array();
-
-	/**
 	 * Get single instance of the class.
 	 *
 	 * @return Arcadia_Blocks
@@ -173,9 +165,6 @@ class Arcadia_Blocks {
 			}
 		}
 
-		// Reset ACF block data collector for dual-write.
-		$this->acf_block_data = array();
-
 		$content = '';
 
 		// Process H1 if present.
@@ -187,89 +176,10 @@ class Arcadia_Blocks {
 		if ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) {
 			foreach ( $json['children'] as $block ) {
 				$content .= $this->process_block( $block );
-				// Collect ACF block properties for dual-write to post_meta.
-				$this->collect_acf_block_data( $block );
 			}
 		}
 
 		return $content;
-	}
-
-	/**
-	 * Recursively collect ACF block data from the block tree.
-	 *
-	 * @param array $block A block from the content tree.
-	 */
-	private function collect_acf_block_data( $block ) {
-		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
-			return;
-		}
-
-		// Collect ACF blocks with properties.
-		if ( str_starts_with( $block['type'], 'acf/' ) && ! empty( $block['properties'] ) ) {
-			$this->acf_block_data[] = array(
-				'block_name' => $block['type'],
-				'properties' => $block['properties'],
-			);
-		}
-
-		// Recurse into children (sections, etc.).
-		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
-			foreach ( $block['children'] as $child ) {
-				$this->collect_acf_block_data( $child );
-			}
-		}
-	}
-
-	/**
-	 * Write collected ACF block properties to post_meta (dual-write).
-	 *
-	 * Called after wp_insert_post/wp_update_post to populate post_meta
-	 * alongside the block comments in post_content. Themes that use
-	 * get_fields() read from post_meta, not from block comment data.
-	 *
-	 * @param int $post_id The post ID.
-	 */
-	public function write_acf_block_meta( $post_id ) {
-		if ( empty( $this->acf_block_data ) || ! function_exists( 'update_field' ) ) {
-			return;
-		}
-
-		$registry = Arcadia_Block_Registry::get_instance();
-
-		foreach ( $this->acf_block_data as $block_entry ) {
-			$block_name = $block_entry['block_name'];
-			$properties = $block_entry['properties'];
-
-			// Get field schema for this block (field names, types, keys).
-			$schema = $registry->get_block_schema( $block_name );
-
-			// Build field key lookup.
-			$field_keys = array();
-			if ( is_array( $schema ) ) {
-				foreach ( $schema as $field ) {
-					if ( ! empty( $field['key'] ) ) {
-						$field_keys[ $field['name'] ] = $field['key'];
-					}
-				}
-			}
-
-			foreach ( $properties as $field_name => $value ) {
-				$field_key = $field_keys[ $field_name ] ?? null;
-
-				if ( $field_key ) {
-					// Use update_field with field key — ACF handles repeater
-					// flattening, reference entries, etc. natively.
-					update_field( $field_key, $value, $post_id );
-				} else {
-					// No field key: write directly to post_meta as fallback.
-					update_post_meta( $post_id, $field_name, $value );
-				}
-			}
-		}
-
-		// Clear after writing.
-		$this->acf_block_data = array();
 	}
 
 	/**

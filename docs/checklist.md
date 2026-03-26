@@ -549,19 +549,28 @@
 
 ---
 
-## Phase 23 : Dual-write ACF block data to post_meta (P1)
+## Phase 23 : ~~Dual-write ACF block data to post_meta~~ REVERTED
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
 
-### P1 — Dual-write: block comment + post_meta pour blocs ACF
-- [DONE] Collecter les propriétés des blocs ACF pendant `json_to_blocks()` (`collect_acf_block_data()`)
-- [DONE] Écrire via `update_field($field_key, $value, $post_id)` après `wp_insert_post` / `wp_update_post`
-- [DONE] Supporté dans `create_post()` et `update_post()`
-- [DONE] ACF gère nativement le format flat pour les repeaters via `update_field()`
-- [DONE] `do_action('acf/save_post')` exécuté après le dual-write pour créer les field references
-- [DONE] Tests unitaires : collecte ACF blocks, write_acf_block_meta appelle update_field, non-ACF ignorés, blocs imbriqués collectés (4 tests)
+### P1 — REVERTED : dual-write cassait le rendu des blocs ACF
+- [REVERTED] `write_acf_block_meta()` supprimé — les champs de blocs écrits en post_meta écrasaient les champs post-level et polluaient `get_fields()`
+- **Root cause** : Les blocs ACF stockent leurs données dans le block comment (`post_content`), pas en post_meta. `get_fields()` sans argument retourne les champs du **post**, pas du bloc. Le dual-write créait des collisions de noms entre blocs.
+- **Référence** : ACF 6.3+ supporte `usePostMeta: true` dans `block.json` (opt-in), ce n'est pas le cas ici.
+- **Décision** : Ne pas tenter de réécrire en post_meta. Le block comment est le bon vecteur.
 
 ### Note — Item 2 du backlog (warnings côté connector) → item ArcadiaAgents, pas plugin
+
+---
+
+## Phase 24 : Nettoyage post_meta polluées (post 63657)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+
+### Nettoyage post_meta créées par le dual-write v0.1.12
+- [ ] Identifier les meta à supprimer sur post 63657 (faq, _faq, color, _color, link, _link, size, _size, block-id, _block-id, title si pollué, etc.)
+- [ ] Script one-shot ou passage WP-CLI pour nettoyer
+- [ ] Vérifier que `get_fields()` ne retourne plus de champs de blocs au post-level
 
 ---
 
