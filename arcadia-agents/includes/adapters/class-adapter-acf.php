@@ -174,11 +174,10 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				case 'repeater':
-					// Flatten repeater array to ACF storage format.
-					if ( is_array( $value ) ) {
-						$flattened = $this->flatten_repeater( $field_name, $value );
-						$data      = array_merge( $data, $flattened );
-					}
+					// Block comment data is read directly by templates via $block['data'].
+					// Templates expect structured arrays, NOT flat ACF storage format.
+					// flatten_repeater() is for post_meta context only (update_field).
+					$data[ $field_name ] = $value;
 					break;
 
 				case 'wysiwyg':
@@ -186,13 +185,8 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				default:
-					// Auto-detect repeater: array of associative arrays without schema.
-					if ( is_array( $value ) && ! empty( $value ) && is_array( reset( $value ) ) ) {
-						$flattened = $this->flatten_repeater( $field_name, $value );
-						$data      = array_merge( $data, $flattened );
-						break;
-					}
-					// Passthrough for text, textarea, url, select, radio.
+					// Passthrough for text, textarea, url, select, radio, and
+					// untyped repeaters (array of objects kept structured for templates).
 					$data[ $field_name ] = $value;
 					break;
 			}

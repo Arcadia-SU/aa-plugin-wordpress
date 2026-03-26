@@ -350,11 +350,17 @@ trait Arcadia_API_Posts_Handler {
 
 		// Handle featured image from URL.
 		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$this->sideload_and_set_featured_image(
+			$fi_result = $this->sideload_and_set_featured_image(
 				$post_id,
 				$meta['featured_image_url'],
 				$meta['featured_image_alt'] ?? ''
 			);
+			if ( is_wp_error( $fi_result ) ) {
+				$taxonomy_warnings[] = sprintf(
+					'Featured image sideload failed: %s',
+					$fi_result->get_error_message()
+				);
+			}
 		}
 
 		// Store SEO meta: meta.title = SEO meta-title (distinct from post_title/H1).
@@ -585,11 +591,17 @@ trait Arcadia_API_Posts_Handler {
 
 		// Update featured image.
 		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$this->sideload_and_set_featured_image(
+			$fi_result = $this->sideload_and_set_featured_image(
 				$post_id,
 				$meta['featured_image_url'],
 				$meta['featured_image_alt'] ?? ''
 			);
+			if ( is_wp_error( $fi_result ) ) {
+				$taxonomy_warnings[] = sprintf(
+					'Featured image sideload failed: %s',
+					$fi_result->get_error_message()
+				);
+			}
 		}
 
 		// Update SEO meta.

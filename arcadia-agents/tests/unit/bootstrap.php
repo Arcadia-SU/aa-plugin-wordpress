@@ -951,9 +951,16 @@ if ( ! function_exists( 'get_index_template' ) ) {
     }
 }
 
-// download_url() stub.
+// download_url() stub — configurable result for sideload failure tests.
 if ( ! function_exists( 'download_url' ) ) {
+    global $_test_download_url_result;
+    $_test_download_url_result = null;
+
     function download_url( $url, $timeout = 300 ) {
+        global $_test_download_url_result;
+        if ( null !== $_test_download_url_result ) {
+            return $_test_download_url_result;
+        }
         return '/tmp/downloaded-image.jpg';
     }
 }

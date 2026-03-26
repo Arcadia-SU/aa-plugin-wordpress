@@ -531,6 +531,24 @@
 
 ---
 
+## Phase 22 : Bugfix repeater block comment + sideload warnings (O1-O2)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+
+### O1 — Fix: `flatten_repeater()` dans block comment cassait les templates ACF
+- [DONE] Supprimer flatten dans `custom_block()` (case `repeater` + auto-detect `default`)
+- [DONE] Garder format structuré dans `$block['data']` — templates lisent `$block['data']` directement
+- [DONE] `flatten_repeater()` conservé pour usage post_meta futur, plus appelé dans block comment
+- [DONE] Tests mis à jour : vérifient format structuré préservé (simple, nested 2 niveaux, nested 3 niveaux)
+
+### O2 — Fix: sideload featured image — erreurs surfacées en `warnings`
+- [DONE] `create_post()` capture `WP_Error` de `sideload_and_set_featured_image()` → `warnings[]`
+- [DONE] `update_post()` idem
+- [DONE] Publication non bloquée — article créé/mis à jour avec succès, warning dans la réponse
+- [DONE] Tests unitaires : create + update sideload failure retournent warning (2 tests)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*

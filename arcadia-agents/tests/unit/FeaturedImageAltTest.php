@@ -147,6 +147,73 @@ class FeaturedImageAltTest extends TestCase {
 	}
 
 	/**
+	 * Test create_post surfaces sideload failure as warning (not error).
+	 */
+	public function test_create_post_sideload_failure_returns_warning(): void {
+		global $_test_download_url_result;
+		$_test_download_url_result = new \WP_Error( 'http_404', 'Not Found' );
+
+		$request = new \WP_REST_Request();
+		$request->set_json_params( array(
+			'title'   => 'Article with broken image',
+			'content' => 'Hello',
+			'meta'    => array(
+				'featured_image_url' => 'https://example.com/broken.jpg',
+			),
+		) );
+
+		$result = $this->helper->create_post( $request );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $result );
+		$data = $result->get_data();
+		$this->assertTrue( $data['success'] );
+		$this->assertNotEmpty( $data['warnings'] );
+		$this->assertStringContainsString( 'Featured image sideload failed', $data['warnings'][0] );
+
+		$_test_download_url_result = null;
+	}
+
+	/**
+	 * Test update_post surfaces sideload failure as warning (not error).
+	 */
+	public function test_update_post_sideload_failure_returns_warning(): void {
+		global $_test_posts, $_test_download_url_result;
+		$_test_download_url_result = new \WP_Error( 'http_timeout', 'Connection timed out' );
+
+		$_test_posts[42] = (object) array(
+			'ID'             => 42,
+			'post_type'      => 'post',
+			'post_title'     => 'Existing',
+			'post_status'    => 'publish',
+			'post_content'   => '',
+			'post_excerpt'   => '',
+			'post_date'      => '2026-01-01 00:00:00',
+			'post_modified'  => '2026-01-01 00:00:00',
+			'post_author'    => 1,
+			'post_name'      => 'existing',
+			'post_mime_type' => '',
+		);
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_json_params( array(
+			'meta' => array(
+				'featured_image_url' => 'https://example.com/timeout.webp',
+			),
+		) );
+
+		$result = $this->helper->update_post( $request );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $result );
+		$data = $result->get_data();
+		$this->assertTrue( $data['success'] );
+		$this->assertNotEmpty( $data['warnings'] );
+		$this->assertStringContainsString( 'Featured image sideload failed', $data['warnings'][0] );
+
+		$_test_download_url_result = null;
+	}
+
+	/**
 	 * Test create_post WITHOUT featured_image_alt does NOT set alt meta.
 	 */
 	public function test_create_post_omits_alt_when_not_provided(): void {
