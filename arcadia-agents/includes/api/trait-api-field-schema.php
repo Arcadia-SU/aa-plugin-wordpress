@@ -218,6 +218,9 @@ trait Arcadia_API_Field_Schema_Handler {
 		// wysiwyg markdown parse, etc.) that we must not clobber with raw values.
 		$explicit_acf = ! empty( $body['acf_fields'] ) ? array_keys( $body['acf_fields'] ) : array();
 
+		// ACF field type map — needed to handle type-specific values (e.g. image sideload).
+		$acf_type_map = $this->build_acf_field_type_map( $post_type );
+
 		// Build source values map.
 		$sources = array(
 			'excerpt'            => isset( $body['excerpt'] ) ? $body['excerpt'] : ( isset( $meta['description'] ) ? $meta['description'] : '' ),
@@ -243,7 +246,26 @@ trait Arcadia_API_Field_Schema_Handler {
 			if ( 'mapping' === $type && ! empty( $mapping['source'] ) ) {
 				$source_key = $mapping['source'];
 				if ( isset( $sources[ $source_key ] ) && '' !== $sources[ $source_key ] ) {
-					update_field( $field_name, $sources[ $source_key ], $post_id );
+					$value = $sources[ $source_key ];
+
+					// Type-aware: ACF image fields expect an attachment ID, not a URL.
+					// Sideload the URL first, same as process_acf_fields() does.
+					$acf_field_type = $acf_type_map[ $field_name ] ?? 'text';
+					if ( 'image' === $acf_field_type && is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
+						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
+						if ( is_wp_error( $sideloaded ) ) {
+							// Log warning but don't fail the whole request.
+							error_log( sprintf(
+								'[ArcadiaAgents] field_schema sideload failed for %s: %s',
+								$field_name,
+								$sideloaded->get_error_message()
+							) );
+							continue;
+						}
+						$value = $sideloaded;
+					}
+
+					update_field( $field_name, $value, $post_id );
 				}
 			}
 			// 'generation' type: the agent passes the value in acf_fields directly.

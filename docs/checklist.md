@@ -586,6 +586,11 @@
 - [DONE] `process_acf_fields()` gère le sideload (URL → attachment ID), `apply_field_schema_mappings()` ne ré-écrit plus
 - [DONE] Test unitaire : image sideloadée par process_acf_fields conserve l'attachment ID, chapo_1 toujours mappé (1 test)
 
+### Fix P2 : `apply_field_schema_mappings()` type-blind sur champs image (aa-gig)
+- [DONE] `apply_field_schema_mappings()` détecte le type ACF du champ cible via `build_acf_field_type_map()`
+- [DONE] Si type `image` + valeur URL → sideload via `Arcadia_ACF_Adapter::sideload_image_field()` avant `update_field()`
+- [DONE] Erreur sideload → log warning + skip (ne fait pas échouer la requête)
+
 ### Note — Item 2 du backlog (warnings côté connector) → item ArcadiaAgents, pas plugin
 
 ---
