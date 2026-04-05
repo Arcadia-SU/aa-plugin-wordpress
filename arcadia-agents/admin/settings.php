@@ -62,6 +62,10 @@ function arcadia_agents_settings_page() {
 		$force_draft = ! empty( $_POST['aa_force_draft'] );
 		update_option( 'aa_force_draft', $force_draft, false );
 
+		// Save Pending Revisions setting.
+		$pending_revisions = ! empty( $_POST['aa_pending_revisions'] );
+		update_option( 'aa_pending_revisions', $pending_revisions, false );
+
 		$notice      = __( 'Settings saved.', 'arcadia-agents' );
 		$notice_type = 'success';
 	}
@@ -272,6 +276,21 @@ function arcadia_agents_settings_page() {
 			</label>
 			<p class="description" style="margin: 5px 0 0 30px;">
 				<?php esc_html_e( 'When enabled, all articles created or updated via the API will be saved as drafts, regardless of the requested status. This prevents direct publication by the agent.', 'arcadia-agents' ); ?>
+			</p>
+
+			<hr style="margin: 15px 0; border: none; border-top: 1px solid #eee;">
+
+			<?php $pending_revisions = get_option( 'aa_pending_revisions', false ); ?>
+			<label style="display: flex; align-items: center; padding: 6px 0; gap: 10px; cursor: pointer;">
+				<input type="checkbox"
+					name="aa_pending_revisions"
+					value="1"
+					<?php checked( $pending_revisions ); ?>
+				/>
+				<span style="min-width: 140px;"><strong><?php esc_html_e( 'Pending Revisions', 'arcadia-agents' ); ?></strong></span>
+			</label>
+			<p class="description" style="margin: 5px 0 0 30px;">
+				<?php esc_html_e( 'When enabled, updates to published articles via the API are stored as pending revisions instead of being applied directly. Review, approve, or reject changes from the article editor.', 'arcadia-agents' ); ?>
 			</p>
 		</div>
 

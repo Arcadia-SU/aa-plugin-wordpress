@@ -530,6 +530,43 @@ trait Arcadia_API_Posts_Handler {
 			$force_draft_applied      = true;
 		}
 
+		// Pending Revision: store as revision instead of live update.
+		// pending_revision takes priority over force_draft (early return = no wp_update_post).
+		$pending_revision_flag = ! empty( $body['pending_revision'] );
+		if ( $pending_revision_flag
+			&& get_option( 'aa_pending_revisions', false )
+			&& 'publish' === $post->post_status
+		) {
+			// Render content for revision storage.
+			$revision_content = null;
+			if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
+				$revision_content = $this->blocks->json_to_blocks( $body, $post->post_type );
+				if ( is_wp_error( $revision_content ) ) {
+					return $revision_content;
+				}
+			} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
+				$revision_content = wp_kses_post( $body['content'] );
+			}
+
+			$revisions  = Arcadia_Revisions::get_instance();
+			$rev_result = $revisions->create_revision( $post_id, $body, $meta, $revision_content );
+			if ( is_wp_error( $rev_result ) ) {
+				return $rev_result;
+			}
+
+			return new WP_REST_Response(
+				array(
+					'revision_created'     => true,
+					'revision_id'          => $rev_result['revision_id'],
+					'revision_version'     => $rev_result['revision_version'],
+					'preview_url'          => $rev_result['preview_url'],
+					'original_post_status' => $post->post_status,
+					'message'              => 'Revision stored. Live post unchanged.',
+				),
+				201
+			);
+		}
+
 		// Update content.
 		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
 			$content = $this->blocks->json_to_blocks( $body, $post->post_type );

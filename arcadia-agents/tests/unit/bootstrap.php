@@ -328,31 +328,33 @@ if ( ! class_exists( 'WP_Query' ) ) {
         public $is_404 = false;
 
         /**
-         * Next result to return (set by tests).
+         * Queue of results to return (set by tests).
+         * Supports both single-shot and multi-query scenarios.
          */
-        private static $next_result = null;
+        private static $result_queue = array();
 
         /**
          * Set the result the next WP_Query instance should return.
+         * Can be called multiple times to queue results for sequential queries.
          *
          * @param array $posts Array of post objects.
          */
         public static function set_next_result( $posts ) {
-            self::$next_result = $posts;
+            self::$result_queue[] = $posts;
         }
 
         /**
-         * Reset the next result.
+         * Reset the result queue.
          */
         public static function reset() {
-            self::$next_result = null;
+            self::$result_queue = array();
         }
 
         public function __construct( $args = array() ) {
-            if ( null !== self::$next_result ) {
-                $this->posts       = self::$next_result;
-                $this->found_posts = count( self::$next_result );
-                self::$next_result = null;
+            if ( ! empty( self::$result_queue ) ) {
+                $result            = array_shift( self::$result_queue );
+                $this->posts       = $result;
+                $this->found_posts = count( $result );
             }
         }
 
@@ -779,7 +781,16 @@ if ( ! function_exists( 'wp_delete_attachment' ) ) {
 // wp_update_post() stub.
 if ( ! function_exists( 'wp_update_post' ) ) {
     function wp_update_post( $post_data, $wp_error = false ) {
-        $id = isset( $post_data['ID'] ) ? $post_data['ID'] : 0;
+        global $_test_posts;
+        $id = isset( $post_data['ID'] ) ? (int) $post_data['ID'] : 0;
+        if ( isset( $_test_posts[ $id ] ) ) {
+            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name' );
+            foreach ( $updatable as $field ) {
+                if ( isset( $post_data[ $field ] ) ) {
+                    $_test_posts[ $id ]->$field = $post_data[ $field ];
+                }
+            }
+        }
         return $id;
     }
 }
@@ -824,6 +835,7 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
         $_test_posts[ $id ] = (object) array(
             'ID'             => $id,
             'post_type'      => isset( $post_data['post_type'] ) ? $post_data['post_type'] : 'post',
+            'post_parent'    => isset( $post_data['post_parent'] ) ? (int) $post_data['post_parent'] : 0,
             'post_title'     => isset( $post_data['post_title'] ) ? $post_data['post_title'] : '',
             'post_status'    => isset( $post_data['post_status'] ) ? $post_data['post_status'] : 'draft',
             'post_content'   => isset( $post_data['post_content'] ) ? $post_data['post_content'] : '',
@@ -1121,6 +1133,44 @@ if ( ! function_exists( 'render_block' ) ) {
     }
 }
 
+// get_post_time() stub.
+if ( ! function_exists( 'get_post_time' ) ) {
+    function get_post_time( $format = 'U', $gmt = false, $post = null ) {
+        if ( is_object( $post ) && ! empty( $post->post_date ) ) {
+            $time = strtotime( $post->post_date );
+            return date( $format, $time );
+        }
+        return date( $format );
+    }
+}
+
+// wp_date() stub.
+if ( ! function_exists( 'wp_date' ) ) {
+    function wp_date( $format, $timestamp = null ) {
+        return date( $format, $timestamp ?? time() );
+    }
+}
+
+// get_the_date() stub.
+if ( ! function_exists( 'get_the_date' ) ) {
+    function get_the_date( $format = '', $post = null ) {
+        if ( is_object( $post ) && ! empty( $post->post_date ) ) {
+            $f = ! empty( $format ) ? $format : 'F j, Y';
+            return date( $f, strtotime( $post->post_date ) );
+        }
+        return date( 'F j, Y' );
+    }
+}
+
+// delete_post_meta() stub.
+if ( ! function_exists( 'delete_post_meta' ) ) {
+    function delete_post_meta( $post_id, $meta_key ) {
+        global $_test_post_meta;
+        unset( $_test_post_meta[ $post_id ][ $meta_key ] );
+        return true;
+    }
+}
+
 // Load Composer autoloader.
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 
@@ -1129,3 +1179,9 @@ require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 
 // Load SEO meta class for testing.
 require_once dirname( __DIR__, 2 ) . '/includes/class-seo-meta.php';
+
+// Load preview class (needed by revisions).
+require_once dirname( __DIR__, 2 ) . '/includes/class-preview.php';
+
+// Load revisions class for testing.
+require_once dirname( __DIR__, 2 ) . '/includes/class-revisions.php';

@@ -98,11 +98,13 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-redirects.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-preview.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revisions.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
 
 		// Admin.
 		if ( is_admin() ) {
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/settings.php';
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revision-metabox.php';
 		}
 	}
 
@@ -120,11 +122,22 @@ class Arcadia_Agents {
 		add_action( 'init', array( $this, 'register_redirect_post_type' ) );
 		add_action( 'template_redirect', array( $this, 'handle_arcadia_redirects' ) );
 
+		// Register revisions CPT.
+		add_action( 'init', array( $this, 'register_revision_post_type' ) );
+
 		// Preview URL: fix main query for CPT drafts, then render on template_redirect.
 		add_action( 'pre_get_posts', array( $this, 'fix_arcadia_preview_query' ) );
 		add_action( 'template_redirect', array( $this, 'handle_arcadia_preview' ), 1 );
 		add_action( 'arcadia_preview_cleanup', array( $this, 'run_preview_cleanup' ) );
 		add_action( 'init', array( 'Arcadia_Preview', 'schedule_cleanup' ) );
+
+		// Revision metaboxes and AJAX (admin only).
+		if ( is_admin() ) {
+			$metabox = new Arcadia_Revision_Metabox();
+			add_action( 'add_meta_boxes', array( $metabox, 'register_metaboxes' ) );
+			add_action( 'wp_ajax_aa_approve_revision', array( $metabox, 'ajax_approve' ) );
+			add_action( 'wp_ajax_aa_reject_revision', array( $metabox, 'ajax_reject' ) );
+		}
 
 		// Admin menu.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
@@ -173,6 +186,13 @@ class Arcadia_Agents {
 	 */
 	public function register_redirect_post_type() {
 		Arcadia_Redirects::get_instance()->register_post_type();
+	}
+
+	/**
+	 * Register the aa_revision Custom Post Type.
+	 */
+	public function register_revision_post_type() {
+		Arcadia_Revisions::get_instance()->register_post_type();
 	}
 
 	/**

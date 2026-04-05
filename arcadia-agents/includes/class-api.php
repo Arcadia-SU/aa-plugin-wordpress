@@ -26,6 +26,7 @@ require_once __DIR__ . '/api/trait-api-site.php';
 require_once __DIR__ . '/api/trait-api-redirects.php';
 require_once __DIR__ . '/api/trait-api-preview.php';
 require_once __DIR__ . '/api/trait-api-field-schema.php';
+require_once __DIR__ . '/api/trait-api-revisions.php';
 
 /**
  * Class Arcadia_API
@@ -45,6 +46,7 @@ class Arcadia_API {
 	use Arcadia_API_Redirects_Handler;
 	use Arcadia_API_Preview_Handler;
 	use Arcadia_API_Field_Schema_Handler;
+	use Arcadia_API_Revisions_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -410,6 +412,27 @@ class Arcadia_API {
 				'permission_callback' => array( $this, 'check_articles_read_permission' ),
 			)
 		);
+
+		// Article revisions endpoints.
+		register_rest_route(
+			$this->namespace,
+			'/articles/(?P<id>\d+)/revisions',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_article_revisions' ),
+				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/articles/(?P<id>\d+)/revisions/(?P<revision_id>\d+)',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'get_article_revision' ),
+				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+			)
+		);
 	}
 
 	// =========================================================================
@@ -634,7 +657,8 @@ class Arcadia_API {
 					'adapter' => $this->blocks->get_adapter_name(),
 				),
 				'settings'         => array(
-					'force_draft' => (bool) get_option( 'aa_force_draft', false ),
+					'force_draft'        => (bool) get_option( 'aa_force_draft', false ),
+					'pending_revisions'  => (bool) get_option( 'aa_pending_revisions', false ),
 				),
 				'acf_available'    => Arcadia_Blocks::is_acf_available(),
 				'acf_field_groups' => $this->get_acf_field_groups_for_post_types(),

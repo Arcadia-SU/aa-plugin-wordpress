@@ -595,6 +595,54 @@
 
 ---
 
+## Phase 25 : Pending Revisions (REV-001)
+
+*Ref: [pending-revisions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/pending-revisions.md)*
+*Intégré depuis backlog le 2026-04-05*
+
+### 25.1 — CPT & Storage
+- [DONE] Enregistrer CPT `aa_revision` (`public: false`, `show_ui: false`, supports `title` + `editor`)
+- [DONE] Meta keys : `_aa_revision_version`, `_aa_revision_meta`, `_aa_revision_created_by`, `_aa_revision_decided_by`, `_aa_revision_decided_at`, `_aa_revision_notes`, `_aa_revision_decision_notes`
+- [DONE] Réutiliser `_aa_preview_token` / `_aa_preview_expires` (même mécanisme preview existant)
+
+### 25.2 — API : créer revision via PUT /articles/{id}
+- [DONE] Flag `pending_revision: true` dans le body — stocke revision au lieu d'update live
+- [DONE] Condition : post doit être `publish` (sinon update direct, flag ignoré)
+- [DONE] Auto-supersede : si pending existante → `post_status = 'superseded'`
+- [DONE] `revision_notes` optionnel stocké en meta
+- [DONE] Version auto-incrémentée par post parent
+- [DONE] Preview URL générée pour la revision
+- [DONE] Réponse 201 avec `revision_created`, `revision_id`, `revision_version`, `preview_url`
+- [DONE] Coexistence avec `force_draft` : `pending_revision` prend priorité
+
+### 25.3 — API : endpoints GET revisions
+- [DONE] `GET /articles/{id}/revisions` — liste paginée, filtre `?status`
+- [DONE] `GET /articles/{id}/revisions/{revision_id}` — détail avec statut, dates, notes, preview_url
+
+### 25.4 — Admin UI
+- [DONE] Metabox bannière haute (jaune #fff3cd) sur écran d'édition quand pending existe
+- [DONE] Bouton "Prévisualiser" → ouvre preview URL revision dans nouvel onglet
+- [DONE] Bouton "Approuver" → copie contenu revision dans post live via `wp_update_post()`, applique meta/acf_fields
+- [DONE] Bouton "Rejeter" → textarea notes optionnelles, marque `rejected`
+- [DONE] Hook `aa_revision_decided` déclenché à l'approbation/rejet
+- [DONE] Metabox sidebar "Révisions Arcadia" — historique 20 dernières, version + date + badge statut
+
+### 25.5 — Settings
+- [DONE] Option WP `aa_pending_revisions` (boolean, default `false`)
+- [DONE] Checkbox "Pending Revisions" dans la page admin plugin
+- [DONE] Exposer dans `GET /site-info` → `settings.pending_revisions`
+
+### 25.6 — Tests
+- [DONE] Tests unitaires CPT registration + meta storage (1 test)
+- [DONE] Tests unitaires PUT avec `pending_revision: true` (create revision, auto-supersede, post live inchangé) (5 tests)
+- [DONE] Tests unitaires GET revisions (list + detail + wrong parent 404) (3 tests)
+- [DONE] Tests unitaires approve/reject flow (3 tests)
+- [DONE] Tests unitaires coexistence avec force_draft (1 test)
+- [DONE] Tests unitaires setting option (1 test)
+- [ ] Validation manuelle sur WordPress dev local (docker)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*
