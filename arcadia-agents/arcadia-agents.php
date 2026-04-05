@@ -3,7 +3,7 @@
  * Plugin Name: Arcadia Agents
  * Plugin URI: https://arcadia-agents.com
  * Description: Connect your WordPress site to Arcadia Agents for autonomous SEO content management.
- * Version: 0.1.16
+ * Version: 0.1.17
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Arcadia
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ARCADIA_AGENTS_VERSION', '0.1.16' );
+define( 'ARCADIA_AGENTS_VERSION', '0.1.17' );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -103,6 +103,7 @@ class Arcadia_Agents {
 
 		// Admin.
 		if ( is_admin() ) {
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/dashboard.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/settings.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revision-metabox.php';
 		}
@@ -131,17 +132,22 @@ class Arcadia_Agents {
 		add_action( 'arcadia_preview_cleanup', array( $this, 'run_preview_cleanup' ) );
 		add_action( 'init', array( 'Arcadia_Preview', 'schedule_cleanup' ) );
 
-		// Revision metaboxes, notices, and AJAX (admin only).
+		// Revision metaboxes and AJAX (admin only).
 		if ( is_admin() ) {
 			$metabox = new Arcadia_Revision_Metabox();
 			add_action( 'add_meta_boxes', array( $metabox, 'register_metaboxes' ) );
-			add_action( 'admin_notices', array( $metabox, 'render_admin_notice' ) );
 			add_action( 'wp_ajax_aa_approve_revision', array( $metabox, 'ajax_approve' ) );
 			add_action( 'wp_ajax_aa_reject_revision', array( $metabox, 'ajax_reject' ) );
+			add_action( 'enqueue_block_editor_assets', array( $metabox, 'enqueue_sidebar_script' ) );
 		}
 
-		// Admin menu (with pending revision bubble count).
+		// Admin menu + icon styling.
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+		add_action( 'admin_head', array( $this, 'admin_menu_icon_css' ) );
+
+		// Invalidate pending revision count cache when a revision decision is made.
+		add_action( 'aa_revision_decided', array( $this, 'invalidate_pending_revision_count' ) );
+		add_action( 'save_post_aa_revision', array( $this, 'invalidate_pending_revision_count' ) );
 
 		// Invalidate blocks usage cache when posts are saved.
 		add_action( 'save_post', array( $this, 'invalidate_blocks_usage_cache' ) );
@@ -253,6 +259,22 @@ class Arcadia_Agents {
 	}
 
 	/**
+	 * Invalidate the pending revision count transient.
+	 *
+	 * Fired when a revision is created, approved, or rejected.
+	 */
+	public function invalidate_pending_revision_count() {
+		delete_transient( 'aa_pending_revision_count' );
+	}
+
+	/**
+	 * Output CSS to style the admin menu icon (rounded corners).
+	 */
+	public function admin_menu_icon_css() {
+		echo '<style>#adminmenu .toplevel_page_arcadia-agents .wp-menu-image img{border-radius:4px;width:20px;height:20px;padding:0!important;margin-top:7px;}</style>';
+	}
+
+	/**
 	 * Register REST API routes.
 	 */
 	public function register_rest_routes() {
@@ -288,66 +310,83 @@ class Arcadia_Agents {
 	}
 
 	/**
-	 * Add admin menu with pending revision notification bubble.
+	 * Add admin menu: top-level Dashboard + Settings submenu.
+	 *
+	 * The pending revision count bubble appears on the top-level menu
+	 * to alert the user that revisions need review.
 	 */
 	public function add_admin_menu() {
-		$pending_count = $this->get_pending_revisions_count();
-		$menu_title    = __( 'Arcadia Agents', 'arcadia-agents' );
+		$menu_title = __( 'Arcadia Agents', 'arcadia-agents' );
 
+		// Add pending revision count bubble.
+		$pending_count = $this->get_pending_revision_count();
 		if ( $pending_count > 0 ) {
 			$menu_title .= sprintf(
-				' <span class="awaiting-mod count-%d"><span class="pending-count">%d</span></span>',
-				$pending_count,
+				' <span class="update-plugins count-%1$d"><span class="plugin-count">%1$d</span></span>',
 				$pending_count
 			);
 		}
 
-		add_options_page(
+		// Top-level menu → Dashboard page.
+		$icon = ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo-icon.png';
+
+		add_menu_page(
 			__( 'Arcadia Agents', 'arcadia-agents' ),
 			$menu_title,
 			'manage_options',
 			'arcadia-agents',
-			'arcadia_agents_settings_page'
+			'arcadia_agents_dashboard_page',
+			$icon,
+			80
 		);
 
-		// Add bubble to the parent "Settings" menu item.
-		if ( $pending_count > 0 ) {
-			global $menu;
-			foreach ( $menu as &$item ) {
-				if ( isset( $item[2] ) && 'options-general.php' === $item[2] ) {
-					// Append bubble if not already present.
-					if ( false === strpos( $item[0], 'awaiting-mod' ) ) {
-						$item[0] .= sprintf(
-							' <span class="awaiting-mod count-%d"><span class="pending-count">%d</span></span>',
-							$pending_count,
-							$pending_count
-						);
-					}
-					break;
-				}
-			}
-		}
+		// Submenu: Dashboard (renames the auto-generated first submenu).
+		add_submenu_page(
+			'arcadia-agents',
+			__( 'Dashboard', 'arcadia-agents' ),
+			__( 'Dashboard', 'arcadia-agents' ),
+			'manage_options',
+			'arcadia-agents',
+			'arcadia_agents_dashboard_page'
+		);
+
+		// Submenu: Settings.
+		add_submenu_page(
+			'arcadia-agents',
+			__( 'Settings', 'arcadia-agents' ),
+			__( 'Settings', 'arcadia-agents' ),
+			'manage_options',
+			'arcadia-agents-settings',
+			'arcadia_agents_settings_page'
+		);
 	}
 
 	/**
-	 * Get total count of pending revisions across all posts.
+	 * Count pending revisions across all posts.
 	 *
-	 * Uses a short transient (5 min) to avoid a DB query on every admin page load.
+	 * Uses a short transient to avoid running WP_Query on every admin page load.
 	 *
 	 * @return int Number of pending revisions.
 	 */
-	private function get_pending_revisions_count() {
-		$count = get_transient( 'aa_pending_revisions_count' );
+	private function get_pending_revision_count() {
+		$count = get_transient( 'aa_pending_revision_count' );
 		if ( false !== $count ) {
 			return (int) $count;
 		}
 
-		global $wpdb;
-		$count = (int) $wpdb->get_var(
-			"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'aa_revision' AND post_status = 'pending'"
+		$query = new WP_Query(
+			array(
+				'post_type'      => 'aa_revision',
+				'post_status'    => 'pending',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+			)
 		);
 
-		set_transient( 'aa_pending_revisions_count', $count, 5 * MINUTE_IN_SECONDS );
+		$count = $query->post_count;
+		set_transient( 'aa_pending_revision_count', $count, 5 * MINUTE_IN_SECONDS );
+
 		return $count;
 	}
 }

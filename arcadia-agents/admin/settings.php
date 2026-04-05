@@ -143,9 +143,9 @@ function arcadia_agents_settings_page() {
 
 	?>
 	<div class="wrap">
-		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo.jpg' ); ?>" alt="Arcadia Agents" style="width: 36px; height: 36px; border-radius: 6px;" />
-			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo-text-black.png' ); ?>" alt="Arcadia" style="height: 24px; width: auto;" />
+		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo.png' ); ?>" alt="Arcadia Agents" style="width: 36px; height: 36px; border-radius: 6px;" />
+			<h1 style="margin: 0;"><?php esc_html_e( 'Settings', 'arcadia-agents' ); ?></h1>
 		</div>
 
 		<?php if ( $notice ) : ?>
