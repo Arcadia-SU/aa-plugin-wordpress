@@ -440,7 +440,7 @@ class Arcadia_Revisions {
 			'revision_id'      => $revision->ID,
 			'revision_version' => $version,
 			'status'           => $revision->post_status,
-			'created_at'       => get_post_time( 'c', true, $revision ),
+			'created_at'       => ! empty( $revision->post_date ) ? gmdate( 'c', strtotime( $revision->post_date ) ) : null,
 			'created_by'       => get_post_meta( $revision->ID, '_aa_revision_created_by', true ) ?: null,
 			'decided_at'       => get_post_meta( $revision->ID, '_aa_revision_decided_at', true ) ?: null,
 			'decided_by'       => get_post_meta( $revision->ID, '_aa_revision_decided_by', true ) ?: null,
