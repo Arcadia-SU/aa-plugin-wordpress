@@ -131,15 +131,16 @@ class Arcadia_Agents {
 		add_action( 'arcadia_preview_cleanup', array( $this, 'run_preview_cleanup' ) );
 		add_action( 'init', array( 'Arcadia_Preview', 'schedule_cleanup' ) );
 
-		// Revision metaboxes and AJAX (admin only).
+		// Revision metaboxes, notices, and AJAX (admin only).
 		if ( is_admin() ) {
 			$metabox = new Arcadia_Revision_Metabox();
 			add_action( 'add_meta_boxes', array( $metabox, 'register_metaboxes' ) );
+			add_action( 'admin_notices', array( $metabox, 'render_admin_notice' ) );
 			add_action( 'wp_ajax_aa_approve_revision', array( $metabox, 'ajax_approve' ) );
 			add_action( 'wp_ajax_aa_reject_revision', array( $metabox, 'ajax_reject' ) );
 		}
 
-		// Admin menu.
+		// Admin menu (with pending revision bubble count).
 		add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
 
 		// Invalidate blocks usage cache when posts are saved.
@@ -287,16 +288,67 @@ class Arcadia_Agents {
 	}
 
 	/**
-	 * Add admin menu.
+	 * Add admin menu with pending revision notification bubble.
 	 */
 	public function add_admin_menu() {
+		$pending_count = $this->get_pending_revisions_count();
+		$menu_title    = __( 'Arcadia Agents', 'arcadia-agents' );
+
+		if ( $pending_count > 0 ) {
+			$menu_title .= sprintf(
+				' <span class="awaiting-mod count-%d"><span class="pending-count">%d</span></span>',
+				$pending_count,
+				$pending_count
+			);
+		}
+
 		add_options_page(
 			__( 'Arcadia Agents', 'arcadia-agents' ),
-			__( 'Arcadia Agents', 'arcadia-agents' ),
+			$menu_title,
 			'manage_options',
 			'arcadia-agents',
 			'arcadia_agents_settings_page'
 		);
+
+		// Add bubble to the parent "Settings" menu item.
+		if ( $pending_count > 0 ) {
+			global $menu;
+			foreach ( $menu as &$item ) {
+				if ( isset( $item[2] ) && 'options-general.php' === $item[2] ) {
+					// Append bubble if not already present.
+					if ( false === strpos( $item[0], 'awaiting-mod' ) ) {
+						$item[0] .= sprintf(
+							' <span class="awaiting-mod count-%d"><span class="pending-count">%d</span></span>',
+							$pending_count,
+							$pending_count
+						);
+					}
+					break;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Get total count of pending revisions across all posts.
+	 *
+	 * Uses a short transient (5 min) to avoid a DB query on every admin page load.
+	 *
+	 * @return int Number of pending revisions.
+	 */
+	private function get_pending_revisions_count() {
+		$count = get_transient( 'aa_pending_revisions_count' );
+		if ( false !== $count ) {
+			return (int) $count;
+		}
+
+		global $wpdb;
+		$count = (int) $wpdb->get_var(
+			"SELECT COUNT(*) FROM {$wpdb->posts} WHERE post_type = 'aa_revision' AND post_status = 'pending'"
+		);
+
+		set_transient( 'aa_pending_revisions_count', $count, 5 * MINUTE_IN_SECONDS );
+		return $count;
 	}
 }
 

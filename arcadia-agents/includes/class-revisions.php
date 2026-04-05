@@ -155,6 +155,8 @@ class Arcadia_Revisions {
 			home_url( '/' )
 		);
 
+		$this->invalidate_count_cache();
+
 		return array(
 			'revision_id'      => $revision_id,
 			'revision_version' => $version,
@@ -294,6 +296,8 @@ class Arcadia_Revisions {
 		 */
 		do_action( 'aa_revision_decided', $revision_id, 'approved' );
 
+		$this->invalidate_count_cache();
+
 		return true;
 	}
 
@@ -333,7 +337,16 @@ class Arcadia_Revisions {
 
 		do_action( 'aa_revision_decided', $revision_id, 'rejected' );
 
+		$this->invalidate_count_cache();
+
 		return true;
+	}
+
+	/**
+	 * Invalidate the pending revisions count transient cache.
+	 */
+	private function invalidate_count_cache() {
+		delete_transient( 'aa_pending_revisions_count' );
 	}
 
 	/**

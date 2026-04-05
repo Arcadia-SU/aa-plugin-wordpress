@@ -22,6 +22,160 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arcadia_Revision_Metabox {
 
 	/**
+	 * Render admin notice banner at the top of post edit screens.
+	 *
+	 * Uses the WordPress admin_notices hook to display a prominent
+	 * orange banner above the editor when a pending revision exists.
+	 * This is visible without scrolling, unlike metaboxes.
+	 */
+	public function render_admin_notice() {
+		$screen = get_current_screen();
+		if ( ! $screen || 'post' !== $screen->base ) {
+			return;
+		}
+
+		global $post;
+		if ( ! $post || 'publish' !== $post->post_status ) {
+			return;
+		}
+
+		$revisions_handler = Arcadia_Revisions::get_instance();
+		$pending           = $revisions_handler->get_pending_revision( $post->ID );
+		if ( ! $pending ) {
+			return;
+		}
+
+		$version = (int) get_post_meta( $pending->ID, '_aa_revision_version', true );
+		$notes   = get_post_meta( $pending->ID, '_aa_revision_notes', true );
+		$date    = get_the_date( '', $pending );
+
+		// Build preview URL.
+		$preview     = Arcadia_Preview::get_instance();
+		$token       = $preview->get_or_create_token( $pending->ID );
+		$preview_url = add_query_arg(
+			array(
+				'p'          => $pending->ID,
+				'aa_preview' => $token,
+			),
+			home_url( '/' )
+		);
+
+		$nonce = wp_create_nonce( 'aa_revision_action' );
+		?>
+		<div class="notice notice-warning" id="aa-revision-notice" style="border-left-color: #ffc107; padding: 12px 16px;">
+			<div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+				<div>
+					<strong style="font-size: 14px;">
+						&#9889; <?php
+						printf(
+							/* translators: 1: version number, 2: date */
+							esc_html__( 'Arcadia Agents — Proposed modification v%1$d (%2$s)', 'arcadia-agents' ),
+							$version,
+							esc_html( $date )
+						);
+						?>
+					</strong>
+					<?php if ( ! empty( $notes ) ) : ?>
+						<br><em style="color: #664d03;">&ldquo;<?php echo esc_html( $notes ); ?>&rdquo;</em>
+					<?php endif; ?>
+				</div>
+				<div style="display: flex; gap: 6px; align-items: center; flex-shrink: 0;">
+					<a href="<?php echo esc_url( $preview_url ); ?>" target="_blank" class="button">
+						<?php esc_html_e( 'Preview', 'arcadia-agents' ); ?>
+					</a>
+					<button type="button" class="button button-primary" id="aa-notice-approve-btn">
+						<?php esc_html_e( 'Approve', 'arcadia-agents' ); ?>
+					</button>
+					<button type="button" class="button" id="aa-notice-reject-btn" style="color: #b32d2e; border-color: #b32d2e;">
+						<?php esc_html_e( 'Reject', 'arcadia-agents' ); ?>
+					</button>
+					<span id="aa-notice-status" style="display: none;"></span>
+				</div>
+			</div>
+			<div id="aa-notice-reject-form" style="display: none; margin-top: 10px;">
+				<label for="aa-notice-reject-notes" style="font-weight: 600;">
+					<?php esc_html_e( 'Rejection notes (optional):', 'arcadia-agents' ); ?>
+				</label>
+				<textarea id="aa-notice-reject-notes" rows="2" style="width: 100%; max-width: 500px; margin-top: 4px;"></textarea>
+				<div style="margin-top: 6px;">
+					<button type="button" class="button" id="aa-notice-reject-confirm" style="color: #b32d2e; border-color: #b32d2e;">
+						<?php esc_html_e( 'Confirm Rejection', 'arcadia-agents' ); ?>
+					</button>
+					<button type="button" class="button" id="aa-notice-reject-cancel">
+						<?php esc_html_e( 'Cancel', 'arcadia-agents' ); ?>
+					</button>
+				</div>
+			</div>
+		</div>
+		<script>
+		(function() {
+			var revisionId = <?php echo (int) $pending->ID; ?>;
+			var nonce = '<?php echo esc_js( $nonce ); ?>';
+			var ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
+			var statusEl = document.getElementById('aa-notice-status');
+
+			function setStatus(msg, color) {
+				statusEl.style.display = 'inline';
+				statusEl.style.color = color;
+				statusEl.textContent = msg;
+			}
+
+			function disableButtons() {
+				['aa-notice-approve-btn', 'aa-notice-reject-btn'].forEach(function(id) {
+					var el = document.getElementById(id);
+					if (el) el.disabled = true;
+				});
+			}
+
+			document.getElementById('aa-notice-approve-btn').addEventListener('click', function() {
+				if (!confirm('<?php echo esc_js( __( 'Apply this revision to the live article?', 'arcadia-agents' ) ); ?>')) return;
+				disableButtons();
+				setStatus('<?php echo esc_js( __( 'Approving...', 'arcadia-agents' ) ); ?>', '#664d03');
+				var data = new FormData();
+				data.append('action', 'aa_approve_revision');
+				data.append('revision_id', revisionId);
+				data.append('nonce', nonce);
+				fetch(ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' })
+					.then(function(r) { return r.json(); })
+					.then(function(resp) {
+						if (resp.success) {
+							setStatus('<?php echo esc_js( __( 'Approved! Reloading...', 'arcadia-agents' ) ); ?>', '#0a5c36');
+							setTimeout(function() { location.reload(); }, 1000);
+						} else { setStatus(resp.data || 'Error', '#b32d2e'); }
+					}).catch(function() { setStatus('Network error', '#b32d2e'); });
+			});
+
+			document.getElementById('aa-notice-reject-btn').addEventListener('click', function() {
+				document.getElementById('aa-notice-reject-form').style.display = 'block';
+			});
+			document.getElementById('aa-notice-reject-cancel').addEventListener('click', function() {
+				document.getElementById('aa-notice-reject-form').style.display = 'none';
+			});
+			document.getElementById('aa-notice-reject-confirm').addEventListener('click', function() {
+				disableButtons();
+				document.getElementById('aa-notice-reject-confirm').disabled = true;
+				setStatus('<?php echo esc_js( __( 'Rejecting...', 'arcadia-agents' ) ); ?>', '#664d03');
+				var notes = document.getElementById('aa-notice-reject-notes').value;
+				var data = new FormData();
+				data.append('action', 'aa_reject_revision');
+				data.append('revision_id', revisionId);
+				data.append('decision_notes', notes);
+				data.append('nonce', nonce);
+				fetch(ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' })
+					.then(function(r) { return r.json(); })
+					.then(function(resp) {
+						if (resp.success) {
+							setStatus('<?php echo esc_js( __( 'Rejected. Reloading...', 'arcadia-agents' ) ); ?>', '#0a5c36');
+							setTimeout(function() { location.reload(); }, 1000);
+						} else { setStatus(resp.data || 'Error', '#b32d2e'); }
+					}).catch(function() { setStatus('Network error', '#b32d2e'); });
+			});
+		})();
+		</script>
+		<?php
+	}
+
+	/**
 	 * Register metaboxes on the post edit screen.
 	 *
 	 * Only registers for public post types (not aa_revision itself).
