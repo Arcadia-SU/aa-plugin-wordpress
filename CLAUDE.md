@@ -14,7 +14,7 @@ Cocher les cases au fur et à mesure de l'avancement.
 
 ### Source de vérité des specs
 
-**Dossier maître :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/`
+**Dossier maître :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/`
 
 Cette session lit directement les fichiers maîtres (pas de copie locale).
 

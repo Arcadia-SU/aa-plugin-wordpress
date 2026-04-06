@@ -5,7 +5,7 @@ Ton objectif : lui donner une vue complète de l'état du projet pour qu'il puis
 
 ## Dossier maître des specs
 
-**Chemin :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/`
+**Chemin :** `/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/`
 
 Cette session lit directement les fichiers maîtres (pas de copie locale).
 
@@ -26,7 +26,7 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 
 Lis le fichier backlog :
 ```
-/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md
+/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md
 ```
 
 - **Si vide** (pas de "Pending Items" ou section vide) : signale "backlog vide, plugin à jour".
@@ -61,7 +61,7 @@ Lance ces vérifications en parallèle :
 
 Lis les dernières entrées du decisions log :
 ```
-/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/decisions.md
+/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/decisions.md
 ```
 
 Pour rappeler à l'utilisateur les décisions récentes et leur contexte.

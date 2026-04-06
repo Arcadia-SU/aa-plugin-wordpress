@@ -159,7 +159,7 @@
 
 ## Phase 6b : Code Review Fixes
 
-*Ref: [code-review.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/code-review.md) — Audit v2.0.1, 33 issues*
+*Ref: [code-review.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/code-review.md) — Audit v2.0.1, 33 issues*
 
 ### CRITICAL + HIGH (specs item 16)
 - [DONE] #1 — `do_action('acf/save_post')` manquant (finding 023)
@@ -284,7 +284,7 @@
 
 ## Phase 10 : Backlog G1-G3 + Bugfix
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-06*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-06*
 
 ### Bug: `featured_image_alt` not set during sideload (P2)
 - [DONE] Ajouter param `$alt = ''` à `sideload_and_set_featured_image()`
@@ -324,7 +324,7 @@
 
 ## Phase 11 : ACF Block Validation at Publish (H1)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-06*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-06*
 *Endpoints concernés : `POST /articles`, `PUT /articles/{id}`*
 
 ### H1.1 — ACF Schema Validation (before save)
@@ -358,7 +358,7 @@
 
 ## Phase 12 : accepted_formats (I1)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-07*
 *Endpoint concerné : `GET /blocks`*
 
 ### I1 — `GET /blocks` : exposer `accepted_formats` sur les champs image
@@ -369,7 +369,7 @@
 
 ## Phase 13 : ACF Bugfixes (J1-J2)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-07*
 
 ### J1 — Conversion markdown → HTML sur champs wysiwyg ACF
 - [DONE] Fix root cause: schema lookup in `custom_block()` passait le nom sans prefix (`bouton`) au lieu du nom complet (`acf/bouton`)
@@ -386,7 +386,7 @@
 
 ## Phase 14 : Backlog K1-K2
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-07*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-07*
 
 ### K1 — Include `preview_url` in GET /articles response
 - [DONE] `get_or_create_token()` sur `Arcadia_Preview` (réutilise tokens valides, évite DB writes inutiles)
@@ -402,7 +402,7 @@
 
 ## Phase 15 : Bugfix Preview URL CPT (L1)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-12*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-12*
 *Fichiers concernés : `includes/class-preview.php`, `arcadia-agents.php`, `tests/unit/PreviewUrlTest.php`, `tests/unit/bootstrap.php`*
 
 ### L1 — Fix preview URL 404 pour CPT `article`
@@ -416,7 +416,7 @@
 
 ## Phase 16 : SEO Meta-Title Separation (M1)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-12*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-12*
 *Fichiers concernés : `includes/api/trait-api-posts.php`, `tests/unit/TitleSeoSeparationTest.php`, `api-contract.md`*
 
 ### M1 — Fix: `body.title` = H1, `meta.title` = SEO meta-title
@@ -433,8 +433,8 @@
 
 ## Phase 17 : Field Schema & Calibration (FS-1→FS-4)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-20*
-*Ref: [content-model.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/content-model.md) section 6*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-20*
+*Ref: [content-model.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/content-model.md) section 6*
 
 ### FS-1 — `field_values` dans format_post()
 - [DONE] `get_fields($post->ID)` si ACF actif, sinon `{}`
@@ -466,7 +466,7 @@
 
 ## Phase 18 : Admin Scope Fix (aa-xs3)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-23*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-23*
 *Découvert: Test calibration e2e (aa-kfe) — 403 `scope_denied` sur `PUT /field-schema`*
 
 ### aa-xs3 — Ajouter `settings:write` dans les checkboxes admin
@@ -479,7 +479,7 @@
 
 ## Phase 19 : Bugfix Preview Body Vide (aa-preview)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-23*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-23*
 *Découvert: Calibration visuelle e2e (Step 5) — ScreenshotOne reçoit une page blanche*
 *Fichiers concernés : `includes/class-preview.php`*
 
@@ -494,7 +494,7 @@
 
 ## Phase 20 : Bugfix field-schema post_type filter (aa-xp8)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-24*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-24*
 *Découvert: Calibration E2E — traces Langfuse montrent `get_field_schema(post_type=article)` retournant le schéma de tous les post types*
 
 ### aa-xp8 — `GET /field-schema` ignore le paramètre `?post_type`
@@ -507,7 +507,7 @@
 
 ## Phase 21 : Backlog robustesse ACF (N1-N3)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-26*
 
 ### N1 — Robustesse champs image/file sur valeurs vides (P2)
 - [DONE] `""`, `null`, `0`, absent → ignorer (pas de sideload), stocker `0` ou vide en base
@@ -533,7 +533,7 @@
 
 ## Phase 22 : Bugfix repeater block comment + sideload warnings (O1-O2)
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-26*
 
 ### O1 — Fix: `flatten_repeater()` dans block comment cassait les templates ACF
 - [DONE] Supprimer flatten dans `custom_block()` (case `repeater` + auto-detect `default`)
@@ -551,7 +551,7 @@
 
 ## Phase 23 : ~~Dual-write ACF block data to post_meta~~ REVERTED
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-26*
 
 ### P1 — REVERTED : dual-write cassait le rendu des blocs ACF
 - [REVERTED] `write_acf_block_meta()` supprimé — les champs de blocs écrits en post_meta écrasaient les champs post-level et polluaient `get_fields()`
@@ -565,7 +565,7 @@
 
 ## Phase 24 : Repeaters flat format avec sub-field keys dans block comments
 
-*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/backlog.md) — intégré 2026-03-26*
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-03-26*
 
 ### Fix : repeaters dans les block comments — format flat ACF avec sub-field keys
 - [DONE] Registry (`get_acf_block_fields()`) expose `sub_fields` pour les champs repeater (récursif pour nested)
@@ -597,7 +597,7 @@
 
 ## Phase 25 : Pending Revisions (REV-001)
 
-*Ref: [pending-revisions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/tasks_backlog/agent-seo/plugin-wp-specs/pending-revisions.md)*
+*Ref: [pending-revisions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/pending-revisions.md)*
 *Intégré depuis backlog le 2026-04-05*
 
 ### 25.1 — CPT & Storage
