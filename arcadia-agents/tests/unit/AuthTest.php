@@ -26,12 +26,11 @@ class AuthTest extends TestCase {
     }
 
     /**
-     * Test check_scope with enabled scope.
+     * Test check_scope with enabled scope (WP admin settings only).
      */
     public function test_check_scope_enabled(): void {
         global $_test_options;
 
-        // Enable all scopes.
         $_test_options['arcadia_agents_scopes'] = array(
             'articles:read',
             'articles:write',
@@ -39,7 +38,7 @@ class AuthTest extends TestCase {
         );
 
         $auth   = \Arcadia_Auth::get_instance();
-        $result = $auth->check_scope( 'articles:read', array( 'articles:read' ) );
+        $result = $auth->check_scope( 'articles:read' );
 
         $this->assertTrue( $result );
     }
@@ -50,35 +49,13 @@ class AuthTest extends TestCase {
     public function test_check_scope_disabled_in_wp(): void {
         global $_test_options;
 
-        // Only enable articles:read.
         $_test_options['arcadia_agents_scopes'] = array( 'articles:read' );
 
         $auth   = \Arcadia_Auth::get_instance();
-        $result = $auth->check_scope( 'articles:write', array( 'articles:write' ) );
+        $result = $auth->check_scope( 'articles:write' );
 
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'scope_denied', $result->get_error_code() );
-    }
-
-    /**
-     * Test check_scope when token doesn't have scope.
-     */
-    public function test_check_scope_not_in_token(): void {
-        global $_test_options;
-
-        // Enable all scopes in WP.
-        $_test_options['arcadia_agents_scopes'] = array(
-            'articles:read',
-            'articles:write',
-            'media:read',
-        );
-
-        $auth = \Arcadia_Auth::get_instance();
-        // Token only has articles:read, but we need articles:write.
-        $result = $auth->check_scope( 'articles:write', array( 'articles:read' ) );
-
-        $this->assertInstanceOf( \WP_Error::class, $result );
-        $this->assertEquals( 'scope_not_granted', $result->get_error_code() );
     }
 
     /**
@@ -136,19 +113,49 @@ class AuthTest extends TestCase {
     }
 
     /**
-     * Test scope checking with empty token scopes defaults to allowed.
+     * Test check_scope uses default all_scopes when no option set.
      */
-    public function test_check_scope_empty_token_scopes(): void {
+    public function test_check_scope_default_all_enabled(): void {
         global $_test_options;
 
-        // Enable scope in WP.
-        $_test_options['arcadia_agents_scopes'] = array( 'articles:read' );
+        // No scopes option set — defaults to all scopes enabled.
+        unset( $_test_options['arcadia_agents_scopes'] );
 
-        $auth = \Arcadia_Auth::get_instance();
-        // Empty token scopes - should pass (WP scope is enabled, no token restriction).
-        $result = $auth->check_scope( 'articles:read', array() );
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->check_scope( 'articles:read' );
 
         $this->assertTrue( $result );
+    }
+
+    /**
+     * Test get_enabled_scopes returns current WP settings.
+     */
+    public function test_get_enabled_scopes(): void {
+        global $_test_options;
+
+        $scopes = array( 'articles:read', 'media:write' );
+        $_test_options['arcadia_agents_scopes'] = $scopes;
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->get_enabled_scopes();
+
+        $this->assertEquals( $scopes, $result );
+    }
+
+    /**
+     * Test get_enabled_scopes returns all scopes when no option set.
+     */
+    public function test_get_enabled_scopes_default(): void {
+        global $_test_options;
+
+        unset( $_test_options['arcadia_agents_scopes'] );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->get_enabled_scopes();
+
+        $this->assertCount( 13, $result );
+        $this->assertContains( 'articles:read', $result );
+        $this->assertContains( 'settings:write', $result );
     }
 
     // -------------------------------------------------------

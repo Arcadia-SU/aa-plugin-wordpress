@@ -208,32 +208,38 @@ class Arcadia_Auth {
 	}
 
 	/**
-	 * Check if a required scope is enabled.
+	 * All scopes supported by the plugin.
+	 *
+	 * @var array
+	 */
+	private static $all_scopes = array(
+		'articles:read',
+		'articles:write',
+		'articles:delete',
+		'media:read',
+		'media:write',
+		'media:delete',
+		'taxonomies:read',
+		'taxonomies:write',
+		'taxonomies:delete',
+		'site:read',
+		'redirects:read',
+		'redirects:write',
+		'settings:write',
+	);
+
+	/**
+	 * Check if a required scope is enabled in WP admin settings.
+	 *
+	 * Permissions are controlled exclusively by the admin checkboxes.
+	 * The JWT proves identity only — it no longer carries scopes.
 	 *
 	 * @param string $required_scope The scope to check.
-	 * @param array  $token_scopes   Scopes from the JWT token.
 	 * @return true|WP_Error True if scope is allowed, WP_Error otherwise.
 	 */
-	public function check_scope( $required_scope, $token_scopes = array() ) {
-		// Get enabled scopes from WP settings.
-		$all_scopes = array(
-			'articles:read',
-			'articles:write',
-			'articles:delete',
-			'media:read',
-			'media:write',
-			'media:delete',
-			'taxonomies:read',
-			'taxonomies:write',
-			'taxonomies:delete',
-			'site:read',
-			'redirects:read',
-			'redirects:write',
-			'settings:write',
-		);
-		$enabled_scopes = get_option( 'arcadia_agents_scopes', $all_scopes );
+	public function check_scope( $required_scope ) {
+		$enabled_scopes = $this->get_enabled_scopes();
 
-		// Check if scope is enabled in WP settings.
 		if ( ! in_array( $required_scope, $enabled_scopes, true ) ) {
 			return new WP_Error(
 				'scope_denied',
@@ -249,23 +255,16 @@ class Arcadia_Auth {
 			);
 		}
 
-		// Check if token has the required scope.
-		if ( ! empty( $token_scopes ) && ! in_array( $required_scope, $token_scopes, true ) ) {
-			return new WP_Error(
-				'scope_not_granted',
-				sprintf(
-					/* translators: %s: scope name */
-					__( "The token does not have the required '%s' scope.", 'arcadia-agents' ),
-					$required_scope
-				),
-				array(
-					'status'         => 403,
-					'required_scope' => $required_scope,
-				)
-			);
-		}
-
 		return true;
+	}
+
+	/**
+	 * Get the list of scopes currently enabled in WP admin settings.
+	 *
+	 * @return array Enabled scope strings.
+	 */
+	public function get_enabled_scopes() {
+		return get_option( 'arcadia_agents_scopes', self::$all_scopes );
 	}
 
 	/**
@@ -328,10 +327,9 @@ class Arcadia_Auth {
 			);
 		}
 
-		// Check scope if required.
+		// Check scope if required (WP admin settings only — JWT no longer carries scopes).
 		if ( null !== $required_scope ) {
-			$token_scopes = isset( $payload['scopes'] ) ? $payload['scopes'] : array();
-			$scope_check  = $this->check_scope( $required_scope, $token_scopes );
+			$scope_check = $this->check_scope( $required_scope );
 			if ( is_wp_error( $scope_check ) ) {
 				return $scope_check;
 			}

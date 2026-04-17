@@ -643,6 +643,27 @@
 
 ---
 
+## Phase 26 : Scopes retirés du JWT (aa-scopes)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-04-17*
+*Ref: [decisions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/decisions.md) — décision 2026-04-17*
+
+### 26.1 — Validation JWT : ignorer le champ `scopes`
+- [DONE] Retirer la lecture/vérification du champ `scopes` dans le payload JWT (`class-auth.php`)
+- [DONE] Backward compat : si un JWT contient encore `scopes`, l'ignorer silencieusement (pas d'erreur)
+- [DONE] Tests unitaires : `check_scope()` ne prend plus `$token_scopes`, `get_enabled_scopes()` (3 tests)
+
+### 26.2 — `GET /site-info` : exposer `enabled_scopes`
+- [DONE] Ajouter `enabled_scopes` dans l'objet `settings` de la réponse
+- [DONE] Liste des scopes actuellement activés via `$this->auth->get_enabled_scopes()`
+
+### 26.3 — Vérification
+- [DONE] La réponse `scope_denied` reste inchangée (checkboxes admin = source de vérité)
+- [DONE] Tests existants passent (256 tests, 771 assertions)
+- [DONE] Build OK (`./build.sh` — v0.1.18, 256 tests, 344KB)
+
+---
+
 ## Phase 7 : Publication
 
 *Note : Attendre le passage en prod de l'agent SEO*
