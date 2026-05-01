@@ -1120,4 +1120,368 @@ class AcfValidatorTest extends TestCase {
 		$this->assertArrayHasKey( 'block_index', $errors[0] );
 		$this->assertStringContainsString( 'Template error', $errors[0]['error'] );
 	}
+
+	// =========================================================================
+	// Phase 27 — Flat-keys repeater expansion (GET → PUT symmetry)
+	// =========================================================================
+
+	/**
+	 * Test: acf/numeric-list flat-keys → expand to array of rows.
+	 */
+	public function test_flat_repeater_numeric_list_expands(): void {
+		$this->register_acf_block(
+			'acf/numeric-list',
+			array(
+				array(
+					'name'       => 'list',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'List',
+					'key'        => 'field_list',
+					'sub_fields' => array(
+						array( 'name' => 'title', 'type' => 'text', 'key' => 'field_list_title' ),
+						array( 'name' => 'text',  'type' => 'wysiwyg', 'key' => 'field_list_text' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/numeric-list',
+				'properties' => array(
+					'list'         => 2,
+					'list_0_title' => 'Étape 1',
+					'list_0_text'  => 'Texte un',
+					'list_1_title' => 'Étape 2',
+					'list_1_text'  => 'Texte deux',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result, 'Flat-keys repeater should pass validation after expansion.' );
+
+		$props = $json['children'][0]['properties'];
+		$this->assertIsArray( $props['list'] );
+		$this->assertCount( 2, $props['list'] );
+		$this->assertSame( 'Étape 1', $props['list'][0]['title'] );
+		$this->assertSame( 'Texte un', $props['list'][0]['text'] );
+		$this->assertSame( 'Étape 2', $props['list'][1]['title'] );
+		$this->assertSame( 'Texte deux', $props['list'][1]['text'] );
+		// Flat keys consumed.
+		$this->assertArrayNotHasKey( 'list_0_title', $props );
+		$this->assertArrayNotHasKey( 'list_1_text', $props );
+	}
+
+	/**
+	 * Test: acf/faq flat-keys → expand to array of rows.
+	 */
+	public function test_flat_repeater_faq_expands(): void {
+		$this->register_acf_block(
+			'acf/faq',
+			array(
+				array(
+					'name'       => 'faq',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'FAQ',
+					'key'        => 'field_faq',
+					'sub_fields' => array(
+						array( 'name' => 'question', 'type' => 'text', 'key' => 'field_faq_question' ),
+						array( 'name' => 'answer',   'type' => 'wysiwyg', 'key' => 'field_faq_answer' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/faq',
+				'properties' => array(
+					'faq'            => 1,
+					'faq_0_question' => 'Q?',
+					'faq_0_answer'   => 'A.',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$rows = $json['children'][0]['properties']['faq'];
+		$this->assertSame( array( array( 'question' => 'Q?', 'answer' => 'A.' ) ), $rows );
+	}
+
+	/**
+	 * Test: acf/pushs flat-keys → expand to array of rows.
+	 */
+	public function test_flat_repeater_pushs_expands(): void {
+		$this->register_acf_block(
+			'acf/pushs',
+			array(
+				array(
+					'name'       => 'pushs',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'Pushs',
+					'key'        => 'field_pushs',
+					'sub_fields' => array(
+						array( 'name' => 'title', 'type' => 'text', 'key' => 'field_pushs_title' ),
+						array( 'name' => 'link',  'type' => 'url',  'key' => 'field_pushs_link' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/pushs',
+				'properties' => array(
+					'pushs'         => 3,
+					'pushs_0_title' => 'A',
+					'pushs_0_link'  => 'https://a',
+					'pushs_1_title' => 'B',
+					'pushs_1_link'  => 'https://b',
+					'pushs_2_title' => 'C',
+					'pushs_2_link'  => 'https://c',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$rows = $json['children'][0]['properties']['pushs'];
+		$this->assertCount( 3, $rows );
+		$this->assertSame( 'A', $rows[0]['title'] );
+		$this->assertSame( 'https://b', $rows[1]['link'] );
+		$this->assertSame( 'C', $rows[2]['title'] );
+	}
+
+	/**
+	 * Test: acf/table flat-keys (nested repeater) → recursive expand.
+	 *
+	 * Outer repeater "table" has sub-field "cells" which is itself a repeater.
+	 * Flat shape:  table = N, table_<i>_label = ..., table_<i>_cells = M,
+	 *              table_<i>_cells_<j>_value = ...
+	 */
+	public function test_flat_repeater_table_nested_expands(): void {
+		$this->register_acf_block(
+			'acf/table',
+			array(
+				array(
+					'name'       => 'table',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'Table',
+					'key'        => 'field_table',
+					'sub_fields' => array(
+						array( 'name' => 'label', 'type' => 'text', 'key' => 'field_table_label' ),
+						array(
+							'name'       => 'cells',
+							'type'       => 'repeater',
+							'key'        => 'field_table_cells',
+							'sub_fields' => array(
+								array( 'name' => 'value', 'type' => 'text', 'key' => 'field_table_cells_value' ),
+							),
+						),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/table',
+				'properties' => array(
+					'table'                 => 2,
+					'table_0_label'         => 'Row A',
+					'table_0_cells'         => 2,
+					'table_0_cells_0_value' => 'a1',
+					'table_0_cells_1_value' => 'a2',
+					'table_1_label'         => 'Row B',
+					'table_1_cells'         => 1,
+					'table_1_cells_0_value' => 'b1',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$rows = $json['children'][0]['properties']['table'];
+		$this->assertCount( 2, $rows );
+		$this->assertSame( 'Row A', $rows[0]['label'] );
+		$this->assertIsArray( $rows[0]['cells'] );
+		$this->assertSame( 'a1', $rows[0]['cells'][0]['value'] );
+		$this->assertSame( 'a2', $rows[0]['cells'][1]['value'] );
+		$this->assertCount( 1, $rows[1]['cells'] );
+		$this->assertSame( 'b1', $rows[1]['cells'][0]['value'] );
+	}
+
+	/**
+	 * Test: synthetic repeater (arbitrary block name and sub-fields) — generic pattern.
+	 */
+	public function test_flat_repeater_synthetic_pattern(): void {
+		$this->register_acf_block(
+			'acf/synthetic',
+			array(
+				array(
+					'name'       => 'items',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'Items',
+					'key'        => 'field_items',
+					'sub_fields' => array(
+						array( 'name' => 'a', 'type' => 'text', 'key' => 'field_items_a' ),
+						array( 'name' => 'b', 'type' => 'number', 'key' => 'field_items_b' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/synthetic',
+				'properties' => array(
+					'items'     => 2,
+					'items_0_a' => 'x',
+					'items_0_b' => 1,
+					'items_1_a' => 'y',
+					'items_1_b' => 2,
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$rows = $json['children'][0]['properties']['items'];
+		$this->assertCount( 2, $rows );
+		$this->assertSame( array( 'a' => 'x', 'b' => 1 ), $rows[0] );
+		$this->assertSame( array( 'a' => 'y', 'b' => 2 ), $rows[1] );
+	}
+
+	/**
+	 * Test: array-of-rows shape remains accepted (regression / backward compat).
+	 */
+	public function test_array_of_rows_remains_accepted(): void {
+		$this->register_acf_block(
+			'acf/numeric-list',
+			array(
+				array(
+					'name'       => 'list',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'List',
+					'key'        => 'field_list',
+					'sub_fields' => array(
+						array( 'name' => 'title', 'type' => 'text', 'key' => 'field_list_title' ),
+					),
+				),
+			)
+		);
+
+		$rows = array(
+			array( 'title' => 'One' ),
+			array( 'title' => 'Two' ),
+		);
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/numeric-list',
+				'properties' => array( 'list' => $rows ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		// Untouched.
+		$this->assertSame( $rows, $json['children'][0]['properties']['list'] );
+	}
+
+	/**
+	 * Test: flat-keys input strips ACF field-key references that the agent
+	 * may have echoed from GET (`_<field>`, `_<field>_<n>_<sub>`).
+	 */
+	public function test_flat_repeater_strips_field_key_refs(): void {
+		$this->register_acf_block(
+			'acf/faq',
+			array(
+				array(
+					'name'       => 'faq',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'FAQ',
+					'key'        => 'field_faq',
+					'sub_fields' => array(
+						array( 'name' => 'question', 'type' => 'text', 'key' => 'field_faq_question' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/faq',
+				'properties' => array(
+					'faq'             => 1,
+					'_faq'            => 'field_faq',
+					'faq_0_question'  => 'Q?',
+					'_faq_0_question' => 'field_faq_question',
+				),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$props = $json['children'][0]['properties'];
+		$this->assertArrayNotHasKey( '_faq', $props );
+		$this->assertArrayNotHasKey( '_faq_0_question', $props );
+		$this->assertSame( array( array( 'question' => 'Q?' ) ), $props['faq'] );
+	}
+
+	/**
+	 * Test: empty repeater (count = 0) expands to empty array.
+	 */
+	public function test_flat_repeater_empty_count_expands_to_array(): void {
+		$this->register_acf_block(
+			'acf/faq',
+			array(
+				array(
+					'name'       => 'faq',
+					'type'       => 'repeater',
+					'required'   => false,
+					'label'      => 'FAQ',
+					'key'        => 'field_faq',
+					'sub_fields' => array(
+						array( 'name' => 'question', 'type' => 'text', 'key' => 'field_faq_question' ),
+					),
+				),
+			)
+		);
+
+		$json = $this->make_json( array(
+			array(
+				'type'       => 'acf/faq',
+				'properties' => array( 'faq' => 0 ),
+			),
+		) );
+
+		$validator = \Arcadia_ACF_Validator::get_instance();
+		$result    = $validator->validate_and_preprocess( $json, 'post' );
+
+		$this->assertTrue( $result );
+		$this->assertSame( array(), $json['children'][0]['properties']['faq'] );
+	}
 }
