@@ -455,13 +455,18 @@ trait Arcadia_API_Posts_Handler {
 	 * Format parsed blocks recursively for API response.
 	 *
 	 * Filters out empty/whitespace-only blocks (null blockName)
-	 * and includes innerBlocks recursively.
+	 * and includes innerBlocks recursively. For ACF blocks, coerces
+	 * `attrs.data` field values to canonical PHP types using the same
+	 * helper PUT relies on, so a GET → store → PUT round-trip is
+	 * identity-passthrough for AA (no manual casting needed downstream).
 	 *
 	 * @param array $parsed_blocks Array from parse_blocks().
 	 * @return array Formatted block list.
 	 */
 	private function format_parsed_blocks( $parsed_blocks ) {
-		$blocks = array();
+		$blocks   = array();
+		$registry = Arcadia_Block_Registry::get_instance();
+		$coercer  = new Arcadia_ACF_Coercer();
 
 		foreach ( $parsed_blocks as $block ) {
 			// Skip empty/whitespace blocks (null blockName).
@@ -469,9 +474,22 @@ trait Arcadia_API_Posts_Handler {
 				continue;
 			}
 
+			$attrs = ! empty( $block['attrs'] ) ? $block['attrs'] : array();
+
+			if (
+				is_array( $attrs )
+				&& isset( $attrs['data'] ) && is_array( $attrs['data'] )
+				&& str_starts_with( (string) $block['blockName'], 'acf/' )
+			) {
+				$schema = $registry->get_block_schema( $block['blockName'] );
+				if ( is_array( $schema ) ) {
+					$coercer->coerce_properties_to_canonical( $attrs['data'], $schema );
+				}
+			}
+
 			$formatted = array(
 				'blockName'  => $block['blockName'],
-				'attrs'      => ! empty( $block['attrs'] ) ? $block['attrs'] : new \stdClass(),
+				'attrs'      => ! empty( $attrs ) ? $attrs : new \stdClass(),
 			);
 
 			// Include innerHTML for content inspection.

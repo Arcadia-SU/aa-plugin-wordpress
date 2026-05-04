@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-05-04 (Phase 28 code+tests OK — v0.1.20, 279 tests verts)
+**Dernière mise à jour :** 2026-05-04 (Phase 29 code+tests+build OK — v0.1.25, 322 tests verts ; déploiement preprod + E2E pending)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -83,9 +83,9 @@ Les types ACF Pro repeater (`acf/numeric-list`, `acf/faq`, `acf/pushs`, `acf/tab
 
 ### 27.3 — Validation & déploiement
 - [x] `./build.sh` passe (tous les checks bloquants) — v0.1.19, 264 tests OK
-- [ ] Déploiement standalone sur preprod-iselection.vertuelle.com
-- [ ] Validation E2E : push article iSelection cms_post_id 20803 (contenant repeater) sans 422
-- [ ] Fermer bead `aa-iedn` côté AA
+- [x] Déploiement standalone sur preprod-iselection.vertuelle.com (via v0.1.20)
+- [x] Validation E2E : push article iSelection cms_post_id 20803 (contenant repeater) sans 422
+- [x] Fermer bead `aa-iedn` côté AA
 
 ---
 
@@ -131,14 +131,56 @@ ACF Pro stocke les `true_false` en `wp_postmeta` LONGTEXT → GET retourne `"1"`
 ### 28.4 — Validation & déploiement
 - [x] Tous les tests existants verts + nouveaux verts (279 tests, 928 assertions)
 - [x] `./build.sh` passe — v0.1.20, zip 348KB
-- [ ] Déploiement preprod-iselection.vertuelle.com
-- [ ] Validation E2E : `python -m scripts.reingest_iselection_legacy --force` puis smoke push `cms_post_id=20723` → 200
-- [ ] Fermer bead `aa-e3m1` (asymétrie `acf/button.icon`) côté AA
+- [x] Déploiement preprod-iselection.vertuelle.com
+- [x] Validation E2E : `python -m scripts.reingest_iselection_legacy --force` puis smoke push `cms_post_id=20723` → 200
+- [x] Fermer bead `aa-e3m1` (asymétrie `acf/button.icon`) côté AA
 
 ### Notes coordination
 - AA backend : patch parallèle de `_parse_error_message` (`wordpress_site_connector.py:205-226`) pour lire `errors` aussi sous `data.errors`. **Aucun changement plugin requis** — le shape émis est correct.
 - **Hors scope :** sites sans ACF (gating `is_acf_available()` OK), core Gutenberg (pas d'asymétrie), migration data pré-existante (AA re-ingest via scripts dédiés).
 - **À ne pas faire :** relaxer `check_field_type()`, ajouter coercion côté AA backend, modifier la sérialisation GET (self-heal au prochain round-trip une fois PUT canonique).
+
+---
+
+## Phase 29 : Coercion canonique côté GET (long-term cleanup)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-05-04*
+*Constat post Phase 28 : asymétrie GET/PUT — PUT auto-coerce canonique, GET retourne encore le shape ACF Pro brut (`is_lightbox: "1"` au lieu de `true`). Observé sur `cms_post_id=20723` après ré-ingestion.*
+*Priorité : **non-bloquant**, pas d'urgence (le PUT round-trip self-heal). Strictement system-cleanliness.*
+
+### Contexte
+Phase 28 a fermé l'asymétrie côté PUT (validator coerce avant `check_field_type()`). Le GET émet toujours le shape brut ACF (string `"1"`/`"0"` pour `true_false`, numeric strings pour `image`, etc.). Conséquence : la DB AA ne devient jamais canonique car chaque ré-ingestion re-pollue avec les strings legacy. Fonctionnellement OK (PUT self-heal), contractuellement asymétrique pour tout consumer (AA ou futur client du plugin).
+
+**Goal :** GET émet les mêmes types canoniques que le validator enforce au PUT — boucle fermée, identity-passthrough end-to-end sans dépendre du validator comme étape de self-heal.
+
+### 29.1 — Application au point de sérialisation GET
+- [x] Localisé : `format_parsed_blocks()` dans `trait-api-posts.php` — endpoint `GET /articles/{id}/blocks` (utilisé par AA `parse_article_block` qui lit `attrs.data` pour les blocs `acf/*`)
+- [x] Réutilisation de `Arcadia_ACF_Coercer::coerce_properties_to_canonical()` (single source of truth)
+- [x] Schema via `Arcadia_Block_Registry::get_block_schema()`
+- [x] Décision : **changement direct** (pas de query param fence) — AA est le seul consumer connu, simplicité prime
+
+### 29.2 — Tests unitaires
+- [x] iSelection regression : `acf/text-image` (`is_lightbox: "1"`, `image: "30225"`) → bool/int canoniques
+- [x] Identity round-trip : GET puis re-coerce = no-op (idempotence)
+- [x] Non-ACF blocks (`core/*`) → unchanged
+- [x] Unknown ACF block (pas dans registry) → passthrough sans crash
+- [x] Nested ACF dans `innerBlocks` → coercion récursive
+- [x] Repeater rows → coercion sub-fields
+- [x] Régression : 322 tests verts (était 279 → +43 incluant les 7 nouveaux ici)
+
+### 29.3 — Validation & déploiement
+- [x] `./build.sh` passe — v0.1.25, zip 356KB
+- [ ] Déploiement preprod-iselection.vertuelle.com
+- [ ] Validation E2E : `python -m scripts.reingest_iselection_legacy --force` puis SQL spot-check :
+  ```sql
+  SELECT jsonb_typeof(jsonb_path_query_first(article_json, '$.children[*] ? (@.type == "acf/text-image")') -> 'properties' -> 'is_lightbox')
+  FROM arcadia_agents.seo_articles WHERE workspace_id = '<iselection>' LIMIT 5;
+  -- expected: 'boolean' on every row
+  ```
+
+### Notes coordination
+- **Hors scope :** comportement pour clients non-AA. Si quelqu'un d'autre lit ces endpoints et attend le shape ACF brut, le changement est observable. Fence par query param ou nouvelle version si nécessaire.
+- **Pas un blocker Path A** — grouper avec d'autres polish GET-side s'il y en a.
 
 ---
 
