@@ -251,7 +251,7 @@ trait Arcadia_API_Media_Handler {
 	 * @param string $alt     Optional alt text for the image.
 	 * @return int|WP_Error Attachment ID or error.
 	 */
-	private function sideload_and_set_featured_image( $post_id, $url, $alt = '' ) {
+	public function sideload_and_set_featured_image( $post_id, $url, $alt = '' ) {
 		$attachment_id = $this->sideload_image( $url );
 
 		if ( is_wp_error( $attachment_id ) ) {

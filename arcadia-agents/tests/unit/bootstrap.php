@@ -843,7 +843,7 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
             'post_date'      => date( 'Y-m-d H:i:s' ),
             'post_modified'  => date( 'Y-m-d H:i:s' ),
             'post_author'    => isset( $post_data['post_author'] ) ? $post_data['post_author'] : 1,
-            'post_name'      => '',
+            'post_name'      => isset( $post_data['post_name'] ) ? $post_data['post_name'] : '',
             'post_mime_type' => '',
         );
 
@@ -1185,3 +1185,6 @@ require_once dirname( __DIR__, 2 ) . '/includes/class-preview.php';
 
 // Load revisions class for testing.
 require_once dirname( __DIR__, 2 ) . '/includes/class-revisions.php';
+
+// Load post builder (used by trait-api-posts).
+require_once dirname( __DIR__, 2 ) . '/includes/class-post-builder.php';

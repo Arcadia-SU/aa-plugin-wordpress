@@ -472,7 +472,7 @@ trait Arcadia_API_Taxonomies_Handler {
 	 * @param string $taxonomy Taxonomy name.
 	 * @return array{ids: int[], errors: string[]} Term IDs and error messages.
 	 */
-	private function get_or_create_terms( $names, $taxonomy ) {
+	public function get_or_create_terms( $names, $taxonomy ) {
 		$term_ids = array();
 		$errors   = array();
 

@@ -151,7 +151,7 @@ trait Arcadia_API_ACF_Fields_Handler {
 	 * @param string $post_content The rendered post_content (for wysiwyg fallback).
 	 * @return true|WP_Error True on success, WP_Error if ACF unavailable.
 	 */
-	private function process_acf_fields( $post_id, $acf_fields, $post_type, $post_content ) {
+	public function process_acf_fields( $post_id, $acf_fields, $post_type, $post_content ) {
 		if ( ! function_exists( 'update_field' ) ) {
 			return new \WP_Error(
 				'acf_unavailable',
@@ -224,7 +224,7 @@ trait Arcadia_API_ACF_Fields_Handler {
 	 * @param int    $post_id   The post ID.
 	 * @param string $post_type The post type slug.
 	 */
-	private function auto_populate_acf_fields( $post_id, $post_type ) {
+	public function auto_populate_acf_fields( $post_id, $post_type ) {
 		if ( ! function_exists( 'update_field' ) ) {
 			return;
 		}

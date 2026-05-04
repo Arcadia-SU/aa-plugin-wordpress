@@ -203,7 +203,7 @@ trait Arcadia_API_Field_Schema_Handler {
 	 * @param array  $body      The original request body.
 	 * @param array  $meta      The meta array from the request.
 	 */
-	private function apply_field_schema_mappings( $post_id, $post_type, $body, $meta ) {
+	public function apply_field_schema_mappings( $post_id, $post_type, $body, $meta ) {
 		if ( ! function_exists( 'update_field' ) ) {
 			return;
 		}

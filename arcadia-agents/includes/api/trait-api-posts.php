@@ -213,204 +213,34 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Validate post status.
-		$status           = isset( $body['status'] ) ? sanitize_text_field( $body['status'] ) : 'draft';
-		$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
-		if ( ! in_array( $status, $allowed_statuses, true ) ) {
-			return new WP_Error(
-				'invalid_status',
-				sprintf(
-					/* translators: 1: received status, 2: allowed statuses */
-					__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
-					$status,
-					implode( ', ', $allowed_statuses )
-				),
-				array( 'status' => 400 )
-			);
+		// Build post_data (status validation, title/slug/excerpt, content rendering).
+		$builder = new Arcadia_Post_Builder( $this->blocks );
+		$built   = $builder->build_post_data( $body, $meta, $post_type );
+		if ( is_wp_error( $built ) ) {
+			return $built;
 		}
 
-		// Force Draft override (aa_force_draft admin setting).
-		$force_draft_applied = false;
-		if ( get_option( 'aa_force_draft', false ) ) {
-			$status              = 'draft';
-			$force_draft_applied = true;
-		}
+		$post_data                = $built['post_data'];
+		$post_data['post_author'] = $post_author;
+		$rendered_post_content    = $built['rendered_content'];
+		$force_draft_applied      = $built['force_draft_applied'];
 
-		// Build post data.
-		$post_data = array(
-			'post_type'   => $post_type,
-			'post_status' => $status,
-			'post_author' => $post_author,
-		);
-
-		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
-		// body.title takes priority for post_title; meta.title is only a fallback.
-		if ( ! empty( $body['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		}
-
-		// Slug.
-		if ( ! empty( $meta['slug'] ) ) {
-			$post_data['post_name'] = sanitize_title( $meta['slug'] );
-		}
-
-		// Excerpt / meta description.
-		if ( ! empty( $meta['description'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
-		}
-
-		// Top-level excerpt overrides meta.description (allows empty string to clear).
-		if ( isset( $body['excerpt'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
-		}
-
-		// Content: convert JSON structure to blocks if present.
-		// Support both top-level structure and nested in 'content' key.
-		$content_data = $body;
-		if ( isset( $body['content'] ) && is_array( $body['content'] ) ) {
-			// Content is nested in 'content' key (API wrapper format).
-			$content_data = $body['content'];
-
-			// Also extract meta from nested content if not already at top level.
-			if ( empty( $meta ) && ! empty( $content_data['meta'] ) ) {
-				$meta = $content_data['meta'];
-
-				// Apply meta values that weren't set yet.
-				if ( empty( $post_data['post_title'] ) && ! empty( $meta['title'] ) ) {
-					$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-				}
-				if ( empty( $post_data['post_name'] ) && ! empty( $meta['slug'] ) ) {
-					$post_data['post_name'] = sanitize_title( $meta['slug'] );
-				}
-				if ( empty( $post_data['post_excerpt'] ) && ! empty( $meta['description'] ) ) {
-					$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
-				}
-			}
-		}
-
-		// Check for structured content (h1 + sections/children).
-		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $content_data, $post_type );
-			if ( is_wp_error( $content ) ) {
-				return $content;
-			}
-			$post_data['post_content'] = $content;
-		} elseif ( ! empty( $body['content'] ) && is_string( $body['content'] ) ) {
-			// Direct content (HTML or plain text).
-			$post_data['post_content'] = wp_kses_post( $body['content'] );
-		}
-
-		// Set current user so wp_insert_post() grants unfiltered_html capability.
-		// Without this, wp_filter_post_kses encodes block comments containing HTML.
-		$original_user_id = get_current_user_id();
-		wp_set_current_user( $post_author );
-
-		// Save rendered post_content before wp_slash for ACF wysiwyg fallback.
-		$rendered_post_content = $post_data['post_content'] ?? '';
-
-		// Slash data for wp_insert_post() which internally calls wp_unslash().
-		// Without this, backslashes in JSON block data (e.g. escaped quotes in
-		// href attributes) are stripped, breaking the block JSON structure.
-		$post_data = wp_slash( $post_data );
-
-		// Create the post.
-		$post_id = wp_insert_post( $post_data, true );
-
-		wp_set_current_user( $original_user_id );
-
+		$post_id = $builder->write_post( $post_data, $post_author );
 		if ( is_wp_error( $post_id ) ) {
 			return $post_id;
 		}
 
-		// Re-attach sideloaded images from H1.2 validation (created with post_parent=0).
-		if ( Arcadia_Blocks::is_acf_available() ) {
-			$acf_validator  = Arcadia_ACF_Validator::get_instance();
-			$sideloaded_ids = $acf_validator->get_and_clear_sideloaded_ids();
-			foreach ( $sideloaded_ids as $att_id ) {
-				wp_update_post( array( 'ID' => $att_id, 'post_parent' => $post_id ) );
-			}
-		}
-
-		// Set categories and tags, collecting any creation warnings.
-		$taxonomy_warnings = array();
-
-		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
-			$cat_result = $this->get_or_create_terms( $meta['categories'], 'category' );
-			wp_set_post_categories( $post_id, $cat_result['ids'] );
-			$taxonomy_warnings = array_merge( $taxonomy_warnings, $cat_result['errors'] );
-		}
-
-		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			$tag_result = $this->get_or_create_terms( $meta['tags'], 'post_tag' );
-			wp_set_post_tags( $post_id, $tag_result['ids'] );
-			$taxonomy_warnings = array_merge( $taxonomy_warnings, $tag_result['errors'] );
-		}
-
-		// Handle featured image from URL.
-		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$fi_result = $this->sideload_and_set_featured_image(
-				$post_id,
-				$meta['featured_image_url'],
-				$meta['featured_image_alt'] ?? ''
-			);
-			if ( is_wp_error( $fi_result ) ) {
-				$taxonomy_warnings[] = sprintf(
-					'Featured image sideload failed: %s',
-					$fi_result->get_error_message()
-				);
-			}
-		}
-
-		// Store SEO meta: meta.title = SEO meta-title (distinct from post_title/H1).
-		if ( ! empty( $meta['title'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
-		}
-		if ( ! empty( $meta['description'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
-		}
-
-		// Process ACF fields: explicit payload or auto-populate from content.
-		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ) {
-			$acf_result = $this->process_acf_fields(
-				$post_id, $body['acf_fields'], $post_type, $rendered_post_content
-			);
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		} else {
-			// No explicit acf_fields — create safe ACF references.
-			// Ensures get_fields() returns an array (not false), preventing
-			// fatal errors in themes that don't guard against false.
-			$this->auto_populate_acf_fields( $post_id, $post_type );
-		}
-
-		// FS-4: Auto-apply field schema mappings.
-		$this->apply_field_schema_mappings( $post_id, $post_type, $body, $meta );
-
-		// Always set _acf_changed when ACF is active (finding 023).
-		if ( function_exists( 'update_field' ) ) {
-			update_post_meta( $post_id, '_acf_changed', 1 );
-		}
-
-		// Trigger ACF save hook to create field reference entries (finding 023).
-		if ( function_exists( 'update_field' ) ) {
-			do_action( 'acf/save_post', $post_id );
-		}
-
-		// Tag post as created by Arcadia (source tracking).
-		if ( taxonomy_exists( 'arcadia_source' ) ) {
-			wp_set_object_terms( $post_id, 'arcadia', 'arcadia_source' );
-		}
-
-		// H1.3 — Render test: catch template-level errors after full setup.
-		if ( Arcadia_Blocks::is_acf_available() && function_exists( 'render_block' ) ) {
-			$acf_validator = Arcadia_ACF_Validator::get_instance();
-			$render_result = $acf_validator->render_test( $post_id );
-			if ( is_wp_error( $render_result ) ) {
-				return $render_result;
-			}
+		$finalize = $builder->finalize_post(
+			(int) $post_id,
+			$body,
+			$meta,
+			$post_type,
+			$rendered_post_content,
+			$this,
+			array( 'is_create' => true )
+		);
+		if ( is_wp_error( $finalize ) ) {
+			return $finalize;
 		}
 
 		$post = get_post( $post_id );
@@ -437,8 +267,8 @@ trait Arcadia_API_Posts_Handler {
 			$response_data['force_draft_applied'] = true;
 		}
 
-		if ( ! empty( $taxonomy_warnings ) ) {
-			$response_data['warnings'] = $taxonomy_warnings;
+		if ( ! empty( $finalize['warnings'] ) ) {
+			$response_data['warnings'] = $finalize['warnings'];
 		}
 
 		return new WP_REST_Response( $response_data, 201 );
@@ -479,57 +309,6 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		$post_data = array( 'ID' => $post_id );
-
-		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
-		// body.title takes priority for post_title; meta.title is only a fallback.
-		if ( ! empty( $body['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		}
-
-		// Update slug.
-		if ( ! empty( $meta['slug'] ) ) {
-			$post_data['post_name'] = sanitize_title( $meta['slug'] );
-		}
-
-		// Update excerpt.
-		if ( ! empty( $meta['description'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
-		}
-
-		// Top-level excerpt overrides meta.description (allows empty string to clear).
-		if ( isset( $body['excerpt'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
-		}
-
-		// Update status.
-		$force_draft_applied = false;
-		if ( ! empty( $body['status'] ) ) {
-			$status           = sanitize_text_field( $body['status'] );
-			$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
-			if ( ! in_array( $status, $allowed_statuses, true ) ) {
-				return new WP_Error(
-					'invalid_status',
-					sprintf(
-						/* translators: 1: received status, 2: allowed statuses */
-						__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
-						$status,
-						implode( ', ', $allowed_statuses )
-					),
-					array( 'status' => 400 )
-				);
-			}
-			$post_data['post_status'] = $status;
-		}
-
-		// Force Draft override (aa_force_draft admin setting).
-		if ( get_option( 'aa_force_draft', false ) ) {
-			$post_data['post_status'] = 'draft';
-			$force_draft_applied      = true;
-		}
-
 		// Pending Revision: store as revision instead of live update.
 		// pending_revision takes priority over force_draft (early return = no wp_update_post).
 		$pending_revision_flag = ! empty( $body['pending_revision'] );
@@ -567,127 +346,33 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Update content.
-		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $body, $post->post_type );
-			if ( is_wp_error( $content ) ) {
-				return $content;
-			}
-			$post_data['post_content'] = $content;
-		} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
-			$post_data['post_content'] = wp_kses_post( $body['content'] );
+		// Build post_data (status validation, title/slug/excerpt, content rendering).
+		$builder = new Arcadia_Post_Builder( $this->blocks );
+		$built   = $builder->build_post_data( $body, $meta, $post->post_type, $post );
+		if ( is_wp_error( $built ) ) {
+			return $built;
 		}
 
-		// Set current user so wp_update_post() grants unfiltered_html capability.
-		$original_user_id = get_current_user_id();
-		$post             = get_post( $post_id );
-		if ( $post ) {
-			wp_set_current_user( $post->post_author );
-		}
+		$post_data             = $built['post_data'];
+		$rendered_post_content = $built['rendered_content'];
+		$force_draft_applied   = $built['force_draft_applied'];
 
-		// Save rendered post_content before wp_slash for ACF wysiwyg fallback.
-		$rendered_post_content = $post_data['post_content'] ?? '';
-
-		// Slash data for wp_update_post() which internally calls wp_unslash().
-		$post_data = wp_slash( $post_data );
-
-		$result = wp_update_post( $post_data, true );
-
-		wp_set_current_user( $original_user_id );
-
+		$result = $builder->write_post( $post_data, (int) $post->post_author );
 		if ( is_wp_error( $result ) ) {
 			return $result;
 		}
 
-		// Re-attach sideloaded images from H1.2 validation (created with post_parent=0).
-		if ( Arcadia_Blocks::is_acf_available() ) {
-			$acf_validator  = Arcadia_ACF_Validator::get_instance();
-			$sideloaded_ids = $acf_validator->get_and_clear_sideloaded_ids();
-			foreach ( $sideloaded_ids as $att_id ) {
-				wp_update_post( array( 'ID' => $att_id, 'post_parent' => $post_id ) );
-			}
-		}
-
-		// Append mode: add taxonomies instead of replacing (finding #22).
-		$append = ! empty( $body['append_taxonomies'] );
-
-		// Update categories and tags, collecting any creation warnings.
-		$taxonomy_warnings = array();
-
-		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
-			$cat_result = $this->get_or_create_terms( $meta['categories'], 'category' );
-			wp_set_post_categories( $post_id, $cat_result['ids'], $append );
-			$taxonomy_warnings = array_merge( $taxonomy_warnings, $cat_result['errors'] );
-		}
-
-		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			$tag_result = $this->get_or_create_terms( $meta['tags'], 'post_tag' );
-			wp_set_post_tags( $post_id, $tag_result['ids'], $append );
-			$taxonomy_warnings = array_merge( $taxonomy_warnings, $tag_result['errors'] );
-		}
-
-		// Update featured image.
-		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$fi_result = $this->sideload_and_set_featured_image(
-				$post_id,
-				$meta['featured_image_url'],
-				$meta['featured_image_alt'] ?? ''
-			);
-			if ( is_wp_error( $fi_result ) ) {
-				$taxonomy_warnings[] = sprintf(
-					'Featured image sideload failed: %s',
-					$fi_result->get_error_message()
-				);
-			}
-		}
-
-		// Update SEO meta.
-		if ( ! empty( $meta['title'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
-		}
-		if ( ! empty( $meta['description'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
-		}
-
-		// Process ACF fields: explicit payload or auto-populate from content.
-		$content_for_acf = $rendered_post_content;
-		if ( empty( $content_for_acf ) ) {
-			$existing = get_post( $post_id );
-			$content_for_acf = $existing ? $existing->post_content : '';
-		}
-
-		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ) {
-			$acf_result = $this->process_acf_fields(
-				$post_id, $body['acf_fields'], $post->post_type, $content_for_acf
-			);
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		} else {
-			// No explicit acf_fields — create safe ACF references.
-			$this->auto_populate_acf_fields( $post_id, $post->post_type );
-		}
-
-		// FS-4: Auto-apply field schema mappings.
-		$this->apply_field_schema_mappings( $post_id, $post->post_type, $body, $meta );
-
-		// Always set _acf_changed when ACF is active (finding 023).
-		if ( function_exists( 'update_field' ) ) {
-			update_post_meta( $post_id, '_acf_changed', 1 );
-		}
-
-		// Trigger ACF save hook to create field reference entries (finding 023).
-		if ( function_exists( 'update_field' ) ) {
-			do_action( 'acf/save_post', $post_id );
-		}
-
-		// H1.3 — Render test: catch template-level errors after full setup.
-		if ( Arcadia_Blocks::is_acf_available() && function_exists( 'render_block' ) ) {
-			$acf_validator = Arcadia_ACF_Validator::get_instance();
-			$render_result = $acf_validator->render_test( $post_id );
-			if ( is_wp_error( $render_result ) ) {
-				return $render_result;
-			}
+		$finalize = $builder->finalize_post(
+			(int) $post_id,
+			$body,
+			$meta,
+			$post->post_type,
+			$rendered_post_content,
+			$this,
+			array( 'is_create' => false )
+		);
+		if ( is_wp_error( $finalize ) ) {
+			return $finalize;
 		}
 
 		$post = get_post( $post_id );
@@ -713,8 +398,8 @@ trait Arcadia_API_Posts_Handler {
 			$response_data['force_draft_applied'] = true;
 		}
 
-		if ( ! empty( $taxonomy_warnings ) ) {
-			$response_data['warnings'] = $taxonomy_warnings;
+		if ( ! empty( $finalize['warnings'] ) ) {
+			$response_data['warnings'] = $finalize['warnings'];
 		}
 
 		return new WP_REST_Response( $response_data, 200 );
