@@ -105,10 +105,51 @@ class Arcadia_API {
 	}
 
 	/**
-	 * Register all REST routes.
+	 * Register all REST routes — orchestrator only.
+	 *
+	 * Route definitions are split per domain to keep the file navigable.
 	 */
 	public function register_routes() {
-		// Articles endpoints.
+		$this->register_article_routes();
+		$this->register_page_routes();
+		$this->register_media_routes();
+		$this->register_taxonomy_routes();
+		$this->register_site_routes();
+		$this->register_redirect_routes();
+		$this->register_field_schema_routes();
+		$this->register_block_routes();
+		$this->register_validation_routes();
+		$this->register_revision_routes();
+	}
+
+	// =========================================================================
+	// Permission gate
+	// =========================================================================
+
+	/**
+	 * Authenticate a request against a required scope.
+	 *
+	 * Single permission gate used by every route via a closure callback.
+	 * Returns true on success or the underlying WP_Error from auth.
+	 *
+	 * @param WP_REST_Request $request The REST request.
+	 * @param string          $scope   Required scope, e.g. 'articles:read'.
+	 * @return bool|WP_Error
+	 */
+	private function check_permission( $request, $scope ) {
+		$result = $this->auth->authenticate_request( $request, $scope );
+		return is_wp_error( $result ) ? $result : true;
+	}
+
+	// =========================================================================
+	// Route groups
+	// =========================================================================
+
+	/**
+	 * Article routes: /articles, /articles/{id}, /articles/{id}/blocks,
+	 * /articles/{id}/preview-url, /articles/{id}/featured-image.
+	 */
+	private function register_article_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/articles',
@@ -116,12 +157,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_posts' ),
-					'permission_callback' => array( $this, 'check_articles_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'create_post' ),
-					'permission_callback' => array( $this, 'check_articles_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
 				),
 			)
 		);
@@ -133,57 +174,58 @@ class Arcadia_API {
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_post' ),
-					'permission_callback' => array( $this, 'check_articles_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
 				),
 				array(
 					'methods'             => 'DELETE',
 					'callback'            => array( $this, 'delete_post' ),
-					'permission_callback' => array( $this, 'check_articles_delete_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:delete' ),
 				),
 			)
 		);
 
-		// Article blocks structure endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/articles/(?P<id>\d+)/blocks',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_article_blocks' ),
-				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 
-		// Preview URL endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/articles/(?P<id>\d+)/preview-url',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_preview_url' ),
-				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 
-		// Featured image endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/articles/(?P<id>\d+)/featured-image',
 			array(
 				'methods'             => 'PUT',
 				'callback'            => array( $this, 'set_featured_image' ),
-				'permission_callback' => array( $this, 'check_media_write_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:write' ),
 			)
 		);
+	}
 
-		// Pages endpoints.
+	/**
+	 * Page routes: /pages, /pages/{id}.
+	 */
+	private function register_page_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/pages',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_pages' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
 
@@ -193,11 +235,15 @@ class Arcadia_API {
 			array(
 				'methods'             => 'PUT',
 				'callback'            => array( $this, 'update_page' ),
-				'permission_callback' => array( $this, 'check_articles_write_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
 			)
 		);
+	}
 
-		// Media endpoints.
+	/**
+	 * Media routes: /media, /media/{id}.
+	 */
+	private function register_media_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/media',
@@ -205,12 +251,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_media' ),
-					'permission_callback' => array( $this, 'check_media_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:read' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'upload_media' ),
-					'permission_callback' => array( $this, 'check_media_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:write' ),
 				),
 			)
 		);
@@ -222,17 +268,21 @@ class Arcadia_API {
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_media' ),
-					'permission_callback' => array( $this, 'check_media_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:write' ),
 				),
 				array(
 					'methods'             => 'DELETE',
 					'callback'            => array( $this, 'delete_media' ),
-					'permission_callback' => array( $this, 'check_media_delete_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:delete' ),
 				),
 			)
 		);
+	}
 
-		// Taxonomies endpoints.
+	/**
+	 * Taxonomy routes: /categories, /tags + their {id} variants.
+	 */
+	private function register_taxonomy_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/categories',
@@ -240,12 +290,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_categories' ),
-					'permission_callback' => array( $this, 'check_taxonomies_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:read' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'create_category' ),
-					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:write' ),
 				),
 			)
 		);
@@ -257,12 +307,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_tags' ),
-					'permission_callback' => array( $this, 'check_taxonomies_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:read' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'create_tag' ),
-					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:write' ),
 				),
 			)
 		);
@@ -274,12 +324,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_category' ),
-					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:write' ),
 				),
 				array(
 					'methods'             => 'DELETE',
 					'callback'            => array( $this, 'delete_category' ),
-					'permission_callback' => array( $this, 'check_taxonomies_delete_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:delete' ),
 				),
 			)
 		);
@@ -291,50 +341,56 @@ class Arcadia_API {
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_tag' ),
-					'permission_callback' => array( $this, 'check_taxonomies_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:write' ),
 				),
 				array(
 					'methods'             => 'DELETE',
 					'callback'            => array( $this, 'delete_tag' ),
-					'permission_callback' => array( $this, 'check_taxonomies_delete_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'taxonomies:delete' ),
 				),
 			)
 		);
+	}
 
-		// Site info endpoint.
+	/**
+	 * Site routes: /site-info, /menus, /users.
+	 */
+	private function register_site_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/site-info',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_site_info' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
 
-		// Menus endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/menus',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_menus' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
 
-		// Users endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/users',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_users_list' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
+	}
 
-		// Redirects endpoints.
+	/**
+	 * Redirect routes: /redirects, /redirects/{id}.
+	 */
+	private function register_redirect_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/redirects',
@@ -342,12 +398,12 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_redirects' ),
-					'permission_callback' => array( $this, 'check_redirects_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'redirects:read' ),
 				),
 				array(
 					'methods'             => 'POST',
 					'callback'            => array( $this, 'create_redirect' ),
-					'permission_callback' => array( $this, 'check_redirects_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'redirects:write' ),
 				),
 			)
 		);
@@ -358,11 +414,15 @@ class Arcadia_API {
 			array(
 				'methods'             => 'DELETE',
 				'callback'            => array( $this, 'delete_redirect' ),
-				'permission_callback' => array( $this, 'check_redirects_write_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'redirects:write' ),
 			)
 		);
+	}
 
-		// Field schema endpoints (FS-2, FS-3).
+	/**
+	 * Field schema routes: /field-schema (GET/PUT).
+	 */
+	private function register_field_schema_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/field-schema',
@@ -370,57 +430,68 @@ class Arcadia_API {
 				array(
 					'methods'             => 'GET',
 					'callback'            => array( $this, 'get_field_schema' ),
-					'permission_callback' => array( $this, 'check_site_read_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 				),
 				array(
 					'methods'             => 'PUT',
 					'callback'            => array( $this, 'update_field_schema' ),
-					'permission_callback' => array( $this, 'check_settings_write_permission' ),
+					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'settings:write' ),
 				),
 			)
 		);
+	}
 
-		// Blocks discovery endpoint.
+	/**
+	 * Block routes: /blocks, /blocks/usage.
+	 */
+	private function register_block_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/blocks',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_blocks' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
 
-		// Blocks usage analysis endpoint.
 		register_rest_route(
 			$this->namespace,
 			'/blocks/usage',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_blocks_usage' ),
-				'permission_callback' => array( $this, 'check_site_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
 			)
 		);
+	}
 
-		// Content dry-run validation endpoint.
+	/**
+	 * Validation routes: /validate-content.
+	 */
+	private function register_validation_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/validate-content',
 			array(
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'validate_content' ),
-				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
+	}
 
-		// Article revisions endpoints.
+	/**
+	 * Revision routes: /articles/{id}/revisions, /articles/{id}/revisions/{revision_id}.
+	 */
+	private function register_revision_routes() {
 		register_rest_route(
 			$this->namespace,
 			'/articles/(?P<id>\d+)/revisions',
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_article_revisions' ),
-				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 
@@ -430,311 +501,9 @@ class Arcadia_API {
 			array(
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_article_revision' ),
-				'permission_callback' => array( $this, 'check_articles_read_permission' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 	}
 
-	// =========================================================================
-	// Permission callbacks
-	// =========================================================================
-
-	/**
-	 * Check articles:read permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_articles_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'articles:read' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check articles:write permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_articles_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'articles:write' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check articles:delete permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_articles_delete_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'articles:delete' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check media:read permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_media_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'media:read' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check media:write permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_media_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'media:write' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check media:delete permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_media_delete_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'media:delete' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check taxonomies:read permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_taxonomies_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'taxonomies:read' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check taxonomies:write permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_taxonomies_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'taxonomies:write' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check taxonomies:delete permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_taxonomies_delete_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'taxonomies:delete' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check redirects:read permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_redirects_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'redirects:read' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check redirects:write permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_redirects_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'redirects:write' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check settings:write permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_settings_write_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'settings:write' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	/**
-	 * Check site:read permission.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return bool|WP_Error
-	 */
-	public function check_site_read_permission( $request ) {
-		$result = $this->auth->authenticate_request( $request, 'site:read' );
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-		return true;
-	}
-
-	// =========================================================================
-	// Site info endpoint
-	// =========================================================================
-
-	/**
-	 * Get site information.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function get_site_info( $request ) {
-		$theme = wp_get_theme();
-
-		return new WP_REST_Response(
-			array(
-				'name'           => get_bloginfo( 'name' ),
-				'description'    => get_bloginfo( 'description' ),
-				'url'            => get_site_url(),
-				'home'           => get_home_url(),
-				'admin_email'    => get_option( 'admin_email' ),
-				'language'       => get_locale(),
-				'timezone'       => wp_timezone_string(),
-				'date_format'    => get_option( 'date_format' ),
-				'time_format'    => get_option( 'time_format' ),
-				'posts_per_page' => (int) get_option( 'posts_per_page' ),
-				'authors'        => $this->get_authors(),
-				'post_types'     => $this->get_post_types(),
-				'theme'          => array(
-					'name'   => $theme->get( 'Name' ),
-					'author' => $theme->get( 'Author' ),
-				),
-				'plugin'         => array(
-					'version' => ARCADIA_AGENTS_VERSION,
-					'adapter' => $this->blocks->get_adapter_name(),
-				),
-				'settings'         => array(
-					'force_draft'        => (bool) get_option( 'aa_force_draft', false ),
-					'pending_revisions'  => (bool) get_option( 'aa_pending_revisions', false ),
-					'enabled_scopes'     => $this->auth->get_enabled_scopes(),
-				),
-				'acf_available'    => Arcadia_Blocks::is_acf_available(),
-				'acf_field_groups' => $this->get_acf_field_groups_for_post_types(),
-				'permalink'        => get_option( 'permalink_structure' ),
-			),
-			200
-		);
-	}
-
-	/**
-	 * Get authors who can publish posts.
-	 *
-	 * Returns users with the 'edit_posts' capability (administrators, editors, authors).
-	 *
-	 * @return array List of authors with email, name, and role.
-	 */
-	private function get_authors() {
-		$users = get_users(
-			array(
-				'role__in' => array( 'administrator', 'editor', 'author' ),
-				'orderby'  => 'display_name',
-				'order'    => 'ASC',
-			)
-		);
-
-		$authors = array();
-		foreach ( $users as $user ) {
-			$authors[] = array(
-				'email' => $user->user_email,
-				'name'  => $user->display_name,
-				'role'  => ! empty( $user->roles ) ? $user->roles[0] : 'none',
-			);
-		}
-
-		return $authors;
-	}
-
-	/**
-	 * Get public post types that support the editor.
-	 *
-	 * Returns post types where content can be created/edited via the API.
-	 * Excludes built-in non-content types (attachment, revision, nav_menu_item, etc.).
-	 *
-	 * @return array List of post types with name, label, and hierarchical flag.
-	 */
-	private function get_post_types() {
-		$types = get_post_types(
-			array(
-				'public' => true,
-			),
-			'objects'
-		);
-
-		$excluded = array( 'attachment' );
-		$result   = array();
-
-		foreach ( $types as $type ) {
-			if ( in_array( $type->name, $excluded, true ) ) {
-				continue;
-			}
-
-			$counts = wp_count_posts( $type->name );
-
-			$result[] = array(
-				'name'         => $type->name,
-				'label'        => $type->label,
-				'hierarchical' => $type->hierarchical,
-				'count'        => array(
-					'publish' => (int) ( $counts->publish ?? 0 ),
-					'draft'   => (int) ( $counts->draft ?? 0 ),
-					'total'   => (int) ( ( $counts->publish ?? 0 ) + ( $counts->draft ?? 0 ) + ( $counts->pending ?? 0 ) + ( $counts->private ?? 0 ) ),
-				),
-			);
-		}
-
-		return $result;
-	}
 }

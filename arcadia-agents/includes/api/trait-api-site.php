@@ -22,6 +22,119 @@ if ( ! defined( 'ABSPATH' ) ) {
 trait Arcadia_API_Site_Handler {
 
 	/**
+	 * Get site information.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function get_site_info( $request ) {
+		$theme = wp_get_theme();
+
+		return new WP_REST_Response(
+			array(
+				'name'           => get_bloginfo( 'name' ),
+				'description'    => get_bloginfo( 'description' ),
+				'url'            => get_site_url(),
+				'home'           => get_home_url(),
+				'admin_email'    => get_option( 'admin_email' ),
+				'language'       => get_locale(),
+				'timezone'       => wp_timezone_string(),
+				'date_format'    => get_option( 'date_format' ),
+				'time_format'    => get_option( 'time_format' ),
+				'posts_per_page' => (int) get_option( 'posts_per_page' ),
+				'authors'        => $this->get_authors(),
+				'post_types'     => $this->get_post_types(),
+				'theme'          => array(
+					'name'   => $theme->get( 'Name' ),
+					'author' => $theme->get( 'Author' ),
+				),
+				'plugin'         => array(
+					'version' => ARCADIA_AGENTS_VERSION,
+					'adapter' => $this->blocks->get_adapter_name(),
+				),
+				'settings'         => array(
+					'force_draft'        => (bool) get_option( 'aa_force_draft', false ),
+					'pending_revisions'  => (bool) get_option( 'aa_pending_revisions', false ),
+					'enabled_scopes'     => $this->auth->get_enabled_scopes(),
+				),
+				'acf_available'    => Arcadia_Blocks::is_acf_available(),
+				'acf_field_groups' => $this->get_acf_field_groups_for_post_types(),
+				'permalink'        => get_option( 'permalink_structure' ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Get authors who can publish posts.
+	 *
+	 * Returns users with the 'edit_posts' capability (administrators, editors, authors).
+	 *
+	 * @return array List of authors with email, name, and role.
+	 */
+	private function get_authors() {
+		$users = get_users(
+			array(
+				'role__in' => array( 'administrator', 'editor', 'author' ),
+				'orderby'  => 'display_name',
+				'order'    => 'ASC',
+			)
+		);
+
+		$authors = array();
+		foreach ( $users as $user ) {
+			$authors[] = array(
+				'email' => $user->user_email,
+				'name'  => $user->display_name,
+				'role'  => ! empty( $user->roles ) ? $user->roles[0] : 'none',
+			);
+		}
+
+		return $authors;
+	}
+
+	/**
+	 * Get public post types that support the editor.
+	 *
+	 * Returns post types where content can be created/edited via the API.
+	 * Excludes built-in non-content types (attachment, revision, nav_menu_item, etc.).
+	 *
+	 * @return array List of post types with name, label, and hierarchical flag.
+	 */
+	private function get_post_types() {
+		$types = get_post_types(
+			array(
+				'public' => true,
+			),
+			'objects'
+		);
+
+		$excluded = array( 'attachment' );
+		$result   = array();
+
+		foreach ( $types as $type ) {
+			if ( in_array( $type->name, $excluded, true ) ) {
+				continue;
+			}
+
+			$counts = wp_count_posts( $type->name );
+
+			$result[] = array(
+				'name'         => $type->name,
+				'label'        => $type->label,
+				'hierarchical' => $type->hierarchical,
+				'count'        => array(
+					'publish' => (int) ( $counts->publish ?? 0 ),
+					'draft'   => (int) ( $counts->draft ?? 0 ),
+					'total'   => (int) ( ( $counts->publish ?? 0 ) + ( $counts->draft ?? 0 ) + ( $counts->pending ?? 0 ) + ( $counts->private ?? 0 ) ),
+				),
+			);
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Get navigation menus with hierarchical items.
 	 *
 	 * @param WP_REST_Request $request The request.
