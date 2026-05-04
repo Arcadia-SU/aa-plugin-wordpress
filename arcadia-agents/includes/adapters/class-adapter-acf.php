@@ -188,7 +188,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				case 'wysiwyg':
-					$data[ $field_name ] = Arcadia_Blocks::parse_markdown( $value );
+					$data[ $field_name ] = Arcadia_Markdown_Parser::parse_markdown( $value );
 					break;
 
 				default:

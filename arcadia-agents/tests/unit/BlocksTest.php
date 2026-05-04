@@ -9,7 +9,8 @@ namespace ArcadiaAgents\Tests;
 
 use PHPUnit\Framework\TestCase;
 
-// Load the class file directly for testing parse_markdown.
+// Load the class files directly for testing parse_markdown + block processing.
+require_once dirname( __DIR__, 2 ) . '/includes/class-markdown-parser.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-blocks.php';
 
 /**
@@ -28,7 +29,7 @@ class BlocksTest extends TestCase {
         $input    = 'This is **bold** text.';
         $expected = 'This is <strong>bold</strong> text.';
 
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
         $this->assertEquals( $expected, $result );
     }
 
@@ -39,7 +40,7 @@ class BlocksTest extends TestCase {
         $input    = 'This is *italic* text.';
         $expected = 'This is <em>italic</em> text.';
 
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
         $this->assertEquals( $expected, $result );
     }
 
@@ -50,7 +51,7 @@ class BlocksTest extends TestCase {
         $input    = 'Use `console.log()` for debugging.';
         $expected = 'Use <code>console.log()</code> for debugging.';
 
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
         $this->assertEquals( $expected, $result );
     }
 
@@ -59,7 +60,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_link(): void {
         $input  = 'Visit [example](https://example.com) for more.';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringContainsString( '<a href="https://example.com"', $result );
         $this->assertStringContainsString( '>example</a>', $result );
@@ -70,7 +71,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_external_link(): void {
         $input  = 'Visit [Google](https://google.com) site.';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringContainsString( 'target="_blank"', $result );
         $this->assertStringContainsString( 'rel="noopener noreferrer"', $result );
@@ -81,7 +82,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_internal_link(): void {
         $input  = 'Go to [home](http://localhost/page) page.';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringNotContainsString( 'target="_blank"', $result );
     }
@@ -91,7 +92,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_combined(): void {
         $input = 'Text with **bold**, *italic*, and `code`.';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringContainsString( '<strong>bold</strong>', $result );
         $this->assertStringContainsString( '<em>italic</em>', $result );
@@ -105,7 +106,7 @@ class BlocksTest extends TestCase {
         $input    = 'This is **bold** and *italic*.';
         $expected = 'This is <strong>bold</strong> and <em>italic</em>.';
 
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
         $this->assertEquals( $expected, $result );
     }
 
@@ -114,7 +115,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_code_escapes_html(): void {
         $input  = 'Use `<script>alert("xss")</script>` tag.';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringContainsString( '&lt;script&gt;', $result );
         $this->assertStringNotContainsString( '<script>', $result );
@@ -127,7 +128,7 @@ class BlocksTest extends TestCase {
         $input    = 'Just plain text without markdown.';
         $expected = 'Just plain text without markdown.';
 
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
         $this->assertEquals( $expected, $result );
     }
 
@@ -136,7 +137,7 @@ class BlocksTest extends TestCase {
      */
     public function test_parse_markdown_multiple_links(): void {
         $input = 'Visit [one](https://one.com) and [two](https://two.com).';
-        $result = \Arcadia_Blocks::parse_markdown( $input );
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
 
         $this->assertStringContainsString( 'href="https://one.com"', $result );
         $this->assertStringContainsString( 'href="https://two.com"', $result );

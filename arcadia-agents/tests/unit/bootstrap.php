@@ -1175,7 +1175,9 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
 require_once dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 
 // Load the classes we want to test (only those that don't have heavy WP dependencies).
-// Note: We only load parse_markdown from Arcadia_Blocks since it's a static method.
+
+// Load markdown parser (pure-function utility, used by adapters).
+require_once dirname( __DIR__, 2 ) . '/includes/class-markdown-parser.php';
 
 // Load SEO meta class for testing.
 require_once dirname( __DIR__, 2 ) . '/includes/class-seo-meta.php';

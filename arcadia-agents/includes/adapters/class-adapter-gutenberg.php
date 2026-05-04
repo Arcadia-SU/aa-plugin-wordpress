@@ -42,7 +42,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	 */
 	public function heading( $text, $level = 2 ) {
 		$level = max( 1, min( 6, (int) $level ) );
-		$text  = Arcadia_Blocks::parse_markdown( $text );
+		$text  = Arcadia_Markdown_Parser::parse_markdown( $text );
 		$text  = esc_html( $text );
 
 		return sprintf(
@@ -63,7 +63,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	 * @return string Block markup.
 	 */
 	public function paragraph( $text ) {
-		$text = Arcadia_Blocks::parse_markdown( $text );
+		$text = Arcadia_Markdown_Parser::parse_markdown( $text );
 
 		return sprintf(
 			'<!-- wp:paragraph -->' . "\n" .
@@ -135,7 +135,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 
 		$list_items = '';
 		foreach ( $items as $item ) {
-			$item        = Arcadia_Blocks::parse_markdown( $item );
+			$item        = Arcadia_Markdown_Parser::parse_markdown( $item );
 			$list_items .= '<li>' . $item . '</li>';
 		}
 
