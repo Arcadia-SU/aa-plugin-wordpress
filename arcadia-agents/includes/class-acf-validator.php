@@ -46,6 +46,20 @@ class Arcadia_ACF_Validator {
 	private $dry_run = false;
 
 	/**
+	 * Coercer for canonical type rewriting + per-field type checks.
+	 *
+	 * @var Arcadia_ACF_Coercer
+	 */
+	private $coercer;
+
+	/**
+	 * Repeater handler for flat-keys → array-of-rows expansion.
+	 *
+	 * @var Arcadia_ACF_Repeater_Handler
+	 */
+	private $repeater_handler;
+
+	/**
 	 * Get single instance of the class.
 	 *
 	 * @return Arcadia_ACF_Validator
@@ -60,7 +74,10 @@ class Arcadia_ACF_Validator {
 	/**
 	 * Constructor.
 	 */
-	private function __construct() {}
+	private function __construct() {
+		$this->coercer          = new Arcadia_ACF_Coercer();
+		$this->repeater_handler = new Arcadia_ACF_Repeater_Handler();
+	}
 
 	/**
 	 * Get and clear the list of sideloaded attachment IDs.
@@ -261,7 +278,15 @@ class Arcadia_ACF_Validator {
 		// of rows, so downstream type validation sees the expected `array` shape and the ACF
 		// adapter's flatten_repeater() can re-emit clean block-comment storage.
 		if ( isset( $block['properties'] ) && is_array( $block['properties'] ) ) {
-			$this->expand_flat_repeaters( $block['properties'], $schema );
+			$this->repeater_handler->expand_flat_repeaters( $block['properties'], $schema );
+		}
+
+		// Coerce GET-shape scalar values (`"1"`, `"42"`, etc. — ACF Pro raw storage) to canonical
+		// types before sideload + validation. This makes GET → store → PUT round-trips succeed
+		// without manual casting on the agent side. Mutates in place; what gets saved is the
+		// canonical type, so future GETs return canonical values too (self-heals).
+		if ( isset( $block['properties'] ) && is_array( $block['properties'] ) ) {
+			$this->coercer->coerce_properties_to_canonical( $block['properties'], $schema );
 		}
 
 		$properties = isset( $block['properties'] ) && is_array( $block['properties'] )
@@ -354,7 +379,7 @@ class Arcadia_ACF_Validator {
 				continue; // Unknown field — skip (no schema entry).
 			}
 
-			$type_error = $this->check_field_type( $value, $expected_type );
+			$type_error = $this->coercer->check_field_type( $value, $expected_type );
 			if ( null !== $type_error ) {
 				$errors[] = array(
 					'block_index' => $index,
@@ -380,241 +405,6 @@ class Arcadia_ACF_Validator {
 				);
 			}
 		}
-	}
-
-	/**
-	 * Expand flat-keys repeater shape into array-of-rows.
-	 *
-	 * The plugin's GET endpoints return ACF Pro repeaters in flat block-comment
-	 * shape (`<field>: <count>`, `<field>_<n>_<sub>: <value>`). Agents that
-	 * round-trip GET → PUT send the same shape, but the validator/adapter
-	 * pipeline expects array-of-rows. This helper detects the flat pattern and
-	 * collapses it back to arrays before validation runs.
-	 *
-	 * Detection is structural: integer count + indexed sub-keys = repeater. The
-	 * schema is consulted only to scope the lookup to declared `repeater` fields,
-	 * avoiding false positives on ordinary integer fields.
-	 *
-	 * @param array &$properties Block properties (mutated: flat keys consumed, rows materialized).
-	 * @param array  $schema     Field schema list with optional `sub_fields`.
-	 */
-	private function expand_flat_repeaters( &$properties, $schema ) {
-		if ( ! is_array( $schema ) ) {
-			return;
-		}
-
-		foreach ( $schema as $field ) {
-			if ( ! is_array( $field ) || ( $field['type'] ?? '' ) !== 'repeater' ) {
-				continue;
-			}
-			$name = $field['name'] ?? null;
-			if ( null === $name || ! array_key_exists( $name, $properties ) ) {
-				continue;
-			}
-
-			$value = $properties[ $name ];
-
-			// Already array-of-rows: leave it (backward compat).
-			if ( is_array( $value ) ) {
-				continue;
-			}
-
-			// Anything other than a non-negative int is not a flat-count — let
-			// type validation flag it.
-			if ( ! is_int( $value ) || $value < 0 ) {
-				continue;
-			}
-
-			if ( 0 === $value ) {
-				$properties[ $name ] = array();
-				$this->strip_field_key_refs( $properties, $name );
-				continue;
-			}
-
-			if ( ! $this->has_indexed_subkeys( $properties, $name, $value ) ) {
-				continue; // Plain int field that happens to be > 0; no flat siblings.
-			}
-
-			$rows                = $this->collapse_flat_to_rows( $properties, $name, $value );
-			$properties[ $name ] = $rows;
-			$this->strip_field_key_refs( $properties, $name );
-
-			// Recurse into nested repeaters using the row's sub_fields schema.
-			if ( ! empty( $field['sub_fields'] ) && is_array( $field['sub_fields'] ) ) {
-				foreach ( $properties[ $name ] as &$row ) {
-					if ( is_array( $row ) ) {
-						$this->expand_flat_repeaters( $row, $field['sub_fields'] );
-					}
-				}
-				unset( $row );
-			}
-		}
-	}
-
-	/**
-	 * Detect whether $props contains at least one `<field>_<n>_<sub>` key for n in [0, count).
-	 *
-	 * @param array  $props Properties.
-	 * @param string $field Field name.
-	 * @param int    $count Expected row count.
-	 * @return bool
-	 */
-	private function has_indexed_subkeys( $props, $field, $count ) {
-		if ( $count < 1 ) {
-			return false;
-		}
-		$prefix = $field . '_';
-		foreach ( $props as $key => $_value ) {
-			if ( ! is_string( $key ) || ! str_starts_with( $key, $prefix ) ) {
-				continue;
-			}
-			$rest = substr( $key, strlen( $prefix ) );
-			if ( ! preg_match( '/^(\d+)_/', $rest, $m ) ) {
-				continue;
-			}
-			$n = (int) $m[1];
-			if ( $n >= 0 && $n < $count ) {
-				return true;
-			}
-		}
-		return false;
-	}
-
-	/**
-	 * Collapse flat `<field>_<n>_<sub>` keys into an array of $count rows.
-	 *
-	 * Consumed flat keys are removed from $props. Nested repeaters within rows
-	 * remain as flat sub-keys at this stage and are expanded by the recursive
-	 * call in {@see expand_flat_repeaters()}.
-	 *
-	 * @param array &$props Properties (mutated).
-	 * @param string $field Field name.
-	 * @param int    $count Row count.
-	 * @return array Indexed array of associative rows.
-	 */
-	private function collapse_flat_to_rows( &$props, $field, $count ) {
-		$rows     = array_fill( 0, $count, array() );
-		$prefix   = $field . '_';
-		$consumed = array();
-
-		foreach ( $props as $key => $value ) {
-			if ( ! is_string( $key ) || ! str_starts_with( $key, $prefix ) ) {
-				continue;
-			}
-			$rest = substr( $key, strlen( $prefix ) );
-			if ( ! preg_match( '/^(\d+)_(.+)$/', $rest, $m ) ) {
-				continue;
-			}
-			$n   = (int) $m[1];
-			$sub = $m[2];
-			if ( $n < 0 || $n >= $count ) {
-				continue;
-			}
-			$rows[ $n ][ $sub ] = $value;
-			$consumed[]         = $key;
-		}
-
-		foreach ( $consumed as $k ) {
-			unset( $props[ $k ] );
-		}
-
-		return $rows;
-	}
-
-	/**
-	 * Strip ACF field-key references (`_<field>`, `_<field>_<n>_<sub>`) from $props.
-	 *
-	 * The adapter re-injects these from the schema, so any agent-supplied copies
-	 * would either duplicate or shadow the canonical keys.
-	 *
-	 * @param array  &$props Properties (mutated).
-	 * @param string  $field Field name.
-	 */
-	private function strip_field_key_refs( &$props, $field ) {
-		unset( $props[ '_' . $field ] );
-		$prefix = '_' . $field . '_';
-		foreach ( array_keys( $props ) as $k ) {
-			if ( is_string( $k ) && str_starts_with( $k, $prefix ) ) {
-				unset( $props[ $k ] );
-			}
-		}
-	}
-
-	/**
-	 * Check a value against an expected ACF field type.
-	 *
-	 * @param mixed  $value         The field value.
-	 * @param string $expected_type The ACF field type.
-	 * @return array|null Error descriptor ('expected', 'got', 'suggestion') or null if valid.
-	 */
-	private function check_field_type( $value, $expected_type ) {
-		switch ( $expected_type ) {
-			case 'image':
-				// 0 is valid: means "no image".
-				if ( 0 === $value ) {
-					break;
-				}
-				if ( ! is_int( $value ) || $value < 0 ) {
-					return array(
-						'expected'   => 'int (attachment ID) or 0 (no image)',
-						'got'        => gettype( $value ) . ( is_string( $value ) ? ' (URL)' : '' ),
-						'suggestion' => 'Upload via POST /media first, or use 0 for no image.',
-					);
-				}
-				break;
-
-			case 'text':
-			case 'textarea':
-			case 'wysiwyg':
-			case 'url':
-			case 'email':
-				if ( ! is_string( $value ) ) {
-					return array(
-						'expected' => 'string',
-						'got'      => gettype( $value ),
-					);
-				}
-				break;
-
-			case 'number':
-				if ( ! is_int( $value ) && ! is_float( $value ) ) {
-					return array(
-						'expected' => 'int|float',
-						'got'      => gettype( $value ),
-					);
-				}
-				break;
-
-			case 'select':
-			case 'radio':
-				if ( ! is_string( $value ) ) {
-					return array(
-						'expected' => 'string',
-						'got'      => gettype( $value ),
-					);
-				}
-				break;
-
-			case 'repeater':
-				if ( ! is_array( $value ) ) {
-					return array(
-						'expected' => 'array',
-						'got'      => gettype( $value ),
-					);
-				}
-				break;
-
-			case 'true_false':
-				if ( ! is_bool( $value ) && ! is_int( $value ) ) {
-					return array(
-						'expected' => 'bool|int',
-						'got'      => gettype( $value ),
-					);
-				}
-				break;
-		}
-
-		return null;
 	}
 
 	// =========================================================================

@@ -20,6 +20,8 @@ require_once dirname( __DIR__, 2 ) . '/includes/adapters/class-adapter-gutenberg
 require_once dirname( __DIR__, 2 ) . '/includes/adapters/class-adapter-acf.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-block-registry.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-blocks.php';
+require_once dirname( __DIR__, 2 ) . '/includes/class-acf-coercer.php';
+require_once dirname( __DIR__, 2 ) . '/includes/class-acf-repeater-handler.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-acf-validator.php';
 
 /**
@@ -188,7 +190,10 @@ class AcfValidatorTest extends TestCase {
 	}
 
 	/**
-	 * Test: text field rejects non-string value.
+	 * Test: text field rejects non-coercible value (array).
+	 *
+	 * Phase 28: scalar values (int/float) are now coerced to string.
+	 * Only non-scalar values (arrays, objects) trigger the type error.
 	 */
 	public function test_text_field_rejects_non_string(): void {
 		$this->register_acf_block( 'acf/cta', array(
@@ -198,7 +203,7 @@ class AcfValidatorTest extends TestCase {
 		$json = $this->make_json( array(
 			array(
 				'type'       => 'acf/cta',
-				'properties' => array( 'label' => 123 ),
+				'properties' => array( 'label' => array( 'foo' => 'bar' ) ),
 			),
 		) );
 
@@ -211,7 +216,7 @@ class AcfValidatorTest extends TestCase {
 		$this->assertCount( 1, $errors );
 		$this->assertEquals( 'label', $errors[0]['field'] );
 		$this->assertEquals( 'string', $errors[0]['expected'] );
-		$this->assertEquals( 'integer', $errors[0]['got'] );
+		$this->assertEquals( 'array', $errors[0]['got'] );
 	}
 
 	/**
@@ -270,6 +275,9 @@ class AcfValidatorTest extends TestCase {
 
 	/**
 	 * Test: error format matches api-contract spec.
+	 *
+	 * Phase 28: int values are now coerced to string for text fields, so we
+	 * use an array (non-coercible) to trigger the type error.
 	 */
 	public function test_error_format_matches_spec(): void {
 		$this->register_acf_block( 'acf/hero', array(
@@ -279,7 +287,7 @@ class AcfValidatorTest extends TestCase {
 		$json = $this->make_json( array(
 			array(
 				'type'       => 'acf/hero',
-				'properties' => array( 'title' => 999 ),
+				'properties' => array( 'title' => array( 'invalid' ) ),
 			),
 		) );
 
@@ -301,6 +309,9 @@ class AcfValidatorTest extends TestCase {
 
 	/**
 	 * Test: collects multiple errors from different blocks.
+	 *
+	 * Phase 28: int values are now coerced to string for text, so first block
+	 * uses an array (non-coercible) for `title` to trigger the type error.
 	 */
 	public function test_collects_multiple_errors(): void {
 		$this->register_acf_block( 'acf/hero', array(
@@ -311,7 +322,7 @@ class AcfValidatorTest extends TestCase {
 		$json = $this->make_json( array(
 			array(
 				'type'       => 'acf/hero',
-				'properties' => array( 'title' => 111 ),
+				'properties' => array( 'title' => array( 'bad' ) ),
 			),
 			array(
 				'type'       => 'acf/hero',
@@ -1015,6 +1026,10 @@ class AcfValidatorTest extends TestCase {
 
 	/**
 	 * Test: dry-run mode still catches invalid types.
+	 *
+	 * Phase 28: scalar coercion casts int → string for text, so we use an
+	 * array (non-coercible) to keep the title error and a non-numeric string
+	 * for count.
 	 */
 	public function test_dry_run_catches_type_errors(): void {
 		$this->register_acf_block( 'acf/hero', array(
@@ -1026,8 +1041,8 @@ class AcfValidatorTest extends TestCase {
 			array(
 				'type'       => 'acf/hero',
 				'properties' => array(
-					'title' => 123,   // Should be string.
-					'count' => 'abc', // Should be int.
+					'title' => array( 'bad' ), // Non-coercible array.
+					'count' => 'abc',          // Non-numeric string.
 				),
 			),
 		) );

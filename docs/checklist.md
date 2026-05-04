@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-05-01 (Phase 27 code+tests OK — reste déploiement preprod)
+**Dernière mise à jour :** 2026-05-04 (Phase 28 code+tests OK — v0.1.20, 279 tests verts)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -86,6 +86,59 @@ Les types ACF Pro repeater (`acf/numeric-list`, `acf/faq`, `acf/pushs`, `acf/tab
 - [ ] Déploiement standalone sur preprod-iselection.vertuelle.com
 - [ ] Validation E2E : push article iSelection cms_post_id 20803 (contenant repeater) sans 422
 - [ ] Fermer bead `aa-iedn` côté AA
+
+---
+
+## Phase 28 : Coercion canonique ACF (identity-passthrough type contract)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-05-04*
+*Bug observé : 422 `acf_validation_failed` sur `acf/text-image` (`is_lightbox`, expected:bool|int, got:string) après round-trip GET/PUT — iSelection preprod `cms_post_id=20723`, 2026-05-04*
+*Bead AA : `aa-e3m1` (asymétrie `acf/button.icon` int/str) fermable par le même mécanisme*
+
+### Contexte
+ACF Pro stocke les `true_false` en `wp_postmeta` LONGTEXT → GET retourne `"1"`/`"0"` (string). AA stocke verbatim (identity-passthrough). PUT exige bool/int strict (`Arcadia_ACF_Validator::check_field_type()` lignes 607-614) → 422. Même asymétrie sur `image` (numeric strings), `number`, etc. Le pattern `expand_flat_repeaters()` (Phase 27) est exactement le pre-coercion à généraliser.
+
+**Goal :** chaque round-trip GET → store → PUT d'un bloc `acf/*` réussit sans casting manuel côté AA. Le plugin owns le type contract end-to-end.
+
+### 28.1 — Helper de coercion canonique
+- [x] Méthode `coerce_field_to_canonical($value, $acf_field_type) → $value` dans `Arcadia_ACF_Validator`
+- [x] Méthode `coerce_properties_to_canonical(&$properties, $schema)` qui walk le schema et mute en place
+- [x] Coercion par type ACF :
+  - `true_false` → `bool` (`"0"`/`""`/`"false"` → false ; `"1"`/`"true"` → true ; bool/int/null passthrough)
+  - `image` / `file` → `int` (numeric string via `ctype_digit` → int ; `""`/`null` → 0 ; URL/object → passthrough vers H1.2 sideload)
+  - `gallery` → `array<int>` (chaque élément via règle `image`)
+  - `number` → `int|float` (numeric string → int si `(float)$int === $float`, sinon float ; non-numeric → laissé pour `check_field_type`)
+  - `text`/`textarea`/`wysiwyg`/`url`/`email`/`select`/`radio` → `string` (cast int/float défensif ; bool/null/array laissés pour type check)
+  - `repeater` → recurse dans rows via `sub_fields` (cohérent avec `expand_flat_repeaters()`)
+  - `relationship` / `post_object` → `int` ou `array<int>`
+  - default (link, custom) → passthrough
+- [x] Si non-coercible (ex: `"banana"` pour `number`) → laissé tel quel pour que `check_field_type()` produise l'erreur claire
+
+### 28.2 — Intégration pipeline validation
+- [x] Appel `coerce_properties_to_canonical()` dans `validate_acf_block()` après `expand_flat_repeaters()` et **avant** sideload (sinon `is_string($numeric)` traiterait `"30225"` comme une URL)
+- [x] `check_field_type()` reste strict — pas de relaxation
+- [x] Mutation `$block['properties']` propagée (pas une copie locale)
+
+### 28.3 — Tests unitaires (PHPUnit)
+- [x] Test class `AcfCoercionTest` (15 tests)
+- [x] **Per-type unit tests** : `true_false`, `image`, `file`, `gallery`, `number`, text-types, `relationship`/`post_object`, type inconnu (passthrough)
+- [x] **Validator integration test** : payload `acf/text-image` iSelection (`is_lightbox: "1"`, `image: "30225"`) → validation passe + `is_lightbox === true` + `image === 30225`
+- [x] **Identity round-trip sentinel** : 2 passes successives → second pass identique au premier (idempotence prouvée)
+- [x] **Negative coercion test** : `"banana"` pour `number` → erreur `got: 'string'`, valeur préservée
+- [x] **Test bonus** : numeric-string image skip sideload (sideload mocké à WP_Error, test passe)
+- [x] **Test bonus** : coercion recurse dans rows de repeater (flat ET array-of-rows)
+
+### 28.4 — Validation & déploiement
+- [x] Tous les tests existants verts + nouveaux verts (279 tests, 928 assertions)
+- [x] `./build.sh` passe — v0.1.20, zip 348KB
+- [ ] Déploiement preprod-iselection.vertuelle.com
+- [ ] Validation E2E : `python -m scripts.reingest_iselection_legacy --force` puis smoke push `cms_post_id=20723` → 200
+- [ ] Fermer bead `aa-e3m1` (asymétrie `acf/button.icon`) côté AA
+
+### Notes coordination
+- AA backend : patch parallèle de `_parse_error_message` (`wordpress_site_connector.py:205-226`) pour lire `errors` aussi sous `data.errors`. **Aucun changement plugin requis** — le shape émis est correct.
+- **Hors scope :** sites sans ACF (gating `is_acf_available()` OK), core Gutenberg (pas d'asymétrie), migration data pré-existante (AA re-ingest via scripts dédiés).
+- **À ne pas faire :** relaxer `check_field_type()`, ajouter coercion côté AA backend, modifier la sérialisation GET (self-heal au prochain round-trip une fois PUT canonique).
 
 ---
 

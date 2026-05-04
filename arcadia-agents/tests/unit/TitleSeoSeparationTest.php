@@ -19,6 +19,8 @@ require_once dirname( __DIR__, 2 ) . '/includes/adapters/class-adapter-gutenberg
 require_once dirname( __DIR__, 2 ) . '/includes/adapters/class-adapter-acf.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-block-registry.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-blocks.php';
+require_once dirname( __DIR__, 2 ) . '/includes/class-acf-coercer.php';
+require_once dirname( __DIR__, 2 ) . '/includes/class-acf-repeater-handler.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-acf-validator.php';
 require_once dirname( __DIR__, 2 ) . '/includes/class-preview.php';
 
