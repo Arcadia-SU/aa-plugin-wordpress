@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-05-04 (Phase 29 code+tests+build OK — v0.1.25, 322 tests verts ; déploiement preprod + E2E pending)
+**Dernière mise à jour :** 2026-06-10 (Phase 30 code+tests+build OK — v0.1.26, 323 tests verts ; Phase 29 déploiement preprod + E2E toujours pending)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -181,6 +181,30 @@ Phase 28 a fermé l'asymétrie côté PUT (validator coerce avant `check_field_t
 ### Notes coordination
 - **Hors scope :** comportement pour clients non-AA. Si quelqu'un d'autre lit ces endpoints et attend le shape ACF brut, le changement est observable. Fence par query param ou nouvelle version si nécessaire.
 - **Pas un blocker Path A** — grouper avec d'autres polish GET-side s'il y en a.
+
+---
+
+## Phase 30 : Pending Revisions — enforcement serveur
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-10*
+*Décision Oscar 2026-06-10 (decisions.md) — supersède le flag opt-in du 2026-04-05*
+*Spec : [pending-revisions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/pending-revisions.md) §2.1 + §8*
+
+### Contexte
+Aujourd'hui la révision n'est créée que si la requête contient `pending_revision: true` **et** que le setting `aa_pending_revisions` est actif. Le setting seul ne protège rien : un PUT sans flag écrase le live même quand le client a activé la validation. Aligner sur le pattern `force_draft` (hard enforcement serveur) — la volonté du client doit être une garantie auto-portante, pas une convention que chaque appelant doit connaître.
+
+### 30.1 — Enforcement serveur (`trait-api-posts.php`)
+- [x] Setting `aa_pending_revisions` actif **et** post `publish` → tout `PUT /articles/{id}` stocké comme révision pending (réponse 201 revision), flag ou non
+- [x] Flag `pending_revision` déprécié : accepté dans le body, ignoré (pas d'erreur)
+- [x] Comportement inchangé : posts non publiés → update direct ; `POST /articles` → territoire `force_draft` ; priorité sur `force_draft` conservée
+
+### 30.2 — Note de supersede avec référence (`class-revisions.php`)
+- [x] `"Superseded by newer revision."` → `"Superseded by revision [new_id]"` (spec §6.1, traçabilité)
+
+### 30.3 — Tests & build
+- [x] `RevisionsTest.php` : nouveau cas "PUT sans flag, setting actif, post publié → révision créée"
+- [x] Tests existants ajustés (flag seul sans setting → update direct, inchangé)
+- [x] `./build.sh` passe
 
 ---
 

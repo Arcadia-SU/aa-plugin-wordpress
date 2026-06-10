@@ -309,11 +309,11 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Pending Revision: store as revision instead of live update.
-		// pending_revision takes priority over force_draft (early return = no wp_update_post).
-		$pending_revision_flag = ! empty( $body['pending_revision'] );
-		if ( $pending_revision_flag
-			&& get_option( 'aa_pending_revisions', false )
+		// Pending Revision: server-side enforcement — setting active + published post
+		// means every update is stored as a pending revision, regardless of the body.
+		// The legacy `pending_revision` flag is deprecated: accepted, ignored.
+		// Takes priority over force_draft (early return = no wp_update_post).
+		if ( get_option( 'aa_pending_revisions', false )
 			&& 'publish' === $post->post_status
 		) {
 			// Render content for revision storage.

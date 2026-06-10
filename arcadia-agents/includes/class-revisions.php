@@ -81,21 +81,9 @@ class Arcadia_Revisions {
 	 * @return array|WP_Error Array with revision_id, revision_version, preview_url on success.
 	 */
 	public function create_revision( $post_id, $body, $meta, $rendered_content = null ) {
-		// Auto-supersede existing pending revision.
+		// Existing pending revision is superseded after the new one is inserted,
+		// so its decision note can reference the replacing revision ID.
 		$existing = $this->get_pending_revision( $post_id );
-		if ( $existing ) {
-			wp_update_post(
-				array(
-					'ID'          => $existing->ID,
-					'post_status' => 'superseded',
-				)
-			);
-			update_post_meta(
-				$existing->ID,
-				'_aa_revision_decision_notes',
-				sprintf( 'Superseded by newer revision.' )
-			);
-		}
 
 		// Compute next version number.
 		$version = $this->get_next_version( $post_id );
@@ -125,6 +113,21 @@ class Arcadia_Revisions {
 
 		if ( is_wp_error( $revision_id ) ) {
 			return $revision_id;
+		}
+
+		// Auto-supersede the previous pending revision, referencing its replacement.
+		if ( $existing ) {
+			wp_update_post(
+				array(
+					'ID'          => $existing->ID,
+					'post_status' => 'superseded',
+				)
+			);
+			update_post_meta(
+				$existing->ID,
+				'_aa_revision_decision_notes',
+				sprintf( 'Superseded by revision %d', $revision_id )
+			);
 		}
 
 		// Store the complete payload as JSON for replay on approve.

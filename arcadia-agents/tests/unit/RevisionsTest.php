@@ -313,6 +313,39 @@ class RevisionsTest extends TestCase {
 		$this->assertEquals( '<p>Original content</p>', $_test_posts[42]->post_content );
 	}
 
+	public function test_update_post_creates_revision_without_flag_when_setting_enabled(): void {
+		global $_test_options;
+		$_test_options['aa_pending_revisions'] = true;
+
+		$this->create_test_post( 42, 'publish' );
+
+		// WP_Query for get_pending_revision (no existing).
+		\WP_Query::set_next_result( array() );
+		// WP_Query for get_next_version (no existing).
+		\WP_Query::set_next_result( array() );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		// No pending_revision flag — the setting alone enforces revision creation.
+		$request->set_json_params( array(
+			'title'    => 'Proposed New Title',
+			'children' => array( array( 'type' => 'paragraph', 'content' => 'test' ) ),
+		) );
+
+		$result = $this->helper->update_post( $request );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $result );
+		$this->assertEquals( 201, $result->get_status() );
+
+		$data = $result->get_data();
+		$this->assertTrue( $data['revision_created'] );
+
+		// Live post should be UNCHANGED.
+		global $_test_posts;
+		$this->assertEquals( 'Original Title', $_test_posts[42]->post_title );
+		$this->assertEquals( '<p>Original content</p>', $_test_posts[42]->post_content );
+	}
+
 	public function test_pending_revision_ignored_on_draft_post(): void {
 		global $_test_options;
 		$_test_options['aa_pending_revisions'] = true;
@@ -421,9 +454,12 @@ class RevisionsTest extends TestCase {
 		$this->assertIsArray( $result );
 		$this->assertEquals( 2, $result['revision_version'] );
 
-		// Old revision should be superseded.
+		// Old revision should be superseded, with a note referencing its replacement.
 		$this->assertEquals( 'superseded', $_test_posts[ $old_rev_id ]->post_status );
-		$this->assertStringContainsString( 'Superseded', $_test_post_meta[ $old_rev_id ]['_aa_revision_decision_notes'] );
+		$this->assertEquals(
+			sprintf( 'Superseded by revision %d', $result['revision_id'] ),
+			$_test_post_meta[ $old_rev_id ]['_aa_revision_decision_notes']
+		);
 	}
 
 	// =========================================================================
