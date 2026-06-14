@@ -277,7 +277,7 @@ class RevisionsTest extends TestCase {
 
 	public function test_update_post_creates_revision_when_enabled(): void {
 		global $_test_options;
-		$_test_options['aa_pending_revisions'] = true;
+		$_test_options['aa_force_draft'] = true;
 
 		$this->create_test_post( 42, 'publish' );
 
@@ -315,7 +315,7 @@ class RevisionsTest extends TestCase {
 
 	public function test_update_post_creates_revision_without_flag_when_setting_enabled(): void {
 		global $_test_options;
-		$_test_options['aa_pending_revisions'] = true;
+		$_test_options['aa_force_draft'] = true;
 
 		$this->create_test_post( 42, 'publish' );
 
@@ -348,7 +348,7 @@ class RevisionsTest extends TestCase {
 
 	public function test_pending_revision_ignored_on_draft_post(): void {
 		global $_test_options;
-		$_test_options['aa_pending_revisions'] = true;
+		$_test_options['aa_force_draft'] = true;
 
 		$this->create_test_post( 42, 'draft' );
 
@@ -369,7 +369,10 @@ class RevisionsTest extends TestCase {
 	}
 
 	public function test_pending_revision_ignored_when_setting_disabled(): void {
-		// aa_pending_revisions NOT set (defaults to false).
+		global $_test_options;
+		// Force Draft off (default): updates to published posts apply directly,
+		// and the deprecated pending_revision body flag is ignored.
+		$_test_options['aa_force_draft'] = false;
 		$this->create_test_post( 42, 'publish' );
 
 		$request = new \WP_REST_Request();
@@ -386,10 +389,11 @@ class RevisionsTest extends TestCase {
 		$this->assertTrue( $data['success'] );
 	}
 
-	public function test_pending_revision_takes_priority_over_force_draft(): void {
+	public function test_force_draft_on_published_post_creates_revision_not_unpublish(): void {
 		global $_test_options;
-		$_test_options['aa_pending_revisions'] = true;
-		$_test_options['aa_force_draft']       = true;
+		// The safety guarantee: Force Draft must NOT unpublish a live article.
+		// On a published post it creates a revision and leaves the live post alone.
+		$_test_options['aa_force_draft'] = true;
 
 		$this->create_test_post( 42, 'publish' );
 
@@ -400,9 +404,8 @@ class RevisionsTest extends TestCase {
 		$request = new \WP_REST_Request();
 		$request->set_param( 'id', 42 );
 		$request->set_json_params( array(
-			'pending_revision' => true,
-			'title'            => 'Proposed Title',
-			'children'         => array(),
+			'title'    => 'Proposed Title',
+			'children' => array(),
 		) );
 
 		$result = $this->helper->update_post( $request );
@@ -410,6 +413,8 @@ class RevisionsTest extends TestCase {
 		$this->assertEquals( 201, $result->get_status() );
 		$data = $result->get_data();
 		$this->assertTrue( $data['revision_created'] );
+		// No direct status change happened — this is a revision, not a force-draft.
+		$this->assertArrayNotHasKey( 'force_draft_applied', $data );
 
 		// Live post should still be publish, NOT draft.
 		global $_test_posts;
@@ -576,13 +581,13 @@ class RevisionsTest extends TestCase {
 	// site-info setting
 	// =========================================================================
 
-	public function test_site_info_includes_pending_revisions_setting(): void {
+	public function test_site_info_pending_revisions_mirrors_force_draft(): void {
 		global $_test_options;
-		$_test_options['aa_pending_revisions'] = true;
+		// /site still reports `pending_revisions`, now derived from force_draft.
+		$_test_options['aa_force_draft'] = true;
+		$this->assertTrue( (bool) get_option( 'aa_force_draft', false ) );
 
-		$this->assertTrue( (bool) get_option( 'aa_pending_revisions', false ) );
-
-		$_test_options['aa_pending_revisions'] = false;
-		$this->assertFalse( (bool) get_option( 'aa_pending_revisions', false ) );
+		$_test_options['aa_force_draft'] = false;
+		$this->assertFalse( (bool) get_option( 'aa_force_draft', false ) );
 	}
 }

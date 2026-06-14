@@ -176,18 +176,19 @@ class ForceDraftTest extends TestCase {
 	// =========================================================================
 
 	/**
-	 * Test update_post forces draft when aa_force_draft is enabled.
+	 * Force Draft keeps a non-published update as a draft (cannot be published).
+	 * A published post would instead become a revision — see RevisionsTest.
 	 */
 	public function test_update_post_forces_draft_when_enabled(): void {
 		global $_test_options, $_test_posts;
 		$_test_options['aa_force_draft'] = true;
 
-		// Create a post to update.
+		// Create a draft post to update.
 		$_test_posts[42] = (object) array(
 			'ID'             => 42,
 			'post_type'      => 'post',
 			'post_title'     => 'Existing',
-			'post_status'    => 'publish',
+			'post_status'    => 'draft',
 			'post_content'   => '',
 			'post_excerpt'   => '',
 			'post_date'      => '2026-01-01 00:00:00',
@@ -243,7 +244,8 @@ class ForceDraftTest extends TestCase {
 	}
 
 	/**
-	 * Test update_post forces draft even without explicit status in body.
+	 * Force Draft keeps a non-published update as a draft even without a status
+	 * in the body. A published post would instead become a revision.
 	 */
 	public function test_update_post_forces_draft_without_status_in_body(): void {
 		global $_test_options, $_test_posts;
@@ -253,7 +255,7 @@ class ForceDraftTest extends TestCase {
 			'ID'             => 42,
 			'post_type'      => 'post',
 			'post_title'     => 'Existing',
-			'post_status'    => 'publish',
+			'post_status'    => 'draft',
 			'post_content'   => '',
 			'post_excerpt'   => '',
 			'post_date'      => '2026-01-01 00:00:00',

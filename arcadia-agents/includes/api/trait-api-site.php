@@ -54,7 +54,9 @@ trait Arcadia_API_Site_Handler {
 				),
 				'settings'         => array(
 					'force_draft'        => (bool) get_option( 'aa_force_draft', false ),
-					'pending_revisions'  => (bool) get_option( 'aa_pending_revisions', false ),
+					// Deprecated: pending-revision behavior is now driven by force_draft.
+					// Mirrors force_draft for backward-compat; AA should read force_draft.
+					'pending_revisions'  => (bool) get_option( 'aa_force_draft', false ),
 					'enabled_scopes'     => $this->auth->get_enabled_scopes(),
 				),
 				'acf_available'    => Arcadia_Blocks::is_acf_available(),

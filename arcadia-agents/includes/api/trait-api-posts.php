@@ -309,11 +309,13 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Pending Revision: server-side enforcement — setting active + published post
-		// means every update is stored as a pending revision, regardless of the body.
-		// The legacy `pending_revision` flag is deprecated: accepted, ignored.
-		// Takes priority over force_draft (early return = no wp_update_post).
-		if ( get_option( 'aa_pending_revisions', false )
+		// Force Draft on a published post: hold the edit as a pending revision
+		// instead of touching the live article. This is what stops Force Draft
+		// from unpublishing live content — the live post stays up, and a human
+		// approves the change from the editor. New posts and non-published posts
+		// fall through to the normal update path below.
+		// The legacy `pending_revision` body flag is deprecated: accepted, ignored.
+		if ( get_option( 'aa_force_draft', false )
 			&& 'publish' === $post->post_status
 		) {
 			// Render content for revision storage.
