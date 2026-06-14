@@ -1,0 +1,75 @@
+parameters:
+	ignoreErrors:
+		-
+			message: "#^Strict comparison using \\=\\=\\= between '0' and mixed~\\(0\\|0\\.0\\|''\\|'0'\\|array\\{\\}\\|false\\|null\\) will always evaluate to false\\.$#"
+			count: 1
+			path: includes/adapters/class-adapter-acf.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between 0 and mixed will always evaluate to false\\.$#"
+			count: 1
+			path: includes/adapters/class-adapter-acf.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between '0' and mixed~\\(0\\|0\\.0\\|''\\|'0'\\|array\\{\\}\\|false\\|null\\) will always evaluate to false\\.$#"
+			count: 1
+			path: includes/class-acf-validator.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between 0 and mixed will always evaluate to false\\.$#"
+			count: 1
+			path: includes/class-acf-validator.php
+
+		-
+			message: "#^Parameter \\#1 \\$id of function wp_set_current_user expects int\\|null, string given\\.$#"
+			count: 1
+			path: includes/class-api.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between '0' and mixed~\\(0\\|0\\.0\\|''\\|'0'\\|array\\{\\}\\|false\\|null\\) will always evaluate to false\\.$#"
+			count: 1
+			path: includes/class-api.php
+
+		-
+			message: "#^Strict comparison using \\=\\=\\= between 0 and mixed will always evaluate to false\\.$#"
+			count: 1
+			path: includes/class-api.php
+
+		-
+			message: "#^Variable \\$value in empty\\(\\) always exists and is not falsy\\.$#"
+			count: 1
+			path: includes/class-api.php
+
+		-
+			message: "#^is_wp_error\\(int\\<0, max\\>\\) will always evaluate to false\\.$#"
+			count: 1
+			path: includes/class-api.php
+
+		-
+			message: "#^Property WP_Block_Type\\:\\:\\$render_callback \\(callable\\) in empty\\(\\) is not falsy\\.$#"
+			count: 1
+			path: includes/class-block-registry.php
+
+		-
+			message: "#^Property WP_Block_Type\\:\\:\\$title \\(string\\) on left side of \\?\\? is not nullable\\.$#"
+			count: 1
+			path: includes/class-block-registry.php
+
+		-
+			message: "#^Function acf_get_block_types not found\\.$#"
+			count: 1
+			path: includes/class-blocks.php
+
+		-
+			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
+			count: 1
+			path: includes/class-revision-metabox.php
+		-
+			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
+			count: 1
+			path: admin/dashboard.php
+
+		-
+			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
+			count: 1
+			path: admin/settings.php

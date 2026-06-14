@@ -15,6 +15,9 @@ Thumbs.db
 /vendor/
 arcadia-agents/vendor/
 
+# PHPStan local config override (the committed baseline is phpstan.neon.dist)
+arcadia-agents/phpstan.neon
+
 # Test artifacts (sensitive)
 arcadia-agents/test/*.pem
 arcadia-agents/test/*.txt

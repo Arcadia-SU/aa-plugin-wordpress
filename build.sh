@@ -128,13 +128,60 @@ else
 	pass "All PHP files pass lint."
 fi
 
+# ─── Debug-code scan ───────────────────────────────────────────────────────
+#
+# Fails the build if debugging leftovers (var_dump / echoing print_r) ship in
+# production source. error_log() is allowed (used for legitimate warnings).
+
+check "Debug-code scan"
+debug_hits=$(grep -rnE "\bvar_dump\s*\(|\bprint_r\s*\([^,)]*\)" \
+	"${PLUGIN_DIR}/includes" "${PLUGIN_DIR}/admin" "${MAIN_FILE:-${PLUGIN_DIR}/arcadia-agents.php}" \
+	2>/dev/null || true)
+if [ -n "$debug_hits" ]; then
+	echo "$debug_hits"
+	fail "Debug code (var_dump / echoing print_r) found in production source."
+else
+	pass "No debug-code leftovers."
+fi
+
+# ─── Uninstall completeness ────────────────────────────────────────────────
+#
+# Every option/CPT/cron the plugin persists must be removed by uninstall.php,
+# otherwise deletion leaks data. Cross-checks the source against uninstall.php.
+
+check "Uninstall completeness"
+UNINSTALL_FILE="${PLUGIN_DIR}/uninstall.php"
+uninstall_missing=0
+while IFS= read -r opt; do
+	[ -z "$opt" ] && continue
+	if ! grep -q "'${opt}'" "$UNINSTALL_FILE"; then
+		warn "Option not cleaned in uninstall.php: ${opt}"
+		uninstall_missing=$((uninstall_missing + 1))
+	fi
+done < <(grep -rhoE "(update_option|add_option)\( *'(arcadia_[a-z_]+|aa_[a-z_]+)'" \
+	"${PLUGIN_DIR}/includes" "${PLUGIN_DIR}/admin" "${PLUGIN_DIR}/arcadia-agents.php" 2>/dev/null \
+	| grep -oE "'(arcadia_[a-z_]+|aa_[a-z_]+)'" | tr -d "'" | sort -u)
+
+for token in aa_revision arcadia_redirect arcadia_preview_cleanup; do
+	if ! grep -q "$token" "$UNINSTALL_FILE"; then
+		warn "Registered artifact not cleaned in uninstall.php: ${token}"
+		uninstall_missing=$((uninstall_missing + 1))
+	fi
+done
+
+if [ "$uninstall_missing" -gt 0 ]; then
+	fail "${uninstall_missing} persisted artifact(s) not handled by uninstall.php."
+else
+	pass "uninstall.php cleans all known options/CPTs/cron."
+fi
+
 # ─── 5. Autoloader audit ───────────────────────────────────────────────────
 
 check "Autoloader audit"
 autoload_files="${PLUGIN_DIR}/vendor/composer/autoload_files.php"
 if [ -f "$autoload_files" ]; then
-	if grep -qi "phpunit\|myclabs\|deep-copy" "$autoload_files"; then
-		fail "autoload_files.php references dev dependencies (phpunit/myclabs). Composer --no-dev did not clean properly."
+	if grep -qi "phpunit\|myclabs\|deep-copy\|phpstan\|szepeviktor\|parallel-lint" "$autoload_files"; then
+		fail "autoload_files.php references dev dependencies (phpunit/phpstan/...). Composer --no-dev did not clean properly."
 	else
 		pass "autoload_files.php exists but contains no dev references."
 	fi
@@ -177,8 +224,18 @@ NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
 sed -i '' "s/define( 'ARCADIA_AGENTS_VERSION', '${CURRENT_VERSION}' )/define( 'ARCADIA_AGENTS_VERSION', '${NEW_VERSION}' )/" "$MAIN_FILE"
 # Update plugin header
 sed -i '' "s/ \* Version: ${CURRENT_VERSION}/ * Version: ${NEW_VERSION}/" "$MAIN_FILE"
+# Keep readme.txt "Stable tag" in lockstep so the WP.org header never drifts.
+README_FILE="${PLUGIN_DIR}/readme.txt"
+sed -i '' "s/^Stable tag: .*/Stable tag: ${NEW_VERSION}/" "$README_FILE"
 
-pass "Version: ${CURRENT_VERSION} → ${NEW_VERSION}"
+# Assert the three version sources now agree (poka-yoke against future drift).
+HDR_VERSION=$(sed -n 's/^ \* Version: \([0-9.]*\).*/\1/p' "$MAIN_FILE")
+README_VERSION=$(sed -n 's/^Stable tag: \([0-9.]*\).*/\1/p' "$README_FILE")
+if [ "$HDR_VERSION" != "$NEW_VERSION" ] || [ "$README_VERSION" != "$NEW_VERSION" ]; then
+	fail "Version drift: define=${NEW_VERSION} header=${HDR_VERSION} readme=${README_VERSION}."
+fi
+
+pass "Version: ${CURRENT_VERSION} → ${NEW_VERSION} (define + header + readme in sync)"
 
 # ─── 9. Create zip ────────────────────────────────────────────────────────
 
@@ -218,6 +275,11 @@ if unzip -l "$ZIP_NAME" | grep -qi "myclabs"; then
 	zip_issues=$((zip_issues + 1))
 fi
 
+if unzip -l "$ZIP_NAME" | grep -qiE "phpstan|szepeviktor|wordpress-stubs|parallel-lint"; then
+	warn "Zip contains static-analysis dev dependencies."
+	zip_issues=$((zip_issues + 1))
+fi
+
 if unzip -l "$ZIP_NAME" | grep -q "composer\.json"; then
 	warn "Zip contains composer.json."
 	zip_issues=$((zip_issues + 1))
@@ -253,7 +315,9 @@ fi
 # ─── 11. Zip size ──────────────────────────────────────────────────────────
 
 check "Zip size"
-zip_size_kb=$(du -k "$ZIP_NAME" | cut -f1)
+# Byte-accurate (stat) rather than block-rounded (du -k); -f%z = BSD/macOS, -c%s = GNU/Linux.
+zip_size_bytes=$(stat -f%z "$ZIP_NAME" 2>/dev/null || stat -c%s "$ZIP_NAME")
+zip_size_kb=$((zip_size_bytes / 1024))
 if [ "$zip_size_kb" -gt "$MAX_ZIP_SIZE_KB" ]; then
 	warn "Zip is ${zip_size_kb}KB (threshold: ${MAX_ZIP_SIZE_KB}KB). Check for unnecessary files."
 else

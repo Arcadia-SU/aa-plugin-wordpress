@@ -1,0 +1,20 @@
+includes:
+	- vendor/szepeviktor/phpstan-wordpress/extension.neon
+	- phpstan-baseline.neon
+
+parameters:
+	level: 5
+	paths:
+		- arcadia-agents.php
+		- uninstall.php
+		- includes
+		- admin
+		- bin
+	excludePaths:
+		- vendor/*
+		- tests/*
+		- test/*
+	# ACF and other optional integrations aren't loaded at analysis time; their
+	# functions surface as "undefined" and are captured in the baseline so the
+	# gate flags NEW issues, not pre-existing optional-dependency noise.
+	treatPhpDocTypesAsCertain: false

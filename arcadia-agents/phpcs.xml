@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<ruleset name="ArcadiaAgents">
+	<description>Coding standards for the Arcadia Agents WordPress plugin.</description>
+
+	<!-- Scan the plugin directory by default. -->
+	<file>.</file>
+
+	<!-- Never scan dependencies, build artifacts, or test code. -->
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/tests/*</exclude-pattern>
+	<exclude-pattern>*/test/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+
+	<!-- PHP files only; show sniff codes and progress. -->
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="sp"/>
+
+	<!-- WordPress coding standards. -->
+	<rule ref="WordPress"/>
+
+	<!-- Enforce the plugin's required prefixes for all globals. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="arcadia"/>
+				<element value="aa_"/>
+				<element value="ARCADIA"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Enforce the single text domain. -->
+	<rule ref="WordPress.WP.I18n">
+		<properties>
+			<property name="text_domain" type="array">
+				<element value="arcadia-agents"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Target the plugin's minimum PHP version. -->
+	<config name="testVersion" value="8.0-"/>
+	<rule ref="PHPCompatibilityWP"/>
+</ruleset>

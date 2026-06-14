@@ -83,24 +83,32 @@ composer require firebase/php-jwt
 ./build.sh
 ```
 
-Le script exécute 12 checks avant de créer le zip :
+Le script exécute ces checks avant de créer le zip :
 
 | # | Check | Bloquant |
 |---|-------|----------|
 | 1 | Docker running | Oui |
-| 2 | PHPUnit tests | Oui |
-| 3 | `composer install --no-dev` | Oui |
-| 4 | PHP lint (tous les .php) | Oui |
-| 5 | Autoloader audit (pas de phpunit/myclabs) | Oui |
-| 6 | Vendor completeness (firebase/php-jwt) | Oui |
-| 7 | Boot test (autoloader charge) | Oui |
-| 8 | Version bump (auto-increment patch X.Y.**Z**) | Oui |
-| 9 | Création du zip | Oui |
-| 10 | Zip content audit (pas de tests/dev deps) | Oui |
-| 11 | Zip size (warning si > 500KB) | Warning |
-| 12 | Restauration dev deps (trap EXIT) | - |
+| 2 | **wp_slash safety gate** (`bin/check-wp-slash.php`) | Oui |
+| 3 | PHPUnit tests | Oui |
+| 4 | **Real-WordPress fidelity check** (`test/fidelity-check.php`) | Oui |
+| 5 | `composer install --no-dev` | Oui |
+| 6 | PHP lint (tous les .php) | Oui |
+| 7 | **Debug-code scan** (pas de `var_dump`/`print_r` echo) | Oui |
+| 8 | **Uninstall completeness** (options/CPT/cron nettoyés) | Oui |
+| 9 | Autoloader audit (pas de dev deps) | Oui |
+| 10 | Vendor completeness (firebase/php-jwt) | Oui |
+| 11 | Boot test (autoloader charge) | Oui |
+| 12 | Version bump + sync readme `Stable tag` | Oui |
+| 13 | Création du zip | Oui |
+| 14 | Zip content audit (pas de tests/dev deps) | Oui |
+| 15 | Zip size en octets (warning si > 500KB) | Warning |
+| – | Restauration dev deps (trap EXIT) | - |
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
+
+**Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
+
+**Analyse statique (CI uniquement) :** PHPStan (niveau 5 + `phpstan-wordpress` + baseline) tourne dans la CI GitHub, pas dans `./build.sh` (le conteneur local manque de RAM pour analyser tout le code d'un coup). Voir `.github/workflows/ci.yml` et `phpstan.neon.dist`.
 
 **RÈGLE : Toujours lancer `./build.sh` après tout changement de code.** Le zip doit rester à jour.
 
