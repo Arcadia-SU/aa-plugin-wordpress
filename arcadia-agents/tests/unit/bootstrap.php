@@ -417,6 +417,23 @@ if ( ! function_exists( 'get_post' ) ) {
     }
 }
 
+// current_user_can() stub. Configurable per test via $_test_user_can:
+//   - callable($cap, ...$args): full control (e.g. allow edit_post only for ID 42)
+//   - array($cap => bool): per-capability allowlist
+//   - bool / unset: blanket allow (default, back-compat for tests ignoring caps)
+if ( ! function_exists( 'current_user_can' ) ) {
+    function current_user_can( $capability, ...$args ) {
+        global $_test_user_can;
+        if ( is_callable( $_test_user_can ) ) {
+            return (bool) call_user_func( $_test_user_can, $capability, ...$args );
+        }
+        if ( is_array( $_test_user_can ) ) {
+            return ! empty( $_test_user_can[ $capability ] );
+        }
+        return isset( $_test_user_can ) ? (bool) $_test_user_can : true;
+    }
+}
+
 // get_post_types() stub.
 if ( ! function_exists( 'get_post_types' ) ) {
     function get_post_types( $args = array(), $output = 'names' ) {
@@ -920,6 +937,32 @@ if ( ! function_exists( 'wp_unslash' ) ) {
 if ( ! function_exists( 'wp_kses_post' ) ) {
     function wp_kses_post( $data ) {
         return $data;
+    }
+}
+
+// wp_kses() stub — faithful enough to enforce a tag allowlist and drop inline
+// event handlers, so XSS-stripping behaviour is actually testable. Disallowed
+// tags are removed but their inner text is kept, matching real wp_kses().
+if ( ! function_exists( 'wp_kses' ) ) {
+    function wp_kses( $string, $allowed_html = array(), $allowed_protocols = array() ) {
+        if ( ! is_array( $allowed_html ) ) {
+            return strip_tags( (string) $string );
+        }
+        $allowed = array_map( 'strtolower', array_keys( $allowed_html ) );
+
+        return preg_replace_callback(
+            '#<\s*(/?)\s*([a-zA-Z0-9]+)([^>]*)>#',
+            function ( $m ) use ( $allowed ) {
+                $tag = strtolower( $m[2] );
+                if ( ! in_array( $tag, $allowed, true ) ) {
+                    return ''; // Drop disallowed tag, keep surrounding text.
+                }
+                // Strip inline event handlers (onerror=, onclick=, ...) from allowed tags.
+                $attrs = preg_replace( '/\s*on[a-zA-Z]+\s*=\s*("[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $m[3] );
+                return '<' . $m[1] . $tag . $attrs . '>';
+            },
+            (string) $string
+        );
     }
 }
 

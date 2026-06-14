@@ -24,6 +24,13 @@ use Firebase\JWT\SignatureInvalidException;
 class Arcadia_Auth {
 
 	/**
+	 * Issuer that must appear in the `iss` claim of every token (spec: auth.md).
+	 *
+	 * @var string
+	 */
+	const EXPECTED_ISSUER = 'arcadia-agents';
+
+	/**
 	 * Single instance of the class.
 	 *
 	 * @var Arcadia_Auth|null
@@ -165,6 +172,14 @@ class Arcadia_Auth {
 			// Convert stdClass to array for consistent return type.
 			$payload = json_decode( wp_json_encode( $decoded ), true );
 
+			// A valid signature proves the token was minted by Arcadia's private
+			// key, but NOT that it was minted for *this* site. Verify the identity
+			// claims (issuer + site binding) before trusting the payload.
+			$claims_check = $this->validate_claims( $payload );
+			if ( is_wp_error( $claims_check ) ) {
+				return $claims_check;
+			}
+
 			// Update last activity.
 			update_option( 'arcadia_agents_last_activity', current_time( 'mysql' ), false );
 
@@ -205,6 +220,59 @@ class Arcadia_Auth {
 				401
 			);
 		}
+	}
+
+	/**
+	 * Validate the identity claims of an already signature-verified payload.
+	 *
+	 * Signature + expiry are checked by validate_jwt(); this enforces *who* the
+	 * caller is, which a valid signature alone does not guarantee:
+	 *   1. `iss` must be the Arcadia issuer (spec-conformance / defense in depth).
+	 *   2. `sub` (the site_id the token was minted for) must match the site this
+	 *      install is pinned to. The handshake response does not carry a site_id
+	 *      (see auth.md), so we pin trust-on-first-use: the first valid token
+	 *      records its `sub`, and every later token must match it. This blocks a
+	 *      token minted for another site (same Arcadia keypair) from being
+	 *      replayed against this install. disconnect() clears the pin so a fresh
+	 *      handshake can re-pin a re-provisioned site.
+	 *
+	 * @param array $payload Decoded JWT payload (associative array).
+	 * @return true|WP_Error True when the identity is acceptable, WP_Error otherwise.
+	 */
+	public function validate_claims( $payload ) {
+		// 1. Issuer.
+		$iss = isset( $payload['iss'] ) ? (string) $payload['iss'] : '';
+		if ( self::EXPECTED_ISSUER !== $iss ) {
+			return $this->error_response(
+				'invalid_issuer',
+				__( 'Token issuer is not recognized.', 'arcadia-agents' ),
+				401
+			);
+		}
+
+		// 2. Subject (site identity), pinned trust-on-first-use.
+		$sub = isset( $payload['sub'] ) ? (string) $payload['sub'] : '';
+		if ( '' === $sub ) {
+			return $this->error_response(
+				'missing_subject',
+				__( 'Token does not identify a site (missing sub claim).', 'arcadia-agents' ),
+				401
+			);
+		}
+
+		$pinned_site_id = (string) get_option( 'arcadia_agents_site_id', '' );
+		if ( '' === $pinned_site_id ) {
+			// First valid token after connection — pin this site identity.
+			update_option( 'arcadia_agents_site_id', $sub, false );
+		} elseif ( ! hash_equals( $pinned_site_id, $sub ) ) {
+			return $this->error_response(
+				'site_mismatch',
+				__( 'Token was issued for a different site.', 'arcadia-agents' ),
+				401
+			);
+		}
+
+		return true;
 	}
 
 	/**
@@ -365,6 +433,7 @@ class Arcadia_Auth {
 		delete_option( 'arcadia_agents_connected_at' );
 		delete_option( 'arcadia_agents_last_activity' );
 		delete_option( 'arcadia_agents_connection_key' );
+		delete_option( 'arcadia_agents_site_id' );
 		return true;
 	}
 }

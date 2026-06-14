@@ -254,10 +254,12 @@ trait Arcadia_API_Field_Schema_Handler {
 					if ( 'image' === $acf_field_type && is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
 						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
 						if ( is_wp_error( $sideloaded ) ) {
-							// Log warning but don't fail the whole request.
+							// Log warning but don't fail the whole request. Sanitize the
+							// agent-supplied field name first so it can't inject forged
+							// log lines (CR/LF / control chars) into the PHP error log.
 							error_log( sprintf(
 								'[ArcadiaAgents] field_schema sideload failed for %s: %s',
-								$field_name,
+								sanitize_key( $field_name ),
 								$sideloaded->get_error_message()
 							) );
 							continue;

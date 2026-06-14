@@ -22,6 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Plugin constants.
 define( 'ARCADIA_AGENTS_VERSION', '0.1.29' );
+define( 'ARCADIA_AGENTS_PLUGIN_FILE', __FILE__ );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 
@@ -120,6 +121,9 @@ class Arcadia_Agents {
 	 * Initialize hooks.
 	 */
 	private function init_hooks() {
+		// Load translations (i18n).
+		add_action( 'init', array( $this, 'load_textdomain' ) );
+
 		// Register REST API endpoints.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 
@@ -158,6 +162,17 @@ class Arcadia_Agents {
 
 		// Invalidate blocks usage cache when posts are saved.
 		add_action( 'save_post', array( $this, 'invalidate_blocks_usage_cache' ) );
+	}
+
+	/**
+	 * Load the plugin text domain so admin/UI strings can be translated.
+	 */
+	public function load_textdomain() {
+		load_plugin_textdomain(
+			'arcadia-agents',
+			false,
+			dirname( plugin_basename( ARCADIA_AGENTS_PLUGIN_FILE ) ) . '/languages'
+		);
 	}
 
 	/**

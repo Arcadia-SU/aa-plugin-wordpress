@@ -266,14 +266,31 @@ class Arcadia_Preview {
 	/**
 	 * Check if this is a debug request.
 	 *
-	 * No additional gate beyond the preview token: the debug output
-	 * contains only theme/template/query diagnostics (no secrets),
-	 * and the token already proves authorized access.
+	 * Gated behind WP_DEBUG. The report lists theme template files and paths,
+	 * which is filesystem reconnaissance we don't want exposed on a production
+	 * site to anyone holding a (shareable) preview token. A capability gate is
+	 * not usable here — preview access is proven by the URL token, not a WP
+	 * login — so WP_DEBUG is the right switch: the tool stays available the
+	 * moment a developer turns debugging on, and is inert otherwise.
 	 *
 	 * @return bool
 	 */
 	private function is_debug_request() {
-		return ! empty( $_GET['aa_debug'] );
+		return ! empty( $_GET['aa_debug'] ) && defined( 'WP_DEBUG' ) && WP_DEBUG;
+	}
+
+	/**
+	 * Strip the WordPress root from a path so the debug report never leaks the
+	 * absolute server layout (e.g. /home/<client>/… or /var/www/html/…).
+	 *
+	 * @param string $value A path, or a message that may contain one.
+	 * @return string The value with ABSPATH removed.
+	 */
+	private function strip_abspath( $value ) {
+		if ( ! is_string( $value ) || ! defined( 'ABSPATH' ) ) {
+			return $value;
+		}
+		return str_replace( ABSPATH, '', $value );
 	}
 
 	/**
@@ -297,7 +314,7 @@ class Arcadia_Preview {
 			try {
 				include $template;
 			} catch ( \Throwable $e ) {
-				$render_error = $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine();
+				$render_error = $this->strip_abspath( $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine() );
 			}
 			$output        = ob_get_clean();
 			$output_length = strlen( $output );
@@ -335,12 +352,12 @@ class Arcadia_Preview {
 			'theme'            => array(
 				'stylesheet'       => get_stylesheet(),
 				'template'         => get_template(),
-				'stylesheet_dir'   => get_stylesheet_directory(),
+				'stylesheet_dir'   => $this->strip_abspath( get_stylesheet_directory() ),
 				'is_child_theme'   => get_stylesheet() !== get_template(),
 			),
 			'template_resolution' => array(
-				'candidates'       => $templates,
-				'resolved'         => $template ? $template : null,
+				'candidates'       => array_map( array( $this, 'strip_abspath' ), $templates ),
+				'resolved'         => $template ? $this->strip_abspath( $template ) : null,
 				'resolved_exists'  => $template ? file_exists( $template ) : false,
 			),
 			'theme_template_files' => $theme_files,

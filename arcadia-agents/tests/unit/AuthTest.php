@@ -101,6 +101,7 @@ class AuthTest extends TestCase {
         $_test_options['arcadia_agents_connected']     = true;
         $_test_options['arcadia_agents_connected_at']  = '2025-01-01 00:00:00';
         $_test_options['arcadia_agents_last_activity'] = '2025-01-02 00:00:00';
+        $_test_options['arcadia_agents_site_id']       = 'site-abc';
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->disconnect();
@@ -110,6 +111,95 @@ class AuthTest extends TestCase {
         $this->assertArrayNotHasKey( 'arcadia_agents_connected', $_test_options );
         $this->assertArrayNotHasKey( 'arcadia_agents_connected_at', $_test_options );
         $this->assertArrayNotHasKey( 'arcadia_agents_last_activity', $_test_options );
+        // The site identity pin must be cleared so a re-handshake can re-pin.
+        $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
+    }
+
+    // -------------------------------------------------------
+    // validate_claims() — JWT identity (A5: iss + site binding)
+    // -------------------------------------------------------
+
+    /**
+     * First valid token pins the site identity (trust-on-first-use).
+     */
+    public function test_validate_claims_pins_site_on_first_use(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'arcadia-agents', 'sub' => 'site-123' )
+        );
+
+        $this->assertTrue( $result );
+        $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
+    }
+
+    /**
+     * A token whose sub matches the pinned site is accepted.
+     */
+    public function test_validate_claims_accepts_matching_site(): void {
+        global $_test_options;
+        $_test_options = array( 'arcadia_agents_site_id' => 'site-123' );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'arcadia-agents', 'sub' => 'site-123' )
+        );
+
+        $this->assertTrue( $result );
+    }
+
+    /**
+     * A token minted for a different site (same keypair) is rejected.
+     */
+    public function test_validate_claims_rejects_site_mismatch(): void {
+        global $_test_options;
+        $_test_options = array( 'arcadia_agents_site_id' => 'site-123' );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'arcadia-agents', 'sub' => 'site-999' )
+        );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'site_mismatch', $result->get_error_code() );
+        // The original pin must not be overwritten by the rejected token.
+        $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
+    }
+
+    /**
+     * A token with the wrong issuer is rejected, even with a valid signature.
+     */
+    public function test_validate_claims_rejects_bad_issuer(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'evil-issuer', 'sub' => 'site-123' )
+        );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'invalid_issuer', $result->get_error_code() );
+        // Must not pin a site from a rejected token.
+        $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
+    }
+
+    /**
+     * A token without a sub claim is rejected (cannot identify a site).
+     */
+    public function test_validate_claims_rejects_missing_subject(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'arcadia-agents' )
+        );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'missing_subject', $result->get_error_code() );
     }
 
     /**

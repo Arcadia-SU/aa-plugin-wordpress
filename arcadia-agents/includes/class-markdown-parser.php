@@ -86,6 +86,22 @@ final class Arcadia_Markdown_Parser {
 			$text
 		);
 
-		return $text;
+		// Final safety net: the bold/italic/link rules above interpolate raw
+		// agent text, so strip anything outside the small inline allowlist.
+		// Neutralises stored XSS (e.g. `**<img src=x onerror=alert(1)>**`) while
+		// keeping the intended formatting.
+		return wp_kses(
+			$text,
+			array(
+				'strong' => array(),
+				'em'     => array(),
+				'code'   => array(),
+				'a'      => array(
+					'href'   => true,
+					'target' => true,
+					'rel'    => true,
+				),
+			)
+		);
 	}
 }

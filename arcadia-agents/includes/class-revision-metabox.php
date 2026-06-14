@@ -272,13 +272,14 @@ class Arcadia_Revision_Metabox {
 	public function ajax_approve() {
 		check_ajax_referer( 'aa_revision_action', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( __( 'Permission denied.', 'arcadia-agents' ) );
-		}
-
 		$revision_id = (int) ( $_POST['revision_id'] ?? 0 );
 		if ( ! $revision_id ) {
 			wp_send_json_error( __( 'Missing revision ID.', 'arcadia-agents' ) );
+		}
+
+		$authorized = $this->authorize_revision_action( $revision_id );
+		if ( is_wp_error( $authorized ) ) {
+			wp_send_json_error( $authorized->get_error_message() );
 		}
 
 		$user   = wp_get_current_user();
@@ -297,15 +298,16 @@ class Arcadia_Revision_Metabox {
 	public function ajax_reject() {
 		check_ajax_referer( 'aa_revision_action', 'nonce' );
 
-		if ( ! current_user_can( 'edit_posts' ) ) {
-			wp_send_json_error( __( 'Permission denied.', 'arcadia-agents' ) );
-		}
-
 		$revision_id    = (int) ( $_POST['revision_id'] ?? 0 );
 		$decision_notes = sanitize_textarea_field( $_POST['decision_notes'] ?? '' );
 
 		if ( ! $revision_id ) {
 			wp_send_json_error( __( 'Missing revision ID.', 'arcadia-agents' ) );
+		}
+
+		$authorized = $this->authorize_revision_action( $revision_id );
+		if ( is_wp_error( $authorized ) ) {
+			wp_send_json_error( $authorized->get_error_message() );
 		}
 
 		$user   = wp_get_current_user();
@@ -316,6 +318,33 @@ class Arcadia_Revision_Metabox {
 		}
 
 		wp_send_json_success( array( 'message' => __( 'Revision rejected.', 'arcadia-agents' ) ) );
+	}
+
+	/**
+	 * Authorize an approve/reject action on a revision.
+	 *
+	 * A global `edit_posts` check is too weak: a contributor could approve a
+	 * revision that targets a post they may not edit. We resolve the revision's
+	 * parent post and require `edit_post` on *that specific post*, so authority
+	 * follows the real target, not a blanket capability.
+	 *
+	 * Returns the parent post ID on success so callers need not re-query it.
+	 *
+	 * @param int $revision_id The aa_revision post ID.
+	 * @return int|WP_Error Parent post ID, or WP_Error when not found / not permitted.
+	 */
+	public function authorize_revision_action( $revision_id ) {
+		$revision = get_post( $revision_id );
+		if ( ! $revision || 'aa_revision' !== $revision->post_type ) {
+			return new WP_Error( 'revision_not_found', __( 'Revision not found.', 'arcadia-agents' ) );
+		}
+
+		$parent_id = (int) $revision->post_parent;
+		if ( ! $parent_id || ! current_user_can( 'edit_post', $parent_id ) ) {
+			return new WP_Error( 'permission_denied', __( 'Permission denied.', 'arcadia-agents' ) );
+		}
+
+		return $parent_id;
 	}
 
 	/**

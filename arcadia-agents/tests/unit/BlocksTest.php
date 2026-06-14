@@ -146,6 +146,52 @@ class BlocksTest extends TestCase {
     }
 
     // =========================================================================
+    // Stored-XSS regression tests (A3) — the bold/italic/link rules interpolate
+    // raw agent text, so parse_markdown() must wp_kses() its output to an inline
+    // allowlist. These prove disallowed markup is neutralised while formatting
+    // survives. Reverting the wp_kses() wrap makes them fail.
+    // =========================================================================
+
+    /**
+     * An injected <img onerror> inside bold markup must be stripped.
+     */
+    public function test_parse_markdown_strips_injected_img_xss(): void {
+        $input  = '**<img src=x onerror=alert(1)>**';
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
+
+        // The <img> tag is not in the allowlist → removed entirely.
+        $this->assertStringNotContainsString( '<img', $result );
+        $this->assertStringNotContainsString( 'onerror', $result );
+        // The legitimate formatting wrapper survives.
+        $this->assertStringContainsString( '<strong>', $result );
+    }
+
+    /**
+     * An injected <script> tag must not survive in the stored output.
+     */
+    public function test_parse_markdown_strips_injected_script(): void {
+        $input  = 'Hello *<script>alert(1)</script>* world';
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
+
+        $this->assertStringNotContainsString( '<script>', $result );
+        $this->assertStringNotContainsString( '</script>', $result );
+        $this->assertStringContainsString( '<em>', $result );
+    }
+
+    /**
+     * The allowlisted inline tags (strong/em/code/a) must pass through intact.
+     */
+    public function test_parse_markdown_keeps_allowlisted_formatting(): void {
+        $input  = '**bold** and *italic* and `snippet` and [link](https://ext.example.com)';
+        $result = \Arcadia_Markdown_Parser::parse_markdown( $input );
+
+        $this->assertStringContainsString( '<strong>bold</strong>', $result );
+        $this->assertStringContainsString( '<em>italic</em>', $result );
+        $this->assertStringContainsString( '<code>snippet</code>', $result );
+        $this->assertStringContainsString( 'href="https://ext.example.com"', $result );
+    }
+
+    // =========================================================================
     // Block structure tests (documentation tests)
     // =========================================================================
 
