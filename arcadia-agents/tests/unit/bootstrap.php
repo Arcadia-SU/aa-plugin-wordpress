@@ -485,7 +485,10 @@ if ( ! function_exists( 'update_post_meta' ) ) {
 
     function update_post_meta( $post_id, $meta_key, $meta_value ) {
         global $_test_post_meta;
-        $_test_post_meta[ $post_id ][ $meta_key ] = $meta_value;
+        // WordPress unslashes meta values internally (update_metadata() calls
+        // wp_unslash). Callers storing wp_json_encode()'d blobs must wp_slash()
+        // first, exactly like post_content. Mirror core so the round-trip is real.
+        $_test_post_meta[ $post_id ][ $meta_key ] = wp_unslash( $meta_value );
         return true;
     }
 }

@@ -146,7 +146,13 @@ class Arcadia_Revisions {
 			'meta' => $meta,
 		);
 		update_post_meta( $revision_id, '_aa_revision_version', $version );
-		update_post_meta( $revision_id, '_aa_revision_meta', wp_json_encode( $revision_meta ) );
+		// wp_slash() is mandatory for the same reason as post_content above:
+		// update_post_meta() runs wp_unslash() internally, and this is a JSON
+		// blob from wp_json_encode() (backslash escapes \" \n). Without slashing,
+		// the escapes are stripped, the JSON breaks, and approve_revision() fails
+		// at json_decode() with "Revision metadata is corrupted" — making EVERY
+		// revision un-approvable even when its rendered content is fine.
+		update_post_meta( $revision_id, '_aa_revision_meta', wp_slash( wp_json_encode( $revision_meta ) ) );
 		update_post_meta( $revision_id, '_aa_revision_created_by', 'arcadia_agent' );
 
 		if ( ! empty( $body['revision_notes'] ) ) {

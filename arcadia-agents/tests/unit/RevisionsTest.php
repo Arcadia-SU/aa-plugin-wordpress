@@ -199,6 +199,55 @@ class RevisionsTest extends TestCase {
 		$this->assertStringContainsString( '"inline"', $decoded['data']['text'], 'Inline quotes must survive' );
 	}
 
+	/**
+	 * Regression: the _aa_revision_meta JSON blob must survive update_post_meta().
+	 *
+	 * update_post_meta() unslashes internally (like wp_insert_post), so the
+	 * wp_json_encode()'d {body, meta} blob MUST be wp_slash()'d first. Without
+	 * that, escaped quotes (\") in the payload collapse to bare ", the stored
+	 * JSON becomes invalid, and approve_revision() dies at json_decode() with
+	 * "Revision metadata is corrupted" — every revision un-approvable, even when
+	 * its rendered content is perfect. This is the second half of the same bug.
+	 *
+	 * Asserts the real end-to-end symptom: a payload containing quotes survives
+	 * storage AND approves cleanly onto the live post.
+	 */
+	public function test_create_revision_meta_survives_storage_and_approve(): void {
+		$this->create_test_post( 42 );
+
+		\WP_Query::set_next_result( array() ); // get_pending_revision: none.
+		\WP_Query::set_next_result( array() ); // get_next_version: first.
+
+		// Quotes in the payload force wp_json_encode() to emit \" escapes —
+		// exactly what update_post_meta()'s wp_unslash() would otherwise eat.
+		$body = array(
+			'title'    => 'Frais de notaire : le "vrai" calcul',
+			'excerpt'  => 'Tout savoir sur le calcul des frais.',
+			'children' => array(),
+		);
+		$meta = array(
+			'title'       => 'Calcul des frais de notaire | "Guide"',
+			'description' => 'Il a dit "bonjour" puis a signé.',
+		);
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$result    = $revisions->create_revision( 42, $body, $meta, '<p>New content</p>' );
+		$rev_id    = $result['revision_id'];
+
+		// 1. Stored blob must still be valid JSON with the quotes intact.
+		global $_test_post_meta, $_test_posts;
+		$decoded = json_decode( $_test_post_meta[ $rev_id ]['_aa_revision_meta'], true );
+		$this->assertIsArray( $decoded, 'Revision meta JSON must remain valid' );
+		$this->assertSame( 'Frais de notaire : le "vrai" calcul', $decoded['body']['title'] );
+		$this->assertSame( 'Il a dit "bonjour" puis a signé.', $decoded['meta']['description'] );
+
+		// 2. End-to-end: approve must NOT fail with revision_meta_corrupt.
+		$approved = $revisions->approve_revision( $rev_id, 'admin' );
+		$this->assertTrue( $approved, 'Approve must succeed (no corrupted-metadata error)' );
+		$this->assertSame( 'Frais de notaire : le "vrai" calcul', $_test_posts[42]->post_title );
+		$this->assertSame( 'Calcul des frais de notaire | "Guide"', $_test_post_meta[42]['_yoast_wpseo_title'] );
+	}
+
 	// =========================================================================
 	// Arcadia_Revisions — approve_revision()
 	// =========================================================================
