@@ -14,6 +14,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Load shared helpers used by adapters (comment-safe serializer + SSRF guard).
+require_once __DIR__ . '/class-block-serializer.php';
+require_once __DIR__ . '/class-url-guard.php';
+
 // Load adapter interface, implementations, and block processor.
 require_once __DIR__ . '/adapters/interface-block-adapter.php';
 require_once __DIR__ . '/adapters/class-adapter-gutenberg.php';

@@ -198,4 +198,32 @@ class MediaCrudTest extends TestCase {
         $this->assertEquals( '2025-06-01', $date_query['after'] );
         $this->assertEquals( '2025-12-31', $date_query['before'] );
     }
+
+    /**
+     * Regression (wp_slash class): a caption containing a backslash must
+     * survive the wp_update_post() round-trip byte-for-byte. Without wp_slash()
+     * WordPress unslashes it on save and silently strips the backslash.
+     */
+    public function test_update_media_caption_preserves_backslash(): void {
+        global $_test_posts;
+        $_test_posts[55] = (object) array(
+            'ID'             => 55,
+            'post_type'      => 'attachment',
+            'post_title'     => 'Image',
+            'post_excerpt'   => '',
+            'post_mime_type' => 'image/jpeg',
+            'post_date'      => '2025-01-01 00:00:00',
+        );
+
+        $caption = 'Windows path C:\Users and a "quoted" word';
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '55' );
+        $request->set_json_params( array( 'caption' => $caption ) );
+
+        $result = $this->helper->update_media( $request );
+
+        $this->assertInstanceOf( \WP_REST_Response::class, $result );
+        $this->assertSame( $caption, $_test_posts[55]->post_excerpt );
+    }
 }

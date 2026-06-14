@@ -91,6 +91,8 @@ class Arcadia_Agents {
 	 */
 	private function load_dependencies() {
 		// Core classes.
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-url-guard.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-serializer.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-markdown-parser.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';

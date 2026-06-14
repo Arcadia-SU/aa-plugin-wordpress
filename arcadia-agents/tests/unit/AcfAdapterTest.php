@@ -74,6 +74,28 @@ class AcfAdapterTest extends TestCase {
 	}
 
 	/**
+	 * Regression (block-comment injection): agent content containing `-->` or a
+	 * forged `<!-- wp:` must not break out of the ACF block comment. Only the
+	 * opening and trailing delimiters are allowed to be comment markers.
+	 */
+	public function test_acf_block_escapes_comment_breakout(): void {
+		$this->register_acf_block( 'acf/hero', array(
+			array( 'name' => 'titre', 'type' => 'text', 'key' => 'field_titre' ),
+		) );
+
+		$result = $this->adapter->custom_block( 'acf/hero', array(
+			'titre' => 'evil --> <!-- wp:core/html breakout',
+		) );
+
+		// Exactly one opening delimiter (the block's own); no forged one in the JSON.
+		$this->assertSame( 1, substr_count( $result, '<!--' ) );
+
+		// Strip the legitimate trailing ` /-->`; the remainder must hold no `-->`.
+		$body = preg_replace( '/\s*\/-->\s*$/', '', $result );
+		$this->assertStringNotContainsString( '-->', $body );
+	}
+
+	/**
 	 * Test that text/url/select fields in ACF block are NOT converted.
 	 *
 	 * These field types should pass through unchanged — no markdown conversion.

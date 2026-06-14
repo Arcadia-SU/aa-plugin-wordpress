@@ -112,7 +112,7 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 	 */
 	public function custom_block( $block_name, $properties ) {
 		$attrs = ! empty( $properties )
-			? ' ' . wp_json_encode( $properties, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
+			? ' ' . Arcadia_Block_Serializer::encode_attributes( $properties )
 			: '';
 
 		return sprintf(

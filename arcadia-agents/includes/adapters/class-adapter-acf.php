@@ -233,6 +233,13 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 			);
 		}
 
+		// SSRF guard — reject non-HTTP(S) schemes and private/reserved hosts
+		// before fetching. Same guard as trait-api-media::sideload_image().
+		$valid = Arcadia_Url_Guard::validate_remote_url( $url );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
+		}
+
 		$attachment_id = media_sideload_image( $url, $post_id, $title, 'id' );
 
 		if ( is_wp_error( $attachment_id ) ) {
@@ -326,7 +333,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 		return sprintf(
 			'<!-- wp:%s %s /-->' . "\n\n",
 			$name,
-			wp_json_encode( $block, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES )
+			Arcadia_Block_Serializer::encode_attributes( $block )
 		);
 	}
 }

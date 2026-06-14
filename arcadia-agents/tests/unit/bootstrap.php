@@ -1025,8 +1025,14 @@ if ( ! function_exists( 'set_post_thumbnail' ) ) {
 }
 
 // wp_http_validate_url() stub.
+// Honors the $_test_http_validate_url global so tests can simulate a blocked
+// (private/reserved) host by setting it to false; defaults to "valid".
 if ( ! function_exists( 'wp_http_validate_url' ) ) {
     function wp_http_validate_url( $url ) {
+        global $_test_http_validate_url;
+        if ( isset( $_test_http_validate_url ) ) {
+            return $_test_http_validate_url;
+        }
         return $url;
     }
 }

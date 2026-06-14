@@ -100,10 +100,12 @@ trait Arcadia_API_Redirects_Handler {
 		$source = '/' . trim( $source, '/' );
 
 		$post_id = wp_insert_post(
-			array(
-				'post_type'   => 'arcadia_redirect',
-				'post_title'  => $source,
-				'post_status' => 'publish',
+			wp_slash(
+				array(
+					'post_type'   => 'arcadia_redirect',
+					'post_title'  => $source,
+					'post_status' => 'publish',
+				)
 			)
 		);
 

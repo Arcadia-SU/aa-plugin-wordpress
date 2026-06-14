@@ -13,6 +13,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+// Shared SSRF guard (single source of truth for remote-URL validation).
+require_once __DIR__ . '/../class-url-guard.php';
+
 /**
  * Trait Arcadia_API_Media_Handler
  *
@@ -57,9 +60,11 @@ trait Arcadia_API_Media_Handler {
 
 		if ( $caption ) {
 			wp_update_post(
-				array(
-					'ID'           => $attachment_id,
-					'post_excerpt' => $caption,
+				wp_slash(
+					array(
+						'ID'           => $attachment_id,
+						'post_excerpt' => $caption,
+					)
 				)
 			);
 		}
@@ -174,23 +179,10 @@ trait Arcadia_API_Media_Handler {
 	 * @return int|WP_Error Attachment ID or error.
 	 */
 	private function sideload_image( $url, $title = '' ) {
-		// Validate URL scheme — only HTTP(S) allowed (finding #13).
-		$parsed = wp_parse_url( $url );
-		if ( empty( $parsed['scheme'] ) || ! in_array( $parsed['scheme'], array( 'http', 'https' ), true ) ) {
-			return new WP_Error(
-				'invalid_url_scheme',
-				__( 'Only HTTP and HTTPS URLs are allowed.', 'arcadia-agents' ),
-				array( 'status' => 400 )
-			);
-		}
-
-		// Block private/reserved IPs — SSRF protection (finding #13).
-		if ( ! wp_http_validate_url( $url ) ) {
-			return new WP_Error(
-				'invalid_url',
-				__( 'URL is not allowed (private/reserved IP).', 'arcadia-agents' ),
-				array( 'status' => 400 )
-			);
+		// Validate scheme + block private/reserved hosts — SSRF protection.
+		$valid = Arcadia_Url_Guard::validate_remote_url( $url );
+		if ( is_wp_error( $valid ) ) {
+			return $valid;
 		}
 
 		// Require media functions.
@@ -380,7 +372,7 @@ trait Arcadia_API_Media_Handler {
 		}
 
 		if ( $updated ) {
-			wp_update_post( $post_data );
+			wp_update_post( wp_slash( $post_data ) );
 		}
 
 		if ( isset( $body['alt_text'] ) ) {
