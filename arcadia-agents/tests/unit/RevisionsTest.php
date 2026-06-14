@@ -152,6 +152,51 @@ class RevisionsTest extends TestCase {
 	}
 
 	/**
+	 * A7: creating a revision prunes decided revisions beyond the retention cap,
+	 * keeping the newest RETENTION_PER_POST and never touching the live pending one.
+	 */
+	public function test_create_revision_prunes_old_revisions_beyond_cap(): void {
+		global $_test_posts;
+		$this->create_test_post( 42 );
+
+		$cap = \Arcadia_Revisions::RETENTION_PER_POST;
+
+		// Seed cap+2 decided (superseded) revisions, oldest-dated first.
+		for ( $i = 0; $i < $cap + 2; $i++ ) {
+			$id = 2000 + $i;
+			$_test_posts[ $id ] = (object) array(
+				'ID'          => $id,
+				'post_type'   => 'aa_revision',
+				'post_parent' => 42,
+				'post_status' => 'superseded',
+				'post_date'   => sprintf( '2026-01-%02d 00:00:00', $i + 1 ),
+			);
+		}
+
+		// create_revision() queries get_pending_revision + get_next_version (WP_Query).
+		\WP_Query::set_next_result( array() );
+		\WP_Query::set_next_result( array() );
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$revisions->create_revision( 42, array( 'title' => 'New' ), array(), '<p>x</p>' );
+
+		// The two oldest decided revisions are pruned...
+		$this->assertArrayNotHasKey( 2000, $_test_posts );
+		$this->assertArrayNotHasKey( 2001, $_test_posts );
+		// ...the next-oldest is kept.
+		$this->assertArrayHasKey( 2002, $_test_posts );
+
+		// Exactly `cap` decided revisions remain for this post.
+		$decided = array_filter(
+			$_test_posts,
+			fn( $p ) => 'aa_revision' === ( $p->post_type ?? '' )
+				&& 42 === ( $p->post_parent ?? 0 )
+				&& 'superseded' === ( $p->post_status ?? '' )
+		);
+		$this->assertCount( $cap, $decided );
+	}
+
+	/**
 	 * Regression: rendered block markup must survive wp_insert_post() intact.
 	 *
 	 * acf_block() builds attributes with wp_json_encode(), so post_content is
@@ -243,7 +288,9 @@ class RevisionsTest extends TestCase {
 
 		// 2. End-to-end: approve must NOT fail with revision_meta_corrupt.
 		$approved = $revisions->approve_revision( $rev_id, 'admin' );
-		$this->assertTrue( $approved, 'Approve must succeed (no corrupted-metadata error)' );
+		$this->assertIsArray( $approved, 'Approve must succeed (no corrupted-metadata error)' );
+		$this->assertTrue( $approved['approved'] );
+		$this->assertSame( array(), $approved['warnings'], 'No replay warnings expected' );
 		$this->assertSame( 'Frais de notaire : le "vrai" calcul', $_test_posts[42]->post_title );
 		$this->assertSame( 'Calcul des frais de notaire | "Guide"', $_test_post_meta[42]['_yoast_wpseo_title'] );
 	}
@@ -292,7 +339,8 @@ class RevisionsTest extends TestCase {
 		$revisions = \Arcadia_Revisions::get_instance();
 		$result    = $revisions->approve_revision( $rev_id, 'admin' );
 
-		$this->assertTrue( $result );
+		$this->assertIsArray( $result );
+		$this->assertTrue( $result['approved'] );
 
 		// Live post should be updated.
 		$this->assertEquals( 'Updated Title', $_test_posts[42]->post_title );

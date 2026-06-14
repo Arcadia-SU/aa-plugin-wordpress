@@ -735,10 +735,64 @@ if ( ! function_exists( 'get_term_by' ) ) {
     }
 }
 
-// wp_delete_post() stub.
+// wp_delete_post() stub. Removes the post from the in-memory store so prune /
+// cleanup logic can be asserted (force-delete also drops its meta).
 if ( ! function_exists( 'wp_delete_post' ) ) {
     function wp_delete_post( $post_id, $force = false ) {
-        return true;
+        global $_test_posts, $_test_post_meta;
+        if ( ! isset( $_test_posts[ $post_id ] ) ) {
+            return false;
+        }
+        $deleted = $_test_posts[ $post_id ];
+        unset( $_test_posts[ $post_id ] );
+        if ( $force && isset( $_test_post_meta[ $post_id ] ) ) {
+            unset( $_test_post_meta[ $post_id ] );
+        }
+        return $deleted;
+    }
+}
+
+// get_posts() stub — supports the subset of args the plugin uses (post_type,
+// post_parent, post_status, orderby=date, order, offset, numberposts/per_page,
+// fields=ids). Backed by the in-memory $_test_posts store.
+if ( ! function_exists( 'get_posts' ) ) {
+    function get_posts( $args = array() ) {
+        global $_test_posts;
+        $posts = array_values( $_test_posts ?? array() );
+
+        if ( ! empty( $args['post_type'] ) ) {
+            $types = (array) $args['post_type'];
+            $posts = array_filter( $posts, fn( $p ) => in_array( $p->post_type ?? '', $types, true ) );
+        }
+        if ( isset( $args['post_parent'] ) ) {
+            $parent = (int) $args['post_parent'];
+            $posts  = array_filter( $posts, fn( $p ) => (int) ( $p->post_parent ?? 0 ) === $parent );
+        }
+        if ( ! empty( $args['post_status'] ) && 'any' !== $args['post_status'] ) {
+            $statuses = (array) $args['post_status'];
+            $posts    = array_filter( $posts, fn( $p ) => in_array( $p->post_status ?? '', $statuses, true ) );
+        }
+        $posts = array_values( $posts );
+
+        if ( ( $args['orderby'] ?? '' ) === 'date' ) {
+            usort( $posts, fn( $a, $b ) => strcmp( (string) ( $b->post_date ?? '' ), (string) ( $a->post_date ?? '' ) ) );
+            if ( ( $args['order'] ?? 'DESC' ) === 'ASC' ) {
+                $posts = array_reverse( $posts );
+            }
+        }
+
+        if ( ! empty( $args['offset'] ) ) {
+            $posts = array_slice( $posts, (int) $args['offset'] );
+        }
+        $limit = (int) ( $args['numberposts'] ?? $args['posts_per_page'] ?? -1 );
+        if ( $limit > 0 ) {
+            $posts = array_slice( $posts, 0, $limit );
+        }
+
+        if ( ( $args['fields'] ?? '' ) === 'ids' ) {
+            return array_map( fn( $p ) => (int) $p->ID, $posts );
+        }
+        return $posts;
     }
 }
 

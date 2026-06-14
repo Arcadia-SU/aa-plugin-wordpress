@@ -289,7 +289,22 @@ class Arcadia_Revision_Metabox {
 			wp_send_json_error( $result->get_error_message() );
 		}
 
-		wp_send_json_success( array( 'message' => __( 'Revision approved and applied.', 'arcadia-agents' ) ) );
+		$warnings = $result['warnings'] ?? array();
+		$message  = __( 'Revision approved and applied.', 'arcadia-agents' );
+		if ( ! empty( $warnings ) ) {
+			$message .= ' ' . sprintf(
+				/* translators: %s: semicolon-separated list of non-fatal warnings */
+				__( 'Warnings: %s', 'arcadia-agents' ),
+				implode( '; ', $warnings )
+			);
+		}
+
+		wp_send_json_success(
+			array(
+				'message'  => $message,
+				'warnings' => $warnings,
+			)
+		);
 	}
 
 	/**

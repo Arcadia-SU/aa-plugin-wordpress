@@ -24,6 +24,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Arcadia_Revisions {
 
 	/**
+	 * Maximum number of revisions kept per post.
+	 *
+	 * Every edit creates an aa_revision; without a cap the CPT grows unbounded
+	 * on busy posts. After inserting a new revision we prune the oldest decided
+	 * ones beyond this many, never touching the live pending revision.
+	 *
+	 * @var int
+	 */
+	const RETENTION_PER_POST = 30;
+
+	/**
 	 * Single instance.
 	 *
 	 * @var Arcadia_Revisions|null
@@ -174,11 +185,44 @@ class Arcadia_Revisions {
 			home_url( '/' )
 		);
 
+		// Keep the revision history bounded for this post.
+		$this->prune_old_revisions( $post_id );
+
 		return array(
 			'revision_id'      => $revision_id,
 			'revision_version' => $version,
 			'preview_url'      => $preview_url,
 		);
+	}
+
+	/**
+	 * Delete the oldest revisions of a post beyond the retention cap.
+	 *
+	 * Only decided revisions (approved/rejected/superseded) are eligible — a
+	 * pending revision is the live proposal and is always kept. We keep the
+	 * newest RETENTION_PER_POST decided revisions and force-delete the rest.
+	 *
+	 * @param int $post_id The parent post ID.
+	 * @return void
+	 */
+	private function prune_old_revisions( $post_id ) {
+		$old = get_posts(
+			array(
+				'post_type'        => 'aa_revision',
+				'post_parent'      => $post_id,
+				'post_status'      => array( 'approved', 'rejected', 'superseded' ),
+				'orderby'          => 'date',
+				'order'            => 'DESC',
+				'offset'           => self::RETENTION_PER_POST,
+				'numberposts'      => 100,
+				'fields'           => 'ids',
+				'suppress_filters' => true,
+			)
+		);
+
+		foreach ( $old as $rev_id ) {
+			wp_delete_post( $rev_id, true );
+		}
 	}
 
 	/**
@@ -189,7 +233,8 @@ class Arcadia_Revisions {
 	 *
 	 * @param int    $revision_id  The aa_revision post ID.
 	 * @param string $user_login   The WP user login who approved.
-	 * @return true|WP_Error True on success.
+	 * @return array{approved:bool,warnings:array<int,string>}|WP_Error Result with any
+	 *               non-fatal warnings on success, WP_Error if a critical step failed.
 	 */
 	public function approve_revision( $revision_id, $user_login ) {
 		$revision = get_post( $revision_id );
@@ -215,6 +260,11 @@ class Arcadia_Revisions {
 
 		$body = $revision_meta['body'] ?? array();
 		$meta = $revision_meta['meta'] ?? array();
+
+		// Non-fatal replay failures (featured image, taxonomies) are collected
+		// here and surfaced to the approver instead of being silently swallowed.
+		// The critical step — the live post update below — still aborts on error.
+		$warnings = array();
 
 		// Build post_data for wp_update_post.
 		$post_data = array( 'ID' => $post_id );
@@ -258,24 +308,28 @@ class Arcadia_Revisions {
 			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
 		}
 
-		// Replay featured image.
+		// Replay featured image (non-fatal failure → warning).
 		if ( ! empty( $meta['featured_image_url'] ) ) {
 			$api = Arcadia_API::get_instance();
 			if ( method_exists( $api, 'sideload_and_set_featured_image' ) ) {
-				$api->sideload_and_set_featured_image(
+				$fi_result = $api->sideload_and_set_featured_image(
 					$post_id,
 					$meta['featured_image_url'],
 					$meta['featured_image_alt'] ?? ''
 				);
+				if ( is_wp_error( $fi_result ) ) {
+					$warnings[] = sprintf( 'Featured image sideload failed: %s', $fi_result->get_error_message() );
+				}
 			}
 		}
 
-		// Replay taxonomies.
+		// Replay taxonomies (term-creation failures → warnings).
 		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
 			$api = Arcadia_API::get_instance();
 			if ( method_exists( $api, 'get_or_create_terms' ) ) {
 				$cat_result = $api->get_or_create_terms( $meta['categories'], 'category' );
 				wp_set_post_categories( $post_id, $cat_result['ids'], false );
+				$warnings = array_merge( $warnings, $cat_result['errors'] ?? array() );
 			}
 		}
 		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
@@ -283,6 +337,7 @@ class Arcadia_Revisions {
 			if ( method_exists( $api, 'get_or_create_terms' ) ) {
 				$tag_result = $api->get_or_create_terms( $meta['tags'], 'post_tag' );
 				wp_set_post_tags( $post_id, $tag_result['ids'], false );
+				$warnings = array_merge( $warnings, $tag_result['errors'] ?? array() );
 			}
 		}
 
@@ -313,7 +368,10 @@ class Arcadia_Revisions {
 		 */
 		do_action( 'aa_revision_decided', $revision_id, 'approved' );
 
-		return true;
+		return array(
+			'approved' => true,
+			'warnings' => $warnings,
+		);
 	}
 
 	/**

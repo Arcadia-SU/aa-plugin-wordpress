@@ -415,3 +415,15 @@ class Arcadia_Agents {
 
 // Initialize plugin.
 Arcadia_Agents::get_instance();
+
+/**
+ * Deactivation: stop the daily preview-cleanup cron so it doesn't keep firing
+ * (and re-scheduling) after the plugin is turned off. Data is intentionally
+ * preserved on deactivation — full removal happens only on delete (uninstall.php).
+ */
+register_deactivation_hook(
+	__FILE__,
+	static function () {
+		Arcadia_Preview::unschedule_cleanup();
+	}
+);
