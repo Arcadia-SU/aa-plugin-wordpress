@@ -782,6 +782,10 @@ if ( ! function_exists( 'wp_delete_attachment' ) ) {
 if ( ! function_exists( 'wp_update_post' ) ) {
     function wp_update_post( $post_data, $wp_error = false ) {
         global $_test_posts;
+
+        // WordPress unslashes post data internally; callers must wp_slash() first.
+        $post_data = wp_unslash( $post_data );
+
         $id = isset( $post_data['ID'] ) ? (int) $post_data['ID'] : 0;
         if ( isset( $_test_posts[ $id ] ) ) {
             $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name' );
@@ -830,6 +834,9 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
 
     function wp_insert_post( $post_data, $wp_error = false ) {
         global $_test_posts, $_test_next_post_id, $_test_post_meta;
+
+        // WordPress unslashes post data internally; callers must wp_slash() first.
+        $post_data = wp_unslash( $post_data );
 
         $id = $_test_next_post_id++;
         $_test_posts[ $id ] = (object) array(
@@ -884,6 +891,23 @@ if ( ! function_exists( 'wp_slash' ) ) {
         }
         if ( is_string( $value ) ) {
             return addslashes( $value );
+        }
+        return $value;
+    }
+}
+
+// wp_unslash() stub — mirrors WP's stripslashes_deep. Faithful to core so that
+// wp_insert_post()/wp_update_post() (which unslash internally) correctly reverse
+// the wp_slash() callers are required to apply. Without this fidelity, content
+// built with wp_json_encode() (backslash escapes \r \n \") would silently survive
+// in tests while corrupting in production.
+if ( ! function_exists( 'wp_unslash' ) ) {
+    function wp_unslash( $value ) {
+        if ( is_array( $value ) ) {
+            return array_map( 'wp_unslash', $value );
+        }
+        if ( is_string( $value ) ) {
+            return stripslashes( $value );
         }
         return $value;
     }

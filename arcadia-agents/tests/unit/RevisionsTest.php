@@ -151,6 +151,54 @@ class RevisionsTest extends TestCase {
 		$this->assertNotEmpty( $_test_post_meta[ $rev_id ]['_aa_preview_token'] );
 	}
 
+	/**
+	 * Regression: rendered block markup must survive wp_insert_post() intact.
+	 *
+	 * acf_block() builds attributes with wp_json_encode(), so post_content is
+	 * full of backslash escapes (\r \n \"). wp_insert_post() unslashes
+	 * internally, so create_revision() MUST wp_slash() first. Without that,
+	 * \r\n collapses to literal "rn" and \" collapses to a bare " — which
+	 * breaks the block-comment JSON and makes parse_blocks() leak raw markup.
+	 *
+	 * This is the bug that corrupted the live preview (notaire article):
+	 * the stored revision (and, on approve, the live post) showed "rn" all
+	 * over the body and dumped raw `wp:acf/text {...}` JSON onto the page.
+	 */
+	public function test_create_revision_preserves_json_escapes_in_content(): void {
+		$this->create_test_post( 42 );
+
+		\WP_Query::set_next_result( array() ); // get_pending_revision: none.
+		\WP_Query::set_next_result( array() ); // get_next_version: first.
+
+		// Exactly what wp_json_encode() emits: literal backslash escapes.
+		// Single-quoted so \r \n \" stay two-character sequences.
+		$rendered = '<!-- wp:acf/text {"name":"acf/text","data":{"text":"First line.\r\nSecond line with \"inline\" quotes."}} /-->';
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$result    = $revisions->create_revision(
+			42,
+			array( 'title' => 'Notaire', 'children' => array() ),
+			array(),
+			$rendered
+		);
+
+		global $_test_posts;
+		$stored = $_test_posts[ $result['revision_id'] ]->post_content;
+
+		// 1. Byte-for-byte round-trip: slash + WP's internal unslash cancel out.
+		$this->assertSame( $rendered, $stored );
+
+		// 2. The "rn" corruption symptom must be absent.
+		$this->assertStringNotContainsString( 'First line.rn', $stored );
+
+		// 3. The block JSON must still parse, and the newline must survive decode.
+		preg_match( '#<!-- wp:acf/text (.*) /-->#', $stored, $m );
+		$decoded = json_decode( $m[1] ?? '', true );
+		$this->assertIsArray( $decoded, 'Block attributes JSON must remain valid' );
+		$this->assertStringContainsString( "\n", $decoded['data']['text'], 'Newline must survive' );
+		$this->assertStringContainsString( '"inline"', $decoded['data']['text'], 'Inline quotes must survive' );
+	}
+
 	// =========================================================================
 	// Arcadia_Revisions — approve_revision()
 	// =========================================================================

@@ -100,13 +100,23 @@ class Arcadia_Revisions {
 		}
 
 		// Insert the revision CPT.
+		//
+		// wp_slash() is mandatory: wp_insert_post() runs wp_unslash() internally,
+		// and $rendered_content is block markup whose attributes are JSON built with
+		// wp_json_encode() — full of backslash escapes (\r, \n, \"). Without slashing
+		// first, wp_unslash() strips those backslashes, turning newlines into literal
+		// "rn" and breaking the block-comment JSON so parse_blocks() leaks raw markup.
+		// Every other write path slashes (see class-post-builder write_post(),
+		// trait-api-posts update path, and the approve path below).
 		$revision_id = wp_insert_post(
-			array(
-				'post_type'    => 'aa_revision',
-				'post_parent'  => $post_id,
-				'post_status'  => 'pending',
-				'post_title'   => $title,
-				'post_content' => $rendered_content ?? '',
+			wp_slash(
+				array(
+					'post_type'    => 'aa_revision',
+					'post_parent'  => $post_id,
+					'post_status'  => 'pending',
+					'post_title'   => $title,
+					'post_content' => $rendered_content ?? '',
+				)
 			),
 			true
 		);
