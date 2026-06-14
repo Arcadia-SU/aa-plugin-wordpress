@@ -116,31 +116,37 @@ class AuthTest extends TestCase {
     }
 
     // -------------------------------------------------------
-    // validate_claims() — JWT identity (A5: iss + site binding)
+    // validate_claims() — JWT identity (A5: issuer + site binding, TOFU)
     // -------------------------------------------------------
 
     /**
-     * First valid token pins the site identity (trust-on-first-use).
+     * First valid token pins the identity (issuer + site) trust-on-first-use.
+     * The exact issuer string is NOT hardcoded — whatever the first token carries
+     * is pinned (production and test tooling use different issuer strings).
      */
-    public function test_validate_claims_pins_site_on_first_use(): void {
+    public function test_validate_claims_pins_identity_on_first_use(): void {
         global $_test_options;
         $_test_options = array();
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->validate_claims(
-            array( 'iss' => 'arcadia-agents', 'sub' => 'site-123' )
+            array( 'iss' => 'arcadia-agents-test', 'sub' => 'site-123' )
         );
 
         $this->assertTrue( $result );
+        $this->assertSame( 'arcadia-agents-test', $_test_options['arcadia_agents_issuer'] );
         $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
     }
 
     /**
-     * A token whose sub matches the pinned site is accepted.
+     * A token whose issuer + sub match the pinned identity is accepted.
      */
-    public function test_validate_claims_accepts_matching_site(): void {
+    public function test_validate_claims_accepts_matching_identity(): void {
         global $_test_options;
-        $_test_options = array( 'arcadia_agents_site_id' => 'site-123' );
+        $_test_options = array(
+            'arcadia_agents_issuer'  => 'arcadia-agents',
+            'arcadia_agents_site_id' => 'site-123',
+        );
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->validate_claims(
@@ -155,7 +161,10 @@ class AuthTest extends TestCase {
      */
     public function test_validate_claims_rejects_site_mismatch(): void {
         global $_test_options;
-        $_test_options = array( 'arcadia_agents_site_id' => 'site-123' );
+        $_test_options = array(
+            'arcadia_agents_issuer'  => 'arcadia-agents',
+            'arcadia_agents_site_id' => 'site-123',
+        );
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->validate_claims(
@@ -169,20 +178,38 @@ class AuthTest extends TestCase {
     }
 
     /**
-     * A token with the wrong issuer is rejected, even with a valid signature.
+     * A token whose issuer differs from the pinned issuer is rejected.
      */
-    public function test_validate_claims_rejects_bad_issuer(): void {
+    public function test_validate_claims_rejects_issuer_change(): void {
+        global $_test_options;
+        $_test_options = array(
+            'arcadia_agents_issuer'  => 'arcadia-agents',
+            'arcadia_agents_site_id' => 'site-123',
+        );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'iss' => 'someone-else', 'sub' => 'site-123' )
+        );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'invalid_issuer', $result->get_error_code() );
+    }
+
+    /**
+     * A token without an iss claim is rejected (spec requires it).
+     */
+    public function test_validate_claims_rejects_missing_issuer(): void {
         global $_test_options;
         $_test_options = array();
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->validate_claims(
-            array( 'iss' => 'evil-issuer', 'sub' => 'site-123' )
+            array( 'sub' => 'site-123' )
         );
 
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'invalid_issuer', $result->get_error_code() );
-        // Must not pin a site from a rejected token.
         $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
     }
 

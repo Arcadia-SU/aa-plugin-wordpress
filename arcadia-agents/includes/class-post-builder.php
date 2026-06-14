@@ -230,6 +230,7 @@ final class Arcadia_Post_Builder {
 			$acf_validator  = Arcadia_ACF_Validator::get_instance();
 			$sideloaded_ids = $acf_validator->get_and_clear_sideloaded_ids();
 			foreach ( $sideloaded_ids as $att_id ) {
+				// arcadia:slash-safe — only attachment ID + parent ID, no slashable content.
 				wp_update_post( array( 'ID' => $att_id, 'post_parent' => $post_id ) );
 			}
 		}

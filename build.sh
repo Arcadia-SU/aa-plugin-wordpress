@@ -66,13 +66,40 @@ else
 	fail "WordPress container is not running. Run ./start.sh first."
 fi
 
-# ─── 2. PHPUnit tests ──────────────────────────────────────────────────────
+# ─── 2. wp_slash safety gate (keystone anti-regression) ─────────────────────
+#
+# Fails the build if a gated WordPress write (wp_insert_post/wp_update_post or a
+# wp_json_encode()'d *_post_meta) is missing wp_slash(). This is the one guard
+# that covers EVERY write site — the bug class that reached production twice.
+
+check "wp_slash safety gate"
+if docker_exec "php bin/check-wp-slash.php"; then
+	pass "No unslashed gated writes."
+else
+	fail "Unslashed WordPress write detected (wp_slash bug class). See output above."
+fi
+
+# ─── 3. PHPUnit tests ──────────────────────────────────────────────────────
 
 check "PHPUnit tests"
 if docker_exec "./vendor/bin/phpunit --testdox"; then
 	pass "All tests passed."
 else
 	fail "PHPUnit tests failed. Fix tests before building."
+fi
+
+# ─── Real-WordPress fidelity check (wp_slash bug class, behavioural) ─────────
+#
+# Complements the static wp_slash gate: drives an adversarial corpus through the
+# real wp_insert_post / wp_unslash / parse_blocks / update_post_meta stack and
+# asserts byte fidelity. Catches a missing wp_slash by its actual effect — data
+# corruption — not just its source signature.
+
+check "Real-WordPress fidelity check"
+if docker_exec "php test/fidelity-check.php"; then
+	pass "Adversarial corpus survived real WordPress intact."
+else
+	fail "Data corruption detected on real WordPress. See output above."
 fi
 
 # ─── 3. Composer install --no-dev ───────────────────────────────────────────

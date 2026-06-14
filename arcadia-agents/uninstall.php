@@ -41,6 +41,7 @@ function arcadia_agents_uninstall_site() {
 		'arcadia_agents_last_activity',
 		'arcadia_agents_connection_key',
 		'arcadia_agents_site_id',
+		'arcadia_agents_issuer',
 		'arcadia_agents_scopes',
 		'arcadia_agents_block_adapter',
 		'aa_force_draft',

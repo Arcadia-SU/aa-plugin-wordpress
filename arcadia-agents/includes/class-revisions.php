@@ -138,6 +138,7 @@ class Arcadia_Revisions {
 
 		// Auto-supersede the previous pending revision, referencing its replacement.
 		if ( $existing ) {
+			// arcadia:slash-safe — only post ID + status, no slashable content.
 			wp_update_post(
 				array(
 					'ID'          => $existing->ID,
@@ -351,6 +352,7 @@ class Arcadia_Revisions {
 		}
 
 		// Mark revision as approved.
+		// arcadia:slash-safe — only post ID + status, no slashable content.
 		wp_update_post(
 			array(
 				'ID'          => $revision_id,
@@ -391,6 +393,7 @@ class Arcadia_Revisions {
 			return new WP_Error( 'revision_not_pending', 'Revision is not pending.', array( 'status' => 400 ) );
 		}
 
+		// arcadia:slash-safe — only post ID + status, no slashable content.
 		wp_update_post(
 			array(
 				'ID'          => $revision_id,
