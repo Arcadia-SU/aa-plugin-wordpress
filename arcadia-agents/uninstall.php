@@ -45,6 +45,10 @@ function arcadia_agents_uninstall_site() {
 		'arcadia_agents_scopes',
 		'arcadia_agents_block_adapter',
 		'aa_force_draft',
+		// Legacy: the standalone Pending Revisions toggle (commit 72c8a47 folded
+		// it into Force Draft and removed the reader/writer). Installs upgraded
+		// from before that change still carry the row, so clean it up here.
+		'aa_pending_revisions',
 	);
 	foreach ( $options as $option ) {
 		delete_option( $option );
@@ -70,18 +74,47 @@ function arcadia_agents_uninstall_site() {
 	delete_post_meta_by_key( '_aa_preview_token' );
 	delete_post_meta_by_key( '_aa_preview_expires' );
 
-	// 4. arcadia_source taxonomy terms (the hidden source tag). The taxonomy
-	//    is not registered during uninstall, so query terms directly.
-	$term_ids = $wpdb->get_col(
+	// 4. arcadia_source taxonomy terms (the hidden source tag). The taxonomy is
+	//    NOT registered during uninstall — only this file loads, the init hook
+	//    that registers it never fires. That makes wp_delete_term() useless here:
+	//    it routes through term_exists() -> get_terms(), which bails with
+	//    WP_Error('invalid_taxonomy') for an unregistered taxonomy, so every call
+	//    is a silent no-op and the rows survive. Delete them directly instead,
+	//    mirroring the raw-SQL transient cleanup in step 5.
+	$tt_rows = $wpdb->get_results(
 		$wpdb->prepare(
-			"SELECT t.term_id FROM {$wpdb->terms} t
-			 INNER JOIN {$wpdb->term_taxonomy} tt ON t.term_id = tt.term_id
-			 WHERE tt.taxonomy = %s",
+			"SELECT term_id, term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE taxonomy = %s",
 			'arcadia_source'
 		)
 	);
-	foreach ( $term_ids as $term_id ) {
-		wp_delete_term( (int) $term_id, 'arcadia_source' );
+	if ( ! empty( $tt_rows ) ) {
+		$term_ids = array_map( static fn( $row ) => (int) $row->term_id, $tt_rows );
+		$tt_ids   = array_map( static fn( $row ) => (int) $row->term_taxonomy_id, $tt_rows );
+
+		// Object relationships first (one row per tagged post), then the taxonomy
+		// rows, then the terms and any term meta.
+		$tt_placeholders = implode( ',', array_fill( 0, count( $tt_ids ), '%d' ) );
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->term_relationships} WHERE term_taxonomy_id IN ($tt_placeholders)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$tt_ids
+			)
+		);
+		$wpdb->delete( $wpdb->term_taxonomy, array( 'taxonomy' => 'arcadia_source' ), array( '%s' ) );
+
+		$term_placeholders = implode( ',', array_fill( 0, count( $term_ids ), '%d' ) );
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->terms} WHERE term_id IN ($term_placeholders)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$term_ids
+			)
+		);
+		$wpdb->query(
+			$wpdb->prepare(
+				"DELETE FROM {$wpdb->termmeta} WHERE term_id IN ($term_placeholders)", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				...$term_ids
+			)
+		);
 	}
 
 	// 5. Transients: fixed names + the dynamic blocks-usage cache family.
