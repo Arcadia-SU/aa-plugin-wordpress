@@ -102,6 +102,7 @@ class AuthTest extends TestCase {
         $_test_options['arcadia_agents_connected_at']  = '2025-01-01 00:00:00';
         $_test_options['arcadia_agents_last_activity'] = '2025-01-02 00:00:00';
         $_test_options['arcadia_agents_site_id']       = 'site-abc';
+        $_test_options['arcadia_agents_issuer']        = 'arcadia-agents';
 
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->disconnect();
@@ -111,8 +112,9 @@ class AuthTest extends TestCase {
         $this->assertArrayNotHasKey( 'arcadia_agents_connected', $_test_options );
         $this->assertArrayNotHasKey( 'arcadia_agents_connected_at', $_test_options );
         $this->assertArrayNotHasKey( 'arcadia_agents_last_activity', $_test_options );
-        // The site identity pin must be cleared so a re-handshake can re-pin.
+        // Both identity pins must be cleared so a re-handshake can re-pin.
         $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
+        $this->assertArrayNotHasKey( 'arcadia_agents_issuer', $_test_options );
     }
 
     // -------------------------------------------------------
@@ -197,9 +199,11 @@ class AuthTest extends TestCase {
     }
 
     /**
-     * A token without an iss claim is rejected (spec requires it).
+     * A token without an iss claim is ACCEPTED on a legacy backend that doesn't
+     * emit one yet, and pins the site (sub) trust-on-first-use. Rejecting it would
+     * lock out every real call until the backend that adds iss is deployed.
      */
-    public function test_validate_claims_rejects_missing_issuer(): void {
+    public function test_validate_claims_accepts_missing_issuer_on_legacy_backend(): void {
         global $_test_options;
         $_test_options = array();
 
@@ -208,9 +212,30 @@ class AuthTest extends TestCase {
             array( 'sub' => 'site-123' )
         );
 
+        $this->assertTrue( $result );
+        $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
+        // No issuer was carried, so none is pinned.
+        $this->assertArrayNotHasKey( 'arcadia_agents_issuer', $_test_options );
+    }
+
+    /**
+     * Once an issuer is pinned (backend known to emit iss), a token that omits iss
+     * is rejected — this blocks an attacker stripping the claim to skip the check.
+     */
+    public function test_validate_claims_requires_issuer_once_pinned(): void {
+        global $_test_options;
+        $_test_options = array(
+            'arcadia_agents_issuer'  => 'arcadia-agents',
+            'arcadia_agents_site_id' => 'site-123',
+        );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->validate_claims(
+            array( 'sub' => 'site-123' )
+        );
+
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'invalid_issuer', $result->get_error_code() );
-        $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
     }
 
     /**
@@ -227,6 +252,68 @@ class AuthTest extends TestCase {
 
         $this->assertInstanceOf( \WP_Error::class, $result );
         $this->assertEquals( 'missing_subject', $result->get_error_code() );
+    }
+
+    // -------------------------------------------------------
+    // pin_identity_from_handshake() — bind identity at the handshake (no race)
+    // -------------------------------------------------------
+
+    /**
+     * The handshake pins site_id + issuer from its (authenticated) response.
+     */
+    public function test_pin_identity_from_handshake_stores_fields(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth = \Arcadia_Auth::get_instance();
+        $auth->pin_identity_from_handshake(
+            array(
+                'public_key' => 'pk',
+                'site_id'    => 'site-123',
+                'issuer'     => 'arcadia-agents',
+            )
+        );
+
+        $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
+        $this->assertSame( 'arcadia-agents', $_test_options['arcadia_agents_issuer'] );
+    }
+
+    /**
+     * A legacy handshake response without the fields pins nothing (TOFU fallback).
+     */
+    public function test_pin_identity_from_handshake_ignores_absent_fields(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth = \Arcadia_Auth::get_instance();
+        $auth->pin_identity_from_handshake( array( 'public_key' => 'pk' ) );
+
+        $this->assertArrayNotHasKey( 'arcadia_agents_site_id', $_test_options );
+        $this->assertArrayNotHasKey( 'arcadia_agents_issuer', $_test_options );
+    }
+
+    /**
+     * With identity pinned at the handshake, the very first token for a different
+     * site is rejected — there is no trust-on-first-use window to race.
+     */
+    public function test_handshake_pin_closes_tofu_race(): void {
+        global $_test_options;
+        $_test_options = array();
+
+        $auth = \Arcadia_Auth::get_instance();
+        // Handshake binds the legitimate identity first…
+        $auth->pin_identity_from_handshake(
+            array( 'site_id' => 'site-123', 'issuer' => 'arcadia-agents' )
+        );
+
+        // …so a foreign token cannot pin itself, even as the first one seen.
+        $result = $auth->validate_claims(
+            array( 'iss' => 'arcadia-agents', 'sub' => 'site-999' )
+        );
+
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertEquals( 'site_mismatch', $result->get_error_code() );
+        $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
     }
 
     /**

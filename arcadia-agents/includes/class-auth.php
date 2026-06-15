@@ -130,6 +130,9 @@ class Arcadia_Auth {
 		update_option( 'arcadia_agents_connected', true, false );
 		update_option( 'arcadia_agents_connected_at', current_time( 'mysql' ), false );
 
+		// Pin the site identity from this authenticated response (when present).
+		$this->pin_identity_from_handshake( $data );
+
 		// Remove the connection key — it's single-use and no longer needed.
 		delete_option( 'arcadia_agents_connection_key' );
 
@@ -216,21 +219,50 @@ class Arcadia_Auth {
 	}
 
 	/**
+	 * Pin the site identity from a trusted handshake response.
+	 *
+	 * The handshake is the authenticated channel — the single-use connection key
+	 * proved who this site is — so the `site_id`/`issuer` it returns are the
+	 * authoritative binding. Pinning them here closes the trust-on-first-use race
+	 * in validate_claims() (the first token can no longer set the identity).
+	 *
+	 * Backends that predate these fields (see auth.md) simply omit them; in that
+	 * case nothing is pinned here and validate_claims() falls back to TOFU.
+	 *
+	 * @param array $data Decoded handshake response body.
+	 * @return void
+	 */
+	public function pin_identity_from_handshake( $data ) {
+		if ( ! empty( $data['site_id'] ) ) {
+			update_option( 'arcadia_agents_site_id', (string) $data['site_id'], false );
+		}
+		if ( ! empty( $data['issuer'] ) ) {
+			update_option( 'arcadia_agents_issuer', (string) $data['issuer'], false );
+		}
+	}
+
+	/**
 	 * Validate the identity claims of an already signature-verified payload.
 	 *
 	 * Signature + expiry are checked by validate_jwt(); this enforces *who* the
-	 * caller is, which a valid signature alone does not guarantee. The handshake
-	 * response carries no site_id (see auth.md), and the exact `iss` string is
-	 * environment-specific (production vs. test tooling differ), so we do NOT
-	 * hardcode an expected issuer — that would risk locking out a legitimate
-	 * signer. Instead we pin the (issuer, subject) pair trust-on-first-use:
-	 *   - Both `iss` and `sub` must be present (spec: auth.md).
-	 *   - The first valid token records them; every later token must match.
+	 * caller is. Each site has its own RSA keypair, so the signature already binds
+	 * the token to this site — these claim checks are defense-in-depth.
 	 *
-	 * The pin blocks a token minted for another site (same Arcadia keypair) from
-	 * being replayed against this install — the real protection a signature alone
-	 * can't give. disconnect() clears the pin so a fresh handshake can re-pin a
-	 * re-provisioned site.
+	 * Identity sources, in order of trust:
+	 *   1. The handshake response pins (site_id, issuer) from its authenticated
+	 *      channel — see pin_identity_from_handshake(). No race.
+	 *   2. If the handshake predates those fields, the first token pins the
+	 *      identity trust-on-first-use (TOFU) as a fallback.
+	 *
+	 * Claim rules:
+	 *   - `sub` (site_id) is always present and is required; it must match the pin.
+	 *   - `iss` is only emitted by newer backends. A *missing* iss must NOT lock
+	 *     out a legitimate caller (older backends never send it), so we enforce it
+	 *     only once an issuer is pinned — at which point this backend is known to
+	 *     emit iss, and a token without one is rejected.
+	 *
+	 * disconnect() clears both pins so a fresh handshake can re-pin a re-provisioned
+	 * site.
 	 *
 	 * @param array $payload Decoded JWT payload (associative array).
 	 * @return true|WP_Error True when the identity is acceptable, WP_Error otherwise.
@@ -239,13 +271,7 @@ class Arcadia_Auth {
 		$iss = isset( $payload['iss'] ) ? (string) $payload['iss'] : '';
 		$sub = isset( $payload['sub'] ) ? (string) $payload['sub'] : '';
 
-		if ( '' === $iss ) {
-			return $this->error_response(
-				'invalid_issuer',
-				__( 'Token is missing the issuer (iss) claim.', 'arcadia-agents' ),
-				401
-			);
-		}
+		// sub identifies the site and is present in every token — required.
 		if ( '' === $sub ) {
 			return $this->error_response(
 				'missing_subject',
@@ -254,29 +280,36 @@ class Arcadia_Auth {
 			);
 		}
 
-		$pinned_iss = (string) get_option( 'arcadia_agents_issuer', '' );
 		$pinned_sub = (string) get_option( 'arcadia_agents_site_id', '' );
+		$pinned_iss = (string) get_option( 'arcadia_agents_issuer', '' );
 
+		// Site binding (sub). Pinned by the handshake when available; otherwise
+		// trust-on-first-use on the first token.
 		if ( '' === $pinned_sub ) {
-			// First valid token after connection — pin this identity (issuer + site).
-			update_option( 'arcadia_agents_issuer', $iss, false );
 			update_option( 'arcadia_agents_site_id', $sub, false );
-			return true;
-		}
-
-		if ( ! hash_equals( $pinned_iss, $iss ) ) {
-			return $this->error_response(
-				'invalid_issuer',
-				__( 'Token issuer does not match the connected issuer.', 'arcadia-agents' ),
-				401
-			);
-		}
-		if ( ! hash_equals( $pinned_sub, $sub ) ) {
+		} elseif ( ! hash_equals( $pinned_sub, $sub ) ) {
 			return $this->error_response(
 				'site_mismatch',
 				__( 'Token was issued for a different site.', 'arcadia-agents' ),
 				401
 			);
+		}
+
+		// Issuer binding (iss). Once an issuer is pinned (from the handshake or a
+		// prior token), this backend is known to emit iss, so require a match —
+		// this also blocks an attacker stripping iss to skip the check. When no
+		// issuer is pinned yet, a token that carries one pins it; a legacy token
+		// without iss is accepted (the backend hasn't started sending it).
+		if ( '' !== $pinned_iss ) {
+			if ( '' === $iss || ! hash_equals( $pinned_iss, $iss ) ) {
+				return $this->error_response(
+					'invalid_issuer',
+					__( 'Token issuer does not match the connected issuer.', 'arcadia-agents' ),
+					401
+				);
+			}
+		} elseif ( '' !== $iss ) {
+			update_option( 'arcadia_agents_issuer', $iss, false );
 		}
 
 		return true;
