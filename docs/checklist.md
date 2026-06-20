@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-06-10 (Phase 30 code+tests+build OK — v0.1.26, 323 tests verts ; Phase 29 déploiement preprod + E2E toujours pending)
+**Dernière mise à jour :** 2026-06-20 (v0.1.32 ; Phases 31 hardening wp_slash + auth/uninstall fixes committées ; Phases 32-33 intégrées depuis backlog ; Phase 29 déploiement preprod + E2E toujours pending)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -205,6 +205,68 @@ Aujourd'hui la révision n'est créée que si la requête contient `pending_revi
 - [x] `RevisionsTest.php` : nouveau cas "PUT sans flag, setting actif, post publié → révision créée"
 - [x] Tests existants ajustés (flag seul sans setting → update direct, inchangé)
 - [x] `./build.sh` passe
+
+---
+
+## Phase 32 : Flag `dry_run` transversal — exécuter sans persister
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-20*
+*Sévérité : moyenne. Besoin immédiat : `POST /articles` (débloque le contrôle de justesse `forward` de la calibration CMS — oracle CMS point (1) — même sur un site sans articles).*
+
+### Contexte
+La calibration CMS du backend doit vérifier que sa transform `forward` (article canonique → blocs ACF) produit des blocs **réellement valides** pour ce CMS. Le seul oracle fiable est le CMS lui-même : sa normalisation ACF (réordonnancement, defaults, rendu HTML). Aujourd'hui l'obtenir imposerait de publier un brouillon de test puis de le supprimer — effet de bord sur le site client + cleanup fragile (orphelin si le delete échoue).
+
+**Demande.** Un flag `dry_run` **sur tous les endpoints qui écrivent** (création, mise à jour, suppression…), pas seulement la création de post. Le flag fait passer le payload dans le **même pipeline** que l'opération réelle (validation + normalisation ACF), mais **s'arrête juste avant le `save`** et renvoie ce que l'opération aurait produit/stocké.
+```json
+POST /articles?dry_run=true  →  { "blocks": [ ...blocs normalisés tels que le CMS les stockerait... ] }
+```
+
+**Forme volontairement générique.** Les endpoints ne savent rien de « calibration » : ils valident/normalisent sans écrire. Convention transversale uniforme (même flag partout), tout appelant futur en bénéficie. Pas d'endpoint dédié. Sans ce flag, l'alternative est publier-puis-supprimer (effet de bord + cleanup).
+
+### 32.1 — Plomberie transversale du flag
+- [ ] Lire `dry_run` (query param + body, bool coercion) de façon uniforme sur tous les handlers d'écriture
+- [ ] Endpoints couverts : `POST /articles`, `PUT /articles/{id}`, `DELETE /articles/{id}`, `POST /pages`, `PUT /pages/{id}`, `DELETE /pages/{id}`, media, taxonomies CRUD, redirects (recenser exhaustivement les write-paths)
+- [ ] Convention de réponse uniforme : renvoyer ce que l'opération aurait persisté (pour `POST/PUT articles` → `blocks` normalisés post-pipeline ACF ; pour delete → ce qui aurait été supprimé)
+
+### 32.2 — Court-circuit avant `save` (priorité : `POST /articles`)
+- [ ] `POST /articles?dry_run=true` : exécute validation + coercion + normalisation ACF, s'arrête avant `wp_insert_post` / `do_action('acf/save_post')`, renvoie les `blocks` normalisés
+- [ ] `PUT /articles/{id}?dry_run=true` : idem avant `wp_update_post` (interaction avec pending-revisions enforcement : ne crée pas de révision non plus)
+- [ ] DELETE `dry_run` : ne supprime pas, renvoie l'effet qu'aurait eu l'opération
+- [ ] Aucun effet de bord : pas de sideload média réel persistant, pas de meta écrite, pas de révision créée
+
+### 32.3 — Tests & build
+- [ ] Test : `POST /articles?dry_run=true` → 0 post créé en DB + `blocks` normalisés retournés
+- [ ] Test : `PUT /articles/{id}?dry_run=true` → post inchangé + aucune révision pending créée (même setting actif)
+- [ ] Test : DELETE `dry_run` → ressource toujours présente
+- [ ] Test : flag absent / false → comportement réel inchangé (regression)
+- [ ] `./build.sh` passe (tous checks bloquants)
+- [ ] Mettre à jour `api-contract.md` (convention `dry_run` transversale) côté master specs
+
+---
+
+## Phase 33 : `GET /articles/{id}/blocks` renvoie les `field_values` (perf, basse priorité)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-20*
+*Sévérité : basse — pure latence. Découvert pendant la review du harness anti-OOM (aa-bqy7). À prendre quand on touche cet endpoint.*
+
+### Contexte
+L'agent SEO lit un article en deux temps via `get_cms_article` : le mode « carte » (défaut) appelle `GET /articles/{id}/blocks` pour la structure des blocs, puis fait un **2e appel** au listing (`GET /articles?...`) uniquement pour récupérer les `field_values` post-level (ACF/meta). `GET /articles/{id}/blocks` ne renvoie aujourd'hui que `{ "post_id": ..., "blocks": [...] }`.
+
+**Demande.** Inclure les `field_values` post-level dans la réponse :
+```json
+{ "post_id": "...", "blocks": [...], "field_values": { "...": "..." } }
+```
+Le backend pourrait alors supprimer le 2e appel HTTP sur le chemin chaud (un appel agent → un appel CMS au lieu de deux). Pas de blocage, pas de régression — le backend est correct aujourd'hui.
+
+### 33.1 — Enrichir la réponse
+- [ ] Ajouter `field_values` (post-level ACF/meta) à la réponse de `GET /articles/{id}/blocks`, même source que le listing
+- [ ] Réutiliser la sérialisation `field_values` existante du listing (single source of truth)
+
+### 33.2 — Tests & build
+- [ ] Test : réponse contient `field_values` cohérents avec le listing
+- [ ] Test : article sans ACF → `field_values` vide/cohérent (pas de crash)
+- [ ] `./build.sh` passe
+- [ ] Mettre à jour `api-contract.md` côté master specs
 
 ---
 
