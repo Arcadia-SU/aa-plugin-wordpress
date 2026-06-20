@@ -118,7 +118,6 @@ class Arcadia_API {
 		$this->register_redirect_routes();
 		$this->register_field_schema_routes();
 		$this->register_block_routes();
-		$this->register_validation_routes();
 		$this->register_revision_routes();
 	}
 
@@ -462,21 +461,6 @@ class Arcadia_API {
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_blocks_usage' ),
 				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
-			)
-		);
-	}
-
-	/**
-	 * Validation routes: /validate-content.
-	 */
-	private function register_validation_routes() {
-		register_rest_route(
-			$this->namespace,
-			'/validate-content',
-			array(
-				'methods'             => 'POST',
-				'callback'            => array( $this, 'validate_content' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 	}

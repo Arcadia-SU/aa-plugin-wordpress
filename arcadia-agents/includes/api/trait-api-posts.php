@@ -184,6 +184,70 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
+	 * Read the transversal `dry_run` flag from the request.
+	 *
+	 * Canonical reader for the dry-run write convention: a write endpoint runs
+	 * its full validation/normalization pipeline but stops before persisting.
+	 * Accepts the flag from the query string (`?dry_run=true`) or the JSON body
+	 * (`{"dry_run": true}`) — WP_REST_Request::get_param() spans both.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool True when the caller asked for a dry run.
+	 */
+	private function is_dry_run( $request ) {
+		return filter_var( $request->get_param( 'dry_run' ), FILTER_VALIDATE_BOOLEAN );
+	}
+
+	/**
+	 * Run the article write pipeline without persisting and return what would
+	 * have been stored.
+	 *
+	 * Executes the same validation + ACF coercion + repeater expansion + block
+	 * render as a real create/update (image sideload skipped — no side-effects),
+	 * then returns the normalized block tree in the exact shape
+	 * GET /articles/{id}/blocks emits (single source of truth via
+	 * format_parsed_blocks()). On validation failure it returns the same WP_Error
+	 * (HTTP 422) a real write would, so the caller sees an identical verdict.
+	 *
+	 * Note: the blocks are normalized by the plugin pipeline (validate + coerce +
+	 * expand + render); this is not a post-`acf/save_post` round-trip (ACF
+	 * save-time reordering/defaults are not applied without a real write).
+	 *
+	 * @param array        $body      Decoded request JSON.
+	 * @param array        $meta      Top-level meta.
+	 * @param string       $post_type Resolved post type.
+	 * @param WP_Post|null $existing  Existing post (update mode) or null (create mode).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private function dry_run_build( $body, $meta, $post_type, $existing ) {
+		$builder = new Arcadia_Post_Builder( $this->blocks );
+		$built   = $builder->build_post_data( $body, $meta, $post_type, $existing, true );
+		if ( is_wp_error( $built ) ) {
+			return $built;
+		}
+
+		$blocks = array();
+		if ( ! empty( $built['rendered_content'] ) ) {
+			$blocks = $this->format_parsed_blocks( parse_blocks( $built['rendered_content'] ) );
+		}
+
+		// Post-level ACF values the operation would write (echoed, not persisted).
+		$field_values = ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) )
+			? (object) $body['acf_fields']
+			: new stdClass();
+
+		return new WP_REST_Response(
+			array(
+				'dry_run'      => true,
+				'valid'        => true,
+				'blocks'       => $blocks,
+				'field_values' => $field_values,
+			),
+			200
+		);
+	}
+
+	/**
 	 * Create a post.
 	 *
 	 * @param WP_REST_Request $request The request.
@@ -211,6 +275,13 @@ trait Arcadia_API_Posts_Handler {
 				),
 				array( 'status' => 400 )
 			);
+		}
+
+		// Dry-run: validate + normalize through the full pipeline and return the
+		// blocks that would be stored, without persisting anything (calibration
+		// forward-check). Works even on a site with no existing articles.
+		if ( $this->is_dry_run( $request ) ) {
+			return $this->dry_run_build( $body, $meta, $post_type, null );
 		}
 
 		// Build post_data (status validation, title/slug/excerpt, content rendering).
@@ -307,6 +378,13 @@ trait Arcadia_API_Posts_Handler {
 				__( 'Changing post_type via update is not allowed. Delete and re-create instead.', 'arcadia-agents' ),
 				array( 'status' => 400 )
 			);
+		}
+
+		// Dry-run short-circuits before the revision / live-write paths: simulate
+		// the update through the full pipeline and return the would-be-stored
+		// blocks without creating a revision or touching the live post.
+		if ( $this->is_dry_run( $request ) ) {
+			return $this->dry_run_build( $body, $meta, $post->post_type, $post );
 		}
 
 		// Force Draft on a published post: hold the edit as a pending revision
@@ -431,11 +509,16 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
+		// Post-level ACF field values, same source as the listing — lets a
+		// consumer read blocks + field_values in one call (Phase 33).
+		$field_values = $this->get_field_values_for_post( $post_id );
+
 		if ( empty( $post->post_content ) ) {
 			return new WP_REST_Response(
 				array(
-					'post_id' => $post_id,
-					'blocks'  => array(),
+					'post_id'      => $post_id,
+					'blocks'       => array(),
+					'field_values' => $field_values,
 				),
 				200
 			);
@@ -446,8 +529,9 @@ trait Arcadia_API_Posts_Handler {
 
 		return new WP_REST_Response(
 			array(
-				'post_id' => $post_id,
-				'blocks'  => $blocks,
+				'post_id'      => $post_id,
+				'blocks'       => $blocks,
+				'field_values' => $field_values,
 			),
 			200
 		);

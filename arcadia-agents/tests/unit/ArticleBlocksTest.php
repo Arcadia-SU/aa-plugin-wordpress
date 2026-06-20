@@ -63,11 +63,12 @@ class ArticleBlocksTest extends TestCase {
      * Set up.
      */
     protected function setUp(): void {
-        global $_test_posts, $_test_parse_blocks_results;
+        global $_test_posts, $_test_parse_blocks_results, $_test_get_fields_results;
         global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
 
         $_test_posts                = array();
         $_test_parse_blocks_results = array();
+        $_test_get_fields_results   = array();
         $_test_acf_block_types      = array();
         $_test_acf_field_groups     = array();
         $_test_acf_fields_by_group  = array();
@@ -448,5 +449,88 @@ class ArticleBlocksTest extends TestCase {
         $blocks = $this->helper->test_format_parsed_blocks( $parsed );
         $this->assertSame( true,  $blocks[0]['attrs']['data']['list'][0]['open'] );
         $this->assertSame( false, $blocks[0]['attrs']['data']['list'][1]['open'] );
+    }
+
+    // =========================================================================
+    // Phase 33 — field_values in GET /articles/{id}/blocks
+    // =========================================================================
+
+    /**
+     * Blocks response carries post-level field_values (ACF), so a consumer reads
+     * structure + field_values in one call instead of a second listing request.
+     */
+    public function test_get_article_blocks_includes_field_values(): void {
+        global $_test_posts, $_test_parse_blocks_results, $_test_get_fields_results;
+
+        $content        = '<!-- wp:paragraph --><p>Hi</p><!-- /wp:paragraph -->';
+        $_test_posts[7] = (object) array(
+            'ID'           => 7,
+            'post_type'    => 'post',
+            'post_content' => $content,
+            'post_title'   => 'With ACF',
+        );
+        $_test_parse_blocks_results[ $content ] = array(
+            array( 'blockName' => 'core/paragraph', 'attrs' => array(), 'innerHTML' => '<p>Hi</p>', 'innerBlocks' => array() ),
+        );
+        $_test_get_fields_results[7] = array( 'subtitle' => 'A subtitle', 'rating' => 5 );
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '7' );
+
+        $result = $this->helper->get_article_blocks( $request );
+        $data   = $result->get_data();
+
+        $this->assertArrayHasKey( 'field_values', $data );
+        $this->assertEquals( 'A subtitle', $data['field_values']->subtitle );
+        $this->assertEquals( 5, $data['field_values']->rating );
+        $this->assertNotEmpty( $data['blocks'] );
+    }
+
+    /**
+     * field_values is present even when the post has no block content.
+     */
+    public function test_get_article_blocks_empty_content_includes_field_values(): void {
+        global $_test_posts, $_test_get_fields_results;
+
+        $_test_posts[8]              = (object) array(
+            'ID'           => 8,
+            'post_type'    => 'post',
+            'post_content' => '',
+            'post_title'   => 'Empty',
+        );
+        $_test_get_fields_results[8] = array( 'color' => 'red' );
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '8' );
+
+        $result = $this->helper->get_article_blocks( $request );
+        $data   = $result->get_data();
+
+        $this->assertEmpty( $data['blocks'] );
+        $this->assertEquals( 'red', $data['field_values']->color );
+    }
+
+    /**
+     * No ACF on the post → field_values is an empty object (not null or array),
+     * matching the listing's contract.
+     */
+    public function test_get_article_blocks_no_acf_returns_empty_field_values_object(): void {
+        global $_test_posts;
+
+        $_test_posts[9] = (object) array(
+            'ID'           => 9,
+            'post_type'    => 'post',
+            'post_content' => '',
+            'post_title'   => 'No ACF',
+        );
+
+        $request = new \WP_REST_Request();
+        $request->set_param( 'id', '9' );
+
+        $result = $this->helper->get_article_blocks( $request );
+        $data   = $result->get_data();
+
+        $this->assertInstanceOf( \stdClass::class, $data['field_values'] );
+        $this->assertEquals( new \stdClass(), $data['field_values'] );
     }
 }

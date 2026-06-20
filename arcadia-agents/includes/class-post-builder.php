@@ -71,9 +71,11 @@ final class Arcadia_Post_Builder {
 	 * @param array        $meta      Top-level meta (mutated by reference).
 	 * @param string       $post_type Resolved post type (already validated).
 	 * @param WP_Post|null $existing  Existing post for update mode, or null for create.
+	 * @param bool         $dry_run   If true, content rendering skips image sideload so
+	 *                                no side-effects occur (used by the dry_run write path).
 	 * @return array{post_data:array, rendered_content:string, force_draft_applied:bool}|WP_Error
 	 */
-	public function build_post_data( array $body, array &$meta, $post_type, $existing = null ) {
+	public function build_post_data( array $body, array &$meta, $post_type, $existing = null, $dry_run = false ) {
 		$post_data           = array();
 		$force_draft_applied = false;
 		$is_create           = ( null === $existing );
@@ -153,7 +155,7 @@ final class Arcadia_Post_Builder {
 
 		$rendered_content = '';
 		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $content_data, $post_type );
+			$content = $this->blocks->json_to_blocks( $content_data, $post_type, $dry_run );
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}

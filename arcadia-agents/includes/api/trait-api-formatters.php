@@ -65,13 +65,7 @@ trait Arcadia_API_Formatters {
 		);
 
 		// ACF field values for calibration (FS-1).
-		$field_values = new stdClass();
-		if ( function_exists( 'get_fields' ) ) {
-			$raw = get_fields( $post->ID );
-			if ( is_array( $raw ) ) {
-				$field_values = (object) $raw;
-			}
-		}
+		$field_values = $this->get_field_values_for_post( $post->ID );
 
 		return array(
 			'id'                 => $post->ID,
@@ -96,6 +90,27 @@ trait Arcadia_API_Formatters {
 			'preview_url'        => $preview_url,
 			'field_values'       => $field_values,
 		);
+	}
+
+	/**
+	 * Extract post-level ACF field values for a post (calibration, FS-1).
+	 *
+	 * Single source of truth for the `field_values` payload, shared by
+	 * format_post() (listing/detail) and the blocks endpoint so a consumer
+	 * never has to issue a second call to fetch them.
+	 *
+	 * @param int $post_id The post ID.
+	 * @return stdClass Field values (empty object if ACF absent or none set).
+	 */
+	private function get_field_values_for_post( $post_id ) {
+		$field_values = new stdClass();
+		if ( function_exists( 'get_fields' ) ) {
+			$raw = get_fields( $post_id );
+			if ( is_array( $raw ) ) {
+				$field_values = (object) $raw;
+			}
+		}
+		return $field_values;
 	}
 
 	/**

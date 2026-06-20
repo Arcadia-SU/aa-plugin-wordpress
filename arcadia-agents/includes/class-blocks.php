@@ -161,9 +161,11 @@ class Arcadia_Blocks {
 	 *
 	 * @param array  $json      The JSON content structure from the agent.
 	 * @param string $post_type Target post type (passed to ACF validator).
+	 * @param bool   $dry_run   If true, skip image sideload (no side-effects) so the
+	 *                          render reflects what would be stored without persisting.
 	 * @return string|WP_Error Block content for post_content, or WP_Error on validation failure.
 	 */
-	public function json_to_blocks( $json, $post_type = 'post' ) {
+	public function json_to_blocks( $json, $post_type = 'post', $dry_run = false ) {
 		// Validate all blocks before rendering (fail fast).
 		$validation = $this->validate_blocks( $json );
 		if ( is_wp_error( $validation ) ) {
@@ -171,9 +173,10 @@ class Arcadia_Blocks {
 		}
 
 		// ACF schema validation + image pre-processing (H1.1 + H1.2).
+		// In dry-run the validator validates + coerces but skips sideload.
 		if ( self::is_acf_available() ) {
 			$acf_validator = Arcadia_ACF_Validator::get_instance();
-			$acf_result    = $acf_validator->validate_and_preprocess( $json, $post_type );
+			$acf_result    = $acf_validator->validate_and_preprocess( $json, $post_type, $dry_run );
 			if ( is_wp_error( $acf_result ) ) {
 				return $acf_result;
 			}
@@ -194,34 +197,6 @@ class Arcadia_Blocks {
 		}
 
 		return $content;
-	}
-
-	/**
-	 * Dry-run validation: checks block types and ACF schema without side-effects.
-	 *
-	 * No sideloading, no database writes. Returns structured errors or true.
-	 *
-	 * @param array  $json      The JSON content structure.
-	 * @param string $post_type Target post type.
-	 * @return true|WP_Error True if valid, WP_Error with errors if not.
-	 */
-	public function validate_content( $json, $post_type = 'post' ) {
-		// Block type + required fields validation.
-		$validation = $this->validate_blocks( $json );
-		if ( is_wp_error( $validation ) ) {
-			return $validation;
-		}
-
-		// ACF schema validation (dry-run: skip sideload).
-		if ( self::is_acf_available() ) {
-			$acf_validator = Arcadia_ACF_Validator::get_instance();
-			$acf_result    = $acf_validator->validate_and_preprocess( $json, $post_type, true );
-			if ( is_wp_error( $acf_result ) ) {
-				return $acf_result;
-			}
-		}
-
-		return true;
 	}
 
 	/**

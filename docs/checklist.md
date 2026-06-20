@@ -170,8 +170,8 @@ Phase 28 a fermé l'asymétrie côté PUT (validator coerce avant `check_field_t
 
 ### 29.3 — Validation & déploiement
 - [x] `./build.sh` passe — v0.1.25, zip 356KB
-- [ ] Déploiement preprod-iselection.vertuelle.com
-- [ ] Validation E2E : `python -m scripts.reingest_iselection_legacy --force` puis SQL spot-check :
+- [x] Déploiement preprod-iselection.vertuelle.com — **couvert par le déploiement v0.1.32** (preprod confirmée à 0.1.32 ≥ 0.1.25, le code Phase 29 est en prod ; 2026-06-20)
+- [ ] Validation E2E **(tâche AA-side, hors session plugin)** : `python -m scripts.reingest_iselection_legacy --force` puis SQL spot-check :
   ```sql
   SELECT jsonb_typeof(jsonb_path_query_first(article_json, '$.children[*] ? (@.type == "acf/text-image")') -> 'properties' -> 'is_lightbox')
   FROM arcadia_agents.seo_articles WHERE workspace_id = '<iselection>' LIMIT 5;
@@ -223,50 +223,53 @@ POST /articles?dry_run=true  →  { "blocks": [ ...blocs normalisés tels que le
 
 **Forme volontairement générique.** Les endpoints ne savent rien de « calibration » : ils valident/normalisent sans écrire. Convention transversale uniforme (même flag partout), tout appelant futur en bénéficie. Pas d'endpoint dédié. Sans ce flag, l'alternative est publier-puis-supprimer (effet de bord + cleanup).
 
-### 32.1 — Plomberie transversale du flag
-- [ ] Lire `dry_run` (query param + body, bool coercion) de façon uniforme sur tous les handlers d'écriture
-- [ ] Endpoints couverts : `POST /articles`, `PUT /articles/{id}`, `DELETE /articles/{id}`, `POST /pages`, `PUT /pages/{id}`, `DELETE /pages/{id}`, media, taxonomies CRUD, redirects (recenser exhaustivement les write-paths)
-- [ ] Convention de réponse uniforme : renvoyer ce que l'opération aurait persisté (pour `POST/PUT articles` → `blocks` normalisés post-pipeline ACF ; pour delete → ce qui aurait été supprimé)
+**Scope réalisé (décision 2026-06-20).** Un validateur no-persist existait déjà (`POST /validate-content`) — orphelin (aucun consommateur AA, absent de `api-contract.md`). Implémenté : `dry_run` sur **`POST` + `PUT /articles`** (besoin réel = calibration), réutilisant le validateur dry-run existant, et **`POST /validate-content` supprimé** (le dry-run create en est un strict superset). La plomberie (helper `is_dry_run()` + convention de réponse) est posée ; les autres write-paths sont **différés** (§32.5) — aucun consommateur aujourd'hui.
 
-### 32.2 — Court-circuit avant `save` (priorité : `POST /articles`)
-- [ ] `POST /articles?dry_run=true` : exécute validation + coercion + normalisation ACF, s'arrête avant `wp_insert_post` / `do_action('acf/save_post')`, renvoie les `blocks` normalisés
-- [ ] `PUT /articles/{id}?dry_run=true` : idem avant `wp_update_post` (interaction avec pending-revisions enforcement : ne crée pas de révision non plus)
-- [ ] DELETE `dry_run` : ne supprime pas, renvoie l'effet qu'aurait eu l'opération
-- [ ] Aucun effet de bord : pas de sideload média réel persistant, pas de meta écrite, pas de révision créée
+### 32.1 — Plomberie du flag (helper partagé)
+- [x] Helper `is_dry_run( $request )` (`trait-api-posts.php`) : lecture query param **et** body via `get_param()` + coercion `filter_var(FILTER_VALIDATE_BOOLEAN)`. Reader canonique de la convention dry-run.
+- [x] Threading `$dry_run` dans `Arcadia_Blocks::json_to_blocks()` → `Arcadia_ACF_Validator::validate_and_preprocess(..., $dry_run)` (skip sideload, déjà en place) et dans `Arcadia_Post_Builder::build_post_data(..., $dry_run)`.
 
-### 32.3 — Tests & build
-- [ ] Test : `POST /articles?dry_run=true` → 0 post créé en DB + `blocks` normalisés retournés
-- [ ] Test : `PUT /articles/{id}?dry_run=true` → post inchangé + aucune révision pending créée (même setting actif)
-- [ ] Test : DELETE `dry_run` → ressource toujours présente
-- [ ] Test : flag absent / false → comportement réel inchangé (regression)
-- [ ] `./build.sh` passe (tous checks bloquants)
-- [ ] Mettre à jour `api-contract.md` (convention `dry_run` transversale) côté master specs
+### 32.2 — Court-circuit avant `save` (articles)
+- [x] `POST /articles?dry_run=true` : exécute validation + coercion + render via `dry_run_build()`, s'arrête avant `write_post`/`finalize_post`, renvoie `{ dry_run, valid, blocks, field_values }` (HTTP 200). Blocs normalisés via `format_parsed_blocks()` (parité `GET .../blocks`).
+- [x] `PUT /articles/{id}?dry_run=true` : early-return **avant** le bloc force-draft/révision → ne crée pas de révision ni ne touche le live. Renvoie le même payload.
+- [x] Échec validation → même `WP_Error` (HTTP 422 + `errors`) qu'un vrai write (parité oracle).
+- [x] Aucun effet de bord : sideload image skippé, pas de meta écrite, pas de révision créée. Fonctionne sur un site sans articles (création simulée).
+
+### 32.3 — Suppression `validate-content` (orphelin)
+- [x] Route (`class-api.php`), handler REST (`trait-api-blocks.php`), méthode métier (`class-blocks.php`) retirés
+- [x] Test N3 (`AcfValidatorTest.php`) conservé (teste `validate_and_preprocess(dry_run)`, fondation du dry-run) — commentaire de section mis à jour
+
+### 32.4 — Tests & build
+- [x] `ArticleDryRunTest.php` (5 tests) : create no-persist + blocs ; create ACF invalide → 422 ; create sans contenu → blocs vides ; flag absent → persiste (regression) ; update publié sous enforcement → pas de révision
+- [x] Suite complète verte : **363 tests** (était 355 ; +5 dry-run +3 field_values Phase 33)
+- [x] `./build.sh` passe — v0.1.33
+- [x] `api-contract.md` master : `dry_run` documenté + caveat + retrait `validate-content`
+
+### 32.5 — Endpoints d'écriture différés (structure sans spéculation)
+Plomberie prête (`is_dry_run()`) ; à câbler dès qu'un consommateur apparaît. Call-sites de save, cut-line = avant la ligne indiquée :
+- `DELETE /articles/{id}` — `wp_delete_post` (`trait-api-posts.php`)
+- `PUT /pages/{id}` — `wp_update_post` (`trait-api-posts.php`)
+- `POST /media` — `media_handle_sideload` ; `PUT /articles/{id}/featured-image` — `set_post_thumbnail` ; `PUT /media/{id}` — `wp_update_post` ; `DELETE /media/{id}` — `wp_delete_attachment` (`trait-api-media.php`)
+- `POST|PUT|DELETE /categories` + `/tags` — `wp_insert_term`/`wp_update_term`/`wp_delete_term` (`trait-api-taxonomies.php`)
+- `POST|DELETE /redirects` — `wp_insert_post`/`wp_delete_post` (`trait-api-redirects.php`) ; `PUT /field-schema` — `update_option` (`trait-api-field-schema.php`)
 
 ---
 
 ## Phase 33 : `GET /articles/{id}/blocks` renvoie les `field_values` (perf, basse priorité)
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-20*
-*Sévérité : basse — pure latence. Découvert pendant la review du harness anti-OOM (aa-bqy7). À prendre quand on touche cet endpoint.*
+*Sévérité : basse — pure latence. Découvert pendant la review du harness anti-OOM (aa-bqy7).*
 
 ### Contexte
-L'agent SEO lit un article en deux temps via `get_cms_article` : le mode « carte » (défaut) appelle `GET /articles/{id}/blocks` pour la structure des blocs, puis fait un **2e appel** au listing (`GET /articles?...`) uniquement pour récupérer les `field_values` post-level (ACF/meta). `GET /articles/{id}/blocks` ne renvoie aujourd'hui que `{ "post_id": ..., "blocks": [...] }`.
-
-**Demande.** Inclure les `field_values` post-level dans la réponse :
-```json
-{ "post_id": "...", "blocks": [...], "field_values": { "...": "..." } }
-```
-Le backend pourrait alors supprimer le 2e appel HTTP sur le chemin chaud (un appel agent → un appel CMS au lieu de deux). Pas de blocage, pas de régression — le backend est correct aujourd'hui.
+L'agent SEO lit un article en deux temps via `get_cms_article` : le mode « carte » (défaut) appelle `GET /articles/{id}/blocks` pour la structure des blocs, puis fait un **2e appel** au listing uniquement pour récupérer les `field_values` post-level (ACF/meta). Inclure les `field_values` dans la réponse blocks supprime ce 2e appel.
 
 ### 33.1 — Enrichir la réponse
-- [ ] Ajouter `field_values` (post-level ACF/meta) à la réponse de `GET /articles/{id}/blocks`, même source que le listing
-- [ ] Réutiliser la sérialisation `field_values` existante du listing (single source of truth)
+- [x] Helper `get_field_values_for_post( $post_id )` extrait de `format_post()` (`trait-api-formatters.php`) — single source of truth, partagé listing + blocks
+- [x] `get_article_blocks()` renvoie `{ post_id, blocks, field_values }` (branches contenu + contenu vide)
 
 ### 33.2 — Tests & build
-- [ ] Test : réponse contient `field_values` cohérents avec le listing
-- [ ] Test : article sans ACF → `field_values` vide/cohérent (pas de crash)
-- [ ] `./build.sh` passe
-- [ ] Mettre à jour `api-contract.md` côté master specs
+- [x] `ArticleBlocksTest.php` (+3 tests) : field_values présents/cohérents ; présents même sans contenu ; sans ACF → objet vide (pas null/array, pas de crash)
+- [x] `./build.sh` passe + `api-contract.md` master mis à jour
 
 ---
 

@@ -994,7 +994,7 @@ class AcfValidatorTest extends TestCase {
 	}
 
 	// =========================================================================
-	// N3 — Dry-run Validation (validate-content)
+	// N3 — Dry-run validation (foundation of POST /articles?dry_run=true)
 	// =========================================================================
 
 	/**
