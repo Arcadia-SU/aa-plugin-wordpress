@@ -191,8 +191,11 @@ class ArticleDryRunTest extends TestCase {
 		$this->assertTrue( $data['valid'] );
 		$this->assertNotEmpty( $data['blocks'] );
 		$this->assertEquals( 'core/paragraph', $data['blocks'][0]['blockName'] );
-		// field_values echoes the post-level acf_fields the operation would write.
-		$this->assertEquals( 'Sub', $data['field_values']->subtitle );
+		// Option A: field_values is omitted from dry-run (it could only echo raw,
+		// un-coerced input — divergent from the coerced values a real write stores).
+		$this->assertArrayNotHasKey( 'field_values', $data );
+		// force_draft option off → preview reports the requested status would hold.
+		$this->assertFalse( $data['force_draft_applied'] );
 
 		// Nothing persisted.
 		$this->assertCount( 0, $_test_posts );
@@ -329,9 +332,62 @@ class ArticleDryRunTest extends TestCase {
 		$data = $result->get_data();
 		$this->assertTrue( $data['dry_run'] );
 		$this->assertArrayNotHasKey( 'revision_created', $data );
+		// force_draft is enabled → preview surfaces that the real write would draft.
+		$this->assertTrue( $data['force_draft_applied'] );
 
 		// Live post unchanged; no revision CPT added (only the original post remains).
 		$this->assertEquals( 'Original Title', $_test_posts[42]->post_title );
 		$this->assertCount( 1, $_test_posts );
+	}
+
+	// =========================================================================
+	// Fail-safe flag reading (finding 9 — never persist on ambiguity)
+	// =========================================================================
+
+	/**
+	 * dry_run set only in the JSON body (not via the query/param store) still
+	 * triggers preview mode. Regression guard: get_param() alone never reads the
+	 * JSON body, so a body-only flag would have silently performed a real write.
+	 */
+	public function test_dry_run_flag_in_json_body_is_honored(): void {
+		global $_test_posts;
+
+		$request = new \WP_REST_Request();
+		$request->set_json_params(
+			array(
+				'title'   => 'Body-flag article',
+				'dry_run' => true,
+			)
+		);
+
+		$result = $this->helper->create_post( $request );
+		$data   = $result->get_data();
+
+		$this->assertTrue( $data['dry_run'] );
+		$this->assertCount( 0, $_test_posts );
+	}
+
+	/**
+	 * Conflict resolution: query says dry_run=false but the body says true →
+	 * preview wins, nothing is persisted. Ambiguity must never resolve toward an
+	 * accidental real write.
+	 */
+	public function test_dry_run_query_body_conflict_prefers_preview(): void {
+		global $_test_posts;
+
+		$request = new \WP_REST_Request();
+		$request->set_query_params( array( 'dry_run' => 'false' ) );
+		$request->set_json_params(
+			array(
+				'title'   => 'Conflict article',
+				'dry_run' => true,
+			)
+		);
+
+		$result = $this->helper->create_post( $request );
+		$data   = $result->get_data();
+
+		$this->assertTrue( $data['dry_run'] );
+		$this->assertCount( 0, $_test_posts );
 	}
 }

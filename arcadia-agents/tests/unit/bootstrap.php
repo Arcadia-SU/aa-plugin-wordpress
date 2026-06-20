@@ -132,9 +132,10 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
      * Minimal WP_REST_Request stub for unit testing.
      */
     class WP_REST_Request {
-        private $headers     = array();
-        private $params      = array();
-        private $json_params = array();
+        private $headers      = array();
+        private $params       = array();
+        private $json_params  = array();
+        private $query_params = array();
 
         public function set_header( $key, $value ) {
             $this->headers[ strtolower( $key ) ] = $value;
@@ -159,6 +160,14 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
 
         public function get_json_params() {
             return $this->json_params;
+        }
+
+        public function set_query_params( $params ) {
+            $this->query_params = $params;
+        }
+
+        public function get_query_params() {
+            return $this->query_params;
         }
     }
 }

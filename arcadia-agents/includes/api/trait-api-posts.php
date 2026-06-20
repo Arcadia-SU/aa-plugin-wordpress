@@ -188,13 +188,32 @@ trait Arcadia_API_Posts_Handler {
 	 *
 	 * Canonical reader for the dry-run write convention: a write endpoint runs
 	 * its full validation/normalization pipeline but stops before persisting.
-	 * Accepts the flag from the query string (`?dry_run=true`) or the JSON body
-	 * (`{"dry_run": true}`) — WP_REST_Request::get_param() spans both.
+	 *
+	 * Fail-safe by design: the flag is read from BOTH the query string
+	 * (`?dry_run=true`) and the JSON body (`{"dry_run": true}`), and a truthy
+	 * value in *either* source forces preview mode. WP_REST_Request::get_param()
+	 * resolves only one source by precedence and silently drops the other, so a
+	 * query/body mismatch could otherwise cause an *accidental real write* — the
+	 * worst possible failure for this flag. OR-ing both sources means ambiguity
+	 * always resolves toward "don't persist".
 	 *
 	 * @param WP_REST_Request $request The request.
 	 * @return bool True when the caller asked for a dry run.
 	 */
 	private function is_dry_run( $request ) {
+		$sources = array(
+			$request->get_query_params(),
+			$request->get_json_params(),
+		);
+		foreach ( $sources as $source ) {
+			if ( is_array( $source ) && isset( $source['dry_run'] )
+				&& filter_var( $source['dry_run'], FILTER_VALIDATE_BOOLEAN ) ) {
+				return true;
+			}
+		}
+
+		// Fallback to the precedence-resolved param: covers URL/body params in
+		// real WP and the unit-test harness (which routes set_param() here).
 		return filter_var( $request->get_param( 'dry_run' ), FILTER_VALIDATE_BOOLEAN );
 	}
 
@@ -204,12 +223,24 @@ trait Arcadia_API_Posts_Handler {
 	 *
 	 * Executes the same validation + ACF coercion + repeater expansion + block
 	 * render as a real create/update (image sideload skipped — no side-effects),
-	 * then returns the normalized block tree in the exact shape
+	 * then returns the normalized block tree in the same shape
 	 * GET /articles/{id}/blocks emits (single source of truth via
 	 * format_parsed_blocks()). On validation failure it returns the same WP_Error
 	 * (HTTP 422) a real write would, so the caller sees an identical verdict.
 	 *
-	 * Note: the blocks are normalized by the plugin pipeline (validate + coerce +
+	 * Scope of `valid: true` — it means *the block pipeline validates*. It does
+	 * NOT run finalize_post()/process_acf_fields(), so post-level ACF coercion
+	 * and image sideload are not exercised: a real write could still fail on a
+	 * broken post-level image URL. The dry-run answers "do my blocks pass and
+	 * what shape do they take", not "is this write guaranteed to succeed".
+	 *
+	 * `field_values` is intentionally omitted: in dry-run it could only echo the
+	 * raw, un-coerced input, which diverges from the coerced values a real write
+	 * stores (image URL→attachment ID, markdown→HTML) and that
+	 * GET /articles/{id}/blocks reads back — a misleading preview. We return
+	 * nothing rather than something wrong.
+	 *
+	 * Note: blocks are normalized by the plugin pipeline (validate + coerce +
 	 * expand + render); this is not a post-`acf/save_post` round-trip (ACF
 	 * save-time reordering/defaults are not applied without a real write).
 	 *
@@ -231,17 +262,12 @@ trait Arcadia_API_Posts_Handler {
 			$blocks = $this->format_parsed_blocks( parse_blocks( $built['rendered_content'] ) );
 		}
 
-		// Post-level ACF values the operation would write (echoed, not persisted).
-		$field_values = ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) )
-			? (object) $body['acf_fields']
-			: new stdClass();
-
 		return new WP_REST_Response(
 			array(
-				'dry_run'      => true,
-				'valid'        => true,
-				'blocks'       => $blocks,
-				'field_values' => $field_values,
+				'dry_run'             => true,
+				'valid'               => true,
+				'force_draft_applied' => $built['force_draft_applied'],
+				'blocks'              => $blocks,
 			),
 			200
 		);
