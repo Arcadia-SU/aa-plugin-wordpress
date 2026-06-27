@@ -220,12 +220,16 @@ final class Arcadia_Post_Builder {
 	 *                                                 (get_or_create_terms, sideload_and_set_featured_image,
 	 *                                                  process_acf_fields, auto_populate_acf_fields,
 	 *                                                  apply_field_schema_mappings).
-	 * @param array{is_create:bool} $options           Mode-specific switches.
+	 * @param array{is_create:bool, skip_markdown?:bool} $options     Mode-specific switches.
+	 *                                                  skip_markdown: treat ACF wysiwyg
+	 *                                                  values as already-rendered HTML
+	 *                                                  (round-trip) — sanitise, don't parse.
 	 * @return array{warnings:array<int,string>}|WP_Error
 	 */
 	public function finalize_post( $post_id, array $body, array $meta, $post_type, $rendered_content, $finalizer_context, array $options ) {
-		$is_create = ! empty( $options['is_create'] );
-		$warnings  = array();
+		$is_create     = ! empty( $options['is_create'] );
+		$skip_markdown = ! empty( $options['skip_markdown'] );
+		$warnings      = array();
 
 		// Re-attach sideloaded images from H1.2 validation (created with post_parent=0).
 		if ( Arcadia_Blocks::is_acf_available() ) {
@@ -281,7 +285,7 @@ final class Arcadia_Post_Builder {
 		}
 
 		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ) {
-			$acf_result = $finalizer_context->process_acf_fields( $post_id, $body['acf_fields'], $post_type, $content_for_acf );
+			$acf_result = $finalizer_context->process_acf_fields( $post_id, $body['acf_fields'], $post_type, $content_for_acf, $skip_markdown );
 			if ( is_wp_error( $acf_result ) ) {
 				return $acf_result;
 			}

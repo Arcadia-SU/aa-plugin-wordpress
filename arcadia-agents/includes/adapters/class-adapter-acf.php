@@ -123,7 +123,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 */
 	public function custom_block( $block_name, $properties ) {
 		// Fallback: core/* blocks delegate to Gutenberg adapter (not ACF format).
-		if ( str_starts_with( $block_name, 'core/' ) ) {
+		if ( Arcadia_Block_Registry::is_core_type( $block_name ) ) {
 			return $this->gutenberg->custom_block( $block_name, $properties );
 		}
 
@@ -188,7 +188,14 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					break;
 
 				case 'wysiwyg':
-					$data[ $field_name ] = Arcadia_Markdown_Parser::parse_markdown( $value );
+					// Parse structural markdown → HTML so the REST write reproduces the
+					// native render (ADR-013). This is the block-GENERATION path: by
+					// contract the agent sends markdown here, never HTML, so there is no
+					// skip_markdown flag to thread through the block pipeline. If a
+					// round-trip ever pushes already-HTML through a custom ACF block
+					// property, parse_block_markdown()'s HTML-passthrough net carries it
+					// verbatim (no inline re-parse) — see Arcadia_Markdown_Parser.
+					$data[ $field_name ] = Arcadia_Markdown_Parser::parse_rich( $value );
 					break;
 
 				default:

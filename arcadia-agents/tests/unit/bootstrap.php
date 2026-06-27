@@ -996,10 +996,57 @@ if ( ! function_exists( 'wp_unslash' ) ) {
     }
 }
 
-// wp_kses_post() stub.
+// wp_kses_post() stub — faithful enough to enforce WordPress' post-content
+// allowlist (structural + inline tags), so Phase 35 wysiwyg tests can assert
+// both preservation (<h2>/<ul>/<table>/…) and stripping (<script>/<iframe>/<img
+// onerror>/on*). Delegates to the wp_kses() stub defined just below (resolved at
+// call time, after the full bootstrap has loaded).
 if ( ! function_exists( 'wp_kses_post' ) ) {
     function wp_kses_post( $data ) {
-        return $data;
+        $allowed = array(
+            'h1'         => array(),
+            'h2'         => array(),
+            'h3'         => array(),
+            'h4'         => array(),
+            'h5'         => array(),
+            'h6'         => array(),
+            'p'          => array(),
+            'br'         => array(),
+            'hr'         => array( 'class' => true ),
+            'strong'     => array(),
+            'b'          => array(),
+            'em'         => array(),
+            'i'          => array(),
+            'u'          => array(),
+            'code'       => array(),
+            'pre'        => array(),
+            'ul'         => array(),
+            'ol'         => array(),
+            'li'         => array(),
+            'blockquote' => array( 'class' => true ),
+            'span'       => array( 'class' => true ),
+            'div'        => array( 'class' => true ),
+            'table'      => array(),
+            'thead'      => array(),
+            'tbody'      => array(),
+            'tfoot'      => array(),
+            'tr'         => array(),
+            'th'         => array(),
+            'td'         => array(),
+            'a'          => array(
+                'href'   => true,
+                'target' => true,
+                'rel'    => true,
+                'title'  => true,
+            ),
+            'figure'     => array( 'class' => true ),
+            'figcaption' => array( 'class' => true ),
+            'img'        => array(
+                'src' => true,
+                'alt' => true,
+            ),
+        );
+        return wp_kses( (string) $data, $allowed );
     }
 }
 

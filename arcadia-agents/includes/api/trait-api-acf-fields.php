@@ -145,13 +145,16 @@ trait Arcadia_API_ACF_Fields_Handler {
 	 * Iterates over the acf_fields payload, applies type-specific
 	 * transformations, and calls update_field() for each.
 	 *
-	 * @param int    $post_id      The post ID.
-	 * @param array  $acf_fields   Associative array of field_name => value.
-	 * @param string $post_type    The post type slug.
-	 * @param string $post_content The rendered post_content (for wysiwyg fallback).
+	 * @param int    $post_id       The post ID.
+	 * @param array  $acf_fields    Associative array of field_name => value.
+	 * @param string $post_type     The post type slug.
+	 * @param string $post_content  The rendered post_content (for wysiwyg fallback).
+	 * @param bool   $skip_markdown When true, treat wysiwyg values as already-rendered
+	 *                             HTML (round-trip) and sanitise only — don't parse
+	 *                             markdown (ADR-013 round-trip exception, aa-u6nl).
 	 * @return true|WP_Error True on success, WP_Error if ACF unavailable.
 	 */
-	public function process_acf_fields( $post_id, $acf_fields, $post_type, $post_content ) {
+	public function process_acf_fields( $post_id, $acf_fields, $post_type, $post_content, $skip_markdown = false ) {
 		if ( ! function_exists( 'update_field' ) ) {
 			return new \WP_Error(
 				'acf_unavailable',
@@ -168,10 +171,12 @@ trait Arcadia_API_ACF_Fields_Handler {
 			switch ( $field_type ) {
 				case 'wysiwyg':
 					if ( null === $value ) {
-						// Copy rendered post_content into this wysiwyg field.
+						// Copy rendered post_content (already HTML) into this field.
 						$value = $post_content;
 					} else {
-						$value = \Arcadia_Markdown_Parser::parse_markdown( $value );
+						// Parse structural markdown → HTML (ADR-013), unless the agent
+						// flagged this as already-HTML round-trip content (skip_markdown).
+						$value = \Arcadia_Markdown_Parser::parse_rich( $value, $skip_markdown );
 					}
 					break;
 

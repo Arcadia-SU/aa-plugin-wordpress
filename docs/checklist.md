@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-06-20 (v0.1.32 ; Phases 31 hardening wp_slash + auth/uninstall fixes committées ; Phases 32-33 intégrées depuis backlog ; Phase 29 déploiement preprod + E2E toujours pending)
+**Dernière mise à jour :** 2026-06-27 (v0.1.37 ; Phase 34 `core/*` **terminée** ; Phase 36 parser markdown bloc+inline **terminée** ; Phase 37 review Phases 34-35 **terminée** ; **Phase 38 review-de-la-review** (durcissement passthrough round-trip : XSS nom de bloc + `inner_content` sanitisé, null-placeholders, no-silent-loss) **terminée** — 14 findings, 2 questions coordination backend ouvertes ; Phase 29 E2E AA-side pending)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -270,6 +270,168 @@ L'agent SEO lit un article en deux temps via `get_cms_article` : le mode « cart
 ### 33.2 — Tests & build
 - [x] `ArticleBlocksTest.php` (+3 tests) : field_values présents/cohérents ; présents même sans contenu ; sans ACF → objet vide (pas null/array, pas de crash)
 - [x] `./build.sh` passe + `api-contract.md` master mis à jour
+
+---
+
+## Phase 34 : Fix `core/*` block pass-through — jamais de 422 sur un bloc core
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-27 ; réponse backend (shapes + scope Tier 2) intégrée 2026-06-27*
+*Nature : **violation de contrat** (`content-model.md` §4 + §8.1 : le plugin ne doit jamais 422 un bloc `core/*`).*
+*Sévérité : moyenne. AA dodge le cas `core/group` par construction (`flatten_sections`), mais `core/quote` / `core/table` / `core/separator` sont **réellement émis** sur site vanilla (tableaux fréquents).*
+*Scope : **Tier 2** — fix 422 **+ rendu natif fidèle** des trois blocs (shapes confirmées/validées backend).*
+
+### Contexte
+Publier un `core/group` (ou `core/quote`, `core/table`, `core/separator`) sur un site Gutenberg-natif (non-ACF) renvoie `422 "Block type 'group' not registered"`. Les blocs `core/*` sont toujours valides dans `post_content`, jamais 422.
+
+**Root cause.** `validate_block_recursive` (`class-blocks.php`) strippe le préfixe `core/` **avant** d'appeler `registry->is_registered($stripped_type)`. L'early-return « core/* toujours accepté » dans `is_registered` (`class-block-registry.php`) est donc **dead code** — au moment où il s'exécute le préfixe a déjà disparu, la vérif retombe sur l'allowlist (`BUILTIN_BLOCKS` {paragraph, heading, image, list} + `INTERNAL_TYPES` {section, text} + custom). Tout autre `core/*` échoue le lookup → 422. `core/paragraph/heading/list/image` marchent uniquement car leur nom strippé EST un builtin (d'où le faux positif de `test_core_blocks_not_rejected`).
+
+**Shapes JSON reçues (confirmées backend, chemin vanilla uniquement — sur ACF elles sont pré-converties par le transform) :**
+- `core/quote` → `{"type":"core/quote","content":"<texte markdown inline>"}` (pas de champ citation)
+- `core/table` → `{"type":"core/table","properties":{"headers":[str]|null,"rows":[[str],…]}}` — cellules = markdown inline (pas HTML brut) ; invariant backend : rectangulaire (`len(row)==len(headers)` si headers)
+- `core/separator` → `{"type":"core/separator"}` (aucun payload)
+
+### 34.1 — Fix validation (jamais de 422 sur core/*)
+- [x] Cas-spécialiser `core/*` **avant** le strip dans `validate_block_recursive` : accepter + récurser dans les enfants (pas de lookup allowlist, pas de validation de propriétés)
+- [x] Garder l'early-return de `is_registered` comme défense en profondeur + commentaire (poka-yoke)
+
+### 34.2 — Rendu natif fidèle (Tier 2)
+- [x] `Arcadia_Gutenberg_Adapter` : `separator()` → `<!-- wp:separator --><hr class="wp-block-separator …"/>…`
+- [x] `Arcadia_Gutenberg_Adapter` : `quote($content)` → `<!-- wp:quote --><blockquote class="wp-block-quote">` + paragraphe interne (`parse_markdown` inline)
+- [x] `Arcadia_Gutenberg_Adapter` : `table($headers, $rows)` → `<!-- wp:table --><figure class="wp-block-table"><table>` + `<thead>` si headers + `<tbody>` ; cellules via `parse_markdown` (pas de double-escape)
+- [x] `Arcadia_Block_Processor` : helper `native_gutenberg()` (adapter-indépendant, filet §551) + `case 'separator'/'quote'/'table'` dans `process_block`
+
+### 34.3 — Tests & build
+- [x] `BlocksTest` : `core/group/quote/table/separator` → string, pas WP_Error
+- [x] `BlocksTest` : `core/table` (avec/sans headers) → `<table>`/`<thead>`/`<td>` ; `core/quote` → `<blockquote>` ; `core/separator` → `<hr` ; markdown inline de cellule converti
+- [x] `BlocksTest` : `core/whatever` inconnu → pas de 422 (fallback existant)
+- [x] `GutenbergAdapterTest` : tests directs des 3 nouvelles méthodes (5 tests)
+- [x] Régression : builtin (paragraph/heading/image/list) + ACF inchangés (379 tests verts)
+- [x] `content-model.md` §4 + `decisions.md` : shapes core/* + rendu fidèle codifiés
+- [x] `./build.sh` passe (v0.1.35)
+
+---
+
+## Phase 35 : Champs wysiwyg ACF — préserver le HTML de structure à l'écriture REST  ⚠️ SUPERSEDED → Phase 36
+
+> **⚠️ Direction corrigée par le backend (2026-06-27).** Phase 35 supposait que l'agent envoie du **HTML** de structure à *préserver* via `wp_kses_post`. **C'est faux** : l'agent n'émet jamais de HTML (ADR-013/ADR-022 — AA produit le contenu, le plugin produit le HTML). Il envoie du **markdown bloc+inline**. Le `parse_rich` inline-only livré en v0.1.35 rend `## Titre` **littéralement**. → refait en **Phase 36** (le `wp_kses_post` final reste valable ; c'est l'étape de parsing qui change).
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-06-27*
+*Nature : **changement de contrat** (pas une violation — le strip inline-only est volontaire, ADR-013).*
+*Sévérité : moyenne — bloque la parité de rendu natif/REST sur les thèmes ACF (iSelection).*
+
+### Contexte
+Tout champ `wysiwyg` d'un bloc ACF passe par `Arcadia_Markdown_Parser::parse_markdown()`, dont le `wp_kses` final n'autorise que l'inline `{strong, em, code, a}` (`class-markdown-parser.php`). Les balises de structure (`<h2>`–`<h6>`, `<p>`, `<ul>/<ol>/<li>`, `<table>`, `<blockquote>`, `<span>`…) sont supprimées à l'enregistrement. Point de strip : `class-adapter-acf.php`, `custom_block()`, `case 'wysiwyg'`.
+
+**Pourquoi changer.** Les articles natifs (rédigés dans l'éditeur WP) stockent du HTML riche directement dans ces champs wysiwyg — c'est ainsi que le thème (iSelection) les stylise (`.acf-text h2`, `.acf-text a` en vert). Le chemin d'écriture REST ne peut donc **pas** reproduire un article au rendu natif :
+- contenu dans `acf/text` → bon conteneur (liens stylés) **mais structure supprimée** ;
+- contenu en `core/*` → structure conservée **mais hors conteneur `.acf-text`** (liens non stylés).
+
+La parité de rendu est impossible tant que les champs wysiwyg suppriment la structure.
+**Preuve :** l'`acf/text` natif du post `58038` (preprod iSelection) contient `<h2>`, plusieurs `<h3>`, `<a href>`, `<ul><li>` — toutes balises que l'écriture REST supprime aujourd'hui.
+
+### 35.1 — Élargir l'allowlist sur le chemin d'écriture wysiwyg
+- [x] Nouveau `Arcadia_Markdown_Parser::parse_rich()` : convertit le markdown inline **puis** sanitise avec `wp_kses_post` (allowlist post-content standard WP). Refactor : `convert_inline()` privé partagé ; `parse_markdown()` (inline-only) inchangé.
+- [x] `wp_kses_post` bloque toujours `<script>` / `<iframe>` / `on*` / `javascript:` → pas de downgrade sécu (déjà utilisé sur le chemin plain-content, `class-post-builder.php`)
+- [x] Strip inline-only **conservé** pour les textes courts encapsulés (heading/paragraph/listing du gutenberg adapter). Les 2 sites wysiwyg (`class-adapter-acf.php`, `trait-api-acf-fields.php`) pointent vers `parse_rich()`.
+
+### 35.2 — Docs & tests à mettre à jour avec le fix
+- [x] `content-model.md` master §2 — formatage des champs wysiwyg (inline markdown + HTML de structure sanitisé)
+- [x] ADR-013 (fichier `adr/ADR-013-*.md`) + `decisions.md` master — le contrat « inline = markdown only » devient « inline markdown + HTML de structure sanitisé » sur wysiwyg
+- [x] Mock `wp_kses_post` durci dans `bootstrap.php` (allowlist post-content fidèle) pour que les tests prouvent vraiment preservation + strip
+- [x] Nouveaux tests (`AcfAdapterTest` + `AcfFieldsTest`) : wysiwyg `<h2>/<ul>/<table>` → préservé ; `<script>/<iframe>/onerror` → strippé. Tests inline `parse_markdown` (BlocksTest) inchangés (chemin inline préservé).
+
+### 35.3 — Build
+- [x] `./build.sh` passe (v0.1.35)
+
+---
+
+## Phase 36 : CORRECTION wysiwyg — l'agent envoie du markdown bloc+inline (PAS du HTML)
+
+*Ref: backlog.md — correction backend intégrée 2026-06-27. **Supersede la direction de Phase 35.***
+*Nature : correction de contrat. Phase 35 supposait « l'agent envoie du HTML à préserver » — faux. L'agent n'émet jamais de HTML (ADR-013/ADR-022).*
+
+### Contrat corrigé (backend, source de vérité)
+Dans un champ `wysiwyg` ACF, l'agent envoie du **markdown de structure** :
+- titres `##` … `######`
+- listes `-` / `1.`
+- tables markdown `| a | b |`
+- citations `>`
+- inline : `**gras**`, `*italique*`, `[lien](url)`, `` `code` ``
+
+**Doit rendre** en HTML riche (`<h2>`, `<p>`, `<ul><li>`, `<table>`, `<blockquote>`, `<a>`, `<strong>`…), identique à un article rédigé nativement, pour que le thème stylise via son conteneur (`.acf-text`).
+
+**Conséquence plugin :** parser le markdown **bloc + inline** → HTML → `wp_kses_post`. Seul écart vs. Phase 35 : le **bloc** en plus de l'inline (aujourd'hui seul l'inline est géré).
+
+### 36.0 — DÉCISION : approche du parser de bloc ⬅️ Oscar
+- [x] **Hand-roll** retenu (`parse_block_markdown()` maison, 0 dépendance). Risque correctness maîtrisé par matrice de tests (44 tests, 3 passes de recherche GFM/CommonMark/inline). Évite collision classe globale `Parsedown` + complexité PHP-Scoper WP.org.
+
+### 36.1 — Parser markdown de bloc
+- [x] `parse_rich()` : markdown **bloc+inline** → HTML → `wp_kses_post` (`parse_rich = wp_kses_post(parse_block_markdown())`)
+- [x] Constructs : titres `##`-`######`, listes `-`/`1.` (imbrication 1 niveau, tight), tables GFM (`| |` + délimiteur concordant, alignement `:`, `\|` échappé), citations `>`, barres `---`, code clôturé ` ``` `, passthrough HTML, paragraphes ; inline réutilise `convert_inline()` (code-span protégé avant emphase). Préprocessing PCRE : garde UTF-8, CRLF, regex `/u`.
+- [x] `skip_markdown` (round-trip, aa-u6nl) : `is_skip_markdown()` (miroir `dry_run`) → `finalize_post` options → `process_acf_fields()` → `parse_rich($v, $skip)`. Chemin génération blocs ACF = markdown par contrat (filet passthrough HTML).
+
+### 36.2 — Tests
+- [x] `MarkdownBlockParserTest` (44 tests) : chaque construct, bloc+inline combinés, `skip_markdown=true` → pas de parsing, `<script>`/`onerror` strippés, accents FR / CRLF / gros input, liens externes `rel`/`target`, `<img>` conservé
+- [x] Tests Phase 35 revus : `AcfAdapterTest` reçoit du markdown (`## Titre` → `<h2>`) ; `AcfFieldsTest` + test `skip_markdown`
+
+### 36.3 — Docs & build
+- [x] `content-model.md` §2 + `decisions.md` : « inline + HTML préservé » → « markdown **bloc+inline** parsé → HTML » (ADR-013 déjà amendé par le backend)
+- [x] `./build.sh` (v0.1.35 → v0.1.36, 15 gates ✓)
+
+### Hors scope (noté backend)
+- `*` / `[` littéral dans du markdown frais = ambigu (italique vs littéral). `skip_markdown` ne le résout pas (on veut le parsing pour `**gras**`). À traiter si la fréquence le justifie. **(= finding review #4)**
+
+---
+
+## Phase 37 : Code-review Phases 34-35 — findings vérifiés (workflow xhigh, 2026-06-27)
+
+*10 finders, 26 candidats, 22 verifiers → 11 findings retenus. Liste unique par sévérité (pas de tri « pré-existant »).*
+
+### P1 — Perte de données / correctness
+- [x] **#1** Blocs conteneurs `core/*` : passthrough verbatim (backend a tranché — ingestion round-trip, jamais vidé en silence). `process_block` détecte les blocs round-trip (`inner_blocks`/`inner_content`) → reconstruit le markup stocké (`<!-- wp:... -->` + ouverture + enfants récursifs + fermeture) ; garde « jamais vide » dans le `default` ; `validate_block_recursive` les accepte verbatim (pas de 422 sur bloc tiers). Symétrie read/write (clés `inner_blocks`/`innerBlocks`/`children`).
+- [x] **#2** `quote()`/`table()` : garde scalaire (`is_scalar() ? (string) : ''`) → plus de littéral `Array` + warning.
+
+### P2 — Contrat / découverte
+- [x] **#3** `core/quote`/`separator`/`table` ajoutés à `BUILTIN_BLOCKS` (GET /blocks les liste, nom nu ne 422 plus ; description table documente `headers`/`rows`).
+- [ ] **#4** Tokenizer inline flanking/escapes → **différé (tranché backend, hors scope)**. Le parser applique des regex sûres (code-span protégé avant emphase) mais ne réécrit pas l'emphase au flanking CommonMark.
+
+### P3 — Sécurité / tests / perf / maintenabilité
+- [x] **#5** wysiwyg persiste `<img>` : **accepté** (cohérent post_content, agent JWT). Test `test_wysiwyg_img_survives`.
+- [x] **#6** Tests liens externes : `test_external_link_gets_rel_and_target` + `test_internal_link_has_no_target` (stub `wp_kses` autorise déjà `href`/`target`/`rel`).
+- [x] **#7** `home_url()` calculé une fois par `convert_inline` (`$site_host` hors callback, capturé via `use()`).
+- [x] **#8** Helper partagé `Arcadia_Block_Registry::is_core_type()`/`strip_core_prefix()` appliqué aux 4 sites (fin du `substr($type,5)` magique).
+- [x] **#9** `native_gutenberg()` : docblock sur la règle de décision (interface = multi-builder pour les types assembly ; `native_gutenberg()` hors interface = rendu core-only).
+
+---
+
+## Phase 38 : Revue de la revue — durcissement passthrough round-trip (workflow xhigh, 2026-06-27)
+
+*Review xhigh des changements Phase 36+37 : 10 finders, 46 candidats, 38 verifiers → 14 findings retenus (9 CONFIRMED + 5 PLAUSIBLE) + 8 réfutés. Tous traités (sauf #12, by-design). v0.1.36 → v0.1.37, 440 tests.*
+
+### 🔴 Sécurité (stored XSS — round-trip n'est plus exempté de `wp_kses_post`)
+- [x] **#1** Nom de bloc réduit à son slug avant le délimiteur `<!-- wp:NAME -->` (`safe_block_name()`) — plus de comment-breakout via un `type` forgé.
+- [x] **#2** Chunks `inner_content` passés par `wp_kses_post()` — plus de `<script>` agent stocké verbatim. ⚠ strippe aussi les `<iframe>`/embeds (voir coordination backend).
+
+### 🟠 Perte de contenu / ordre
+- [x] **#3** Feuille `core/*` non rendue préservée en commentaire natif (`native_block_comment()`) au lieu d'être droppée.
+- [x] **#5** Validation recurse les enfants round-trip (nœud cassé → 422, plus de disparition muette) ; feuilles namespaced du sous-arbre acceptées (pas de 422 sur contenu tiers).
+- [x] **#4** Reconstruction fidèle via null placeholders WP-grammar (enfants interleavés) ; fallback lossless si absents. ⚠ exactitude complète dépend du reader AA (voir coordination backend).
+- [x] **#6** URL avec parenthèses équilibrées non tronquée (liens Wikipedia).
+- [x] **#7** Liens extraits avant la passe emphase (`*` dans URL ne devient plus `<em>` mangé par `esc_url`) ; emphase appliquée au texte du lien.
+- [x] **#8** Filet passthrough HTML élargi aux balises inline en début de ligne (round-trip HTML sans `skip_markdown` non corrompu).
+
+### 🟡 Robustesse / fail-safety
+- [x] **#9** `content:"0"` n'est plus traité comme vide (`'' !==` au lieu de `empty()`).
+- [x] **#10** Garde `function_exists` sur mbstring (pas de fatal sur hôte sans ext-mbstring).
+- [x] **#11** Backstop `MAX_BLOCK_DEPTH` sur la récursion passthrough (anti-DoS imbrication).
+- [x] **#13** `content` non vide prime sur un `inner_content` parasite (discriminateur round-trip).
+- [x] **#14** Test `skip_markdown` non-vacant (input markdown nu, prouve le threading du flag dans les 2 branches).
+- [x] **#15** `passthrough_block` utilise `strip_core_prefix()` (plus de `preg_replace('#^core/#')` dupliqué).
+- [ ] **#12** Prose wysiwyg `## `/`- `/`| |` → élément structurel : **by-design** (contrat Phase 36, le wysiwyg porte du markdown). Pas de changement de code.
+
+### 🔵 Coordination backend (questions ouvertes — voir decisions.md 2026-06-27)
+- [x] **Null placeholders** : ~~décider~~ **tranché (Oscar)** — note basse-priorité à AA, **non-bloquant**. Le reader AA dé-nulle `inner_content` → ordre deviné pour un conteneur avec HTML brut entre enfants (jamais perdu, repli lossless ; cas rare). Plugin déjà forward-compatible : si AA **préserve** les null placeholders un jour, reconstruction exacte sans changement plugin.
+- [x] **Embeds/iframes** : ~~décider~~ **tranché (Oscar)** — on garde le strip `wp_kses_post` des `<iframe>`/embeds sur round-trip. Sécurité > préservation verbatim.
 
 ---
 

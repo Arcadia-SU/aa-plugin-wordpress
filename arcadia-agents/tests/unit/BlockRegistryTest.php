@@ -50,18 +50,25 @@ class BlockRegistryTest extends TestCase {
 	// =========================================================================
 
 	/**
-	 * Test that builtin blocks list contains exactly 4 types.
+	 * Test that builtin blocks list advertises every adapter-handled core block.
+	 *
+	 * Phase 37 #3: quote/separator/table render natively (process_block) and must
+	 * also be advertised so GET /blocks lists them and a bare {type:"quote"} stops
+	 * 422-ing.
 	 */
-	public function test_builtin_blocks_contains_four_types(): void {
+	public function test_builtin_blocks_contains_all_core_types(): void {
 		$builtins = $this->registry->get_builtin_blocks();
 
-		$this->assertCount( 4, $builtins );
+		$this->assertCount( 7, $builtins );
 
 		$types = array_column( $builtins, 'type' );
 		$this->assertContains( 'core/paragraph', $types );
 		$this->assertContains( 'core/heading', $types );
 		$this->assertContains( 'core/image', $types );
 		$this->assertContains( 'core/list', $types );
+		$this->assertContains( 'core/quote', $types );
+		$this->assertContains( 'core/separator', $types );
+		$this->assertContains( 'core/table', $types );
 	}
 
 	/**

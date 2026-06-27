@@ -226,46 +226,91 @@ class Arcadia_Blocks {
 	 * @param array $block The block data.
 	 * @return true|WP_Error True if valid, WP_Error if not.
 	 */
-	private function validate_block_recursive( $block ) {
+	private function validate_block_recursive( $block, $in_roundtrip = false ) {
 		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
 			return true;
 		}
 
-		// Normalize core/* prefix for validation (same as process_block).
+		// Round-trip / WP-grammar content is reproduced verbatim on write
+		// (read/write symmetry): the node itself is the site's own existing content,
+		// not new generation to check against the registry (a registry check would
+		// 422 legitimate third-party blocks and break the round-trip). But we DO
+		// recurse its children so a structurally-broken nested node surfaces an
+		// error instead of vanishing silently at render (review #5). Same
+		// discriminator the renderer uses, so validation and rendering agree.
+		if ( Arcadia_Block_Processor::is_roundtrip_block( $block ) ) {
+			return $this->validate_block_children( $block, true );
+		}
+
 		$type = $block['type'];
-		if ( str_starts_with( $type, 'core/' ) ) {
-			$type = substr( $type, 5 );
-		}
 
-		// Check if the block type is registered.
-		if ( ! $this->registry->is_registered( $type ) ) {
-			return new WP_Error(
-				'unknown_block_type',
-				sprintf(
-					/* translators: %s: block type name */
-					__( "Block type '%s' is not registered.", 'arcadia-agents' ),
-					$type
-				),
-				array(
-					'status'                  => 422,
-					'block_type'              => $type,
-					'available_custom_blocks' => $this->registry->get_custom_block_names(),
-				)
-			);
-		}
+		// core/* blocks are always valid in post_content (native Gutenberg
+		// pass-through, content-model.md §4). Accept without allowlist/property
+		// checks — they must never 422 — but still recurse into children below so
+		// a malformed nested block is still caught. This special-case must come
+		// BEFORE any prefix normalization: stripping `core/` first would route the
+		// short name (e.g. "quote") through the registered-types allowlist and
+		// reject everything outside BUILTIN_BLOCKS (the historical 422 bug).
+		//
+		// Inside a round-trip subtree, a namespaced leaf (core/* OR third-party,
+		// e.g. a self-closing acme/spacer with empty inner_content) is also the
+		// site's own content: the renderer preserves it as native markup, so accept
+		// it here too rather than 422 it (review #5). Outside round-trip, only
+		// core/* skips the registry — acf/* generation blocks still get validated.
+		$is_namespaced = is_string( $type ) && false !== strpos( $type, '/' );
+		$skip_registry = Arcadia_Block_Registry::is_core_type( $type ) || ( $in_roundtrip && $is_namespaced );
+		if ( ! $skip_registry ) {
+			// Check if the block type is registered.
+			if ( ! $this->registry->is_registered( $type ) ) {
+				return new WP_Error(
+					'unknown_block_type',
+					sprintf(
+						/* translators: %s: block type name */
+						__( "Block type '%s' is not registered.", 'arcadia-agents' ),
+						$type
+					),
+					array(
+						'status'                  => 422,
+						'block_type'              => $type,
+						'available_custom_blocks' => $this->registry->get_custom_block_names(),
+					)
+				);
+			}
 
-		// Validate properties for custom blocks.
-		if ( ! empty( $block['properties'] ) && is_array( $block['properties'] ) ) {
-			$validation = $this->registry->validate_properties( $type, $block['properties'] );
-			if ( is_wp_error( $validation ) ) {
-				return $validation;
+			// Validate properties for custom blocks.
+			if ( ! empty( $block['properties'] ) && is_array( $block['properties'] ) ) {
+				$validation = $this->registry->validate_properties( $type, $block['properties'] );
+				if ( is_wp_error( $validation ) ) {
+					return $validation;
+				}
 			}
 		}
 
 		// Recurse into children.
-		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
-			foreach ( $block['children'] as $child ) {
-				$result = $this->validate_block_recursive( $child );
+		return $this->validate_block_children( $block, $in_roundtrip );
+	}
+
+	/**
+	 * Recurse validation into a block's children under any child key.
+	 *
+	 * Walks `children` (generation) plus `inner_blocks`/`innerBlocks` (round-trip),
+	 * so a malformed node nested inside a round-trip container is still caught
+	 * (review #5: never silent content loss). Children reached through an
+	 * inner_blocks key — or any child of a round-trip block — inherit the
+	 * round-trip context so their own namespaced leaves are accepted, not 422'd.
+	 *
+	 * @param array $block        The block data.
+	 * @param bool  $in_roundtrip Whether $block is itself round-trip content.
+	 * @return true|WP_Error True if all children valid, WP_Error otherwise.
+	 */
+	private function validate_block_children( $block, $in_roundtrip = false ) {
+		foreach ( array( 'children', 'inner_blocks', 'innerBlocks' ) as $key ) {
+			if ( empty( $block[ $key ] ) || ! is_array( $block[ $key ] ) ) {
+				continue;
+			}
+			$child_roundtrip = $in_roundtrip || 'inner_blocks' === $key || 'innerBlocks' === $key;
+			foreach ( $block[ $key ] as $child ) {
+				$result = $this->validate_block_recursive( $child, $child_roundtrip );
 				if ( is_wp_error( $result ) ) {
 					return $result;
 				}

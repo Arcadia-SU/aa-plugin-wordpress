@@ -58,6 +58,18 @@ class Arcadia_Block_Registry {
 			'type'        => 'list',
 			'description' => 'Ordered/unordered list',
 		),
+		'quote'     => array(
+			'type'        => 'quote',
+			'description' => 'Blockquote (core/quote). Text in `content` (inline markdown).',
+		),
+		'separator' => array(
+			'type'        => 'separator',
+			'description' => 'Horizontal separator (core/separator). No payload.',
+		),
+		'table'     => array(
+			'type'        => 'table',
+			'description' => 'Table (core/table). properties.headers (string[]|null) + properties.rows (string[][]); cells are inline markdown.',
+		),
 	);
 
 	/**
@@ -66,6 +78,37 @@ class Arcadia_Block_Registry {
 	 * @var array
 	 */
 	private const INTERNAL_TYPES = array( 'section', 'text' );
+
+	/**
+	 * Namespace prefix for native WordPress (core) blocks.
+	 *
+	 * @var string
+	 */
+	private const CORE_PREFIX = 'core/';
+
+	/**
+	 * True when a block type is a native WordPress core/* type.
+	 *
+	 * Single source of truth for the core/ namespace check, shared by the
+	 * processor, validator and ACF adapter (poka-yoke: no duplicated literal).
+	 *
+	 * @param string $type The block type name.
+	 * @return bool
+	 */
+	public static function is_core_type( $type ) {
+		return is_string( $type ) && str_starts_with( $type, self::CORE_PREFIX );
+	}
+
+	/**
+	 * Strip the core/ namespace from a type, leaving the short name unchanged
+	 * for non-core types. Replaces the brittle hard-coded substr( $type, 5 ).
+	 *
+	 * @param string $type The block type name (e.g. 'core/quote').
+	 * @return string Short name (e.g. 'quote'), or $type unchanged if not core/*.
+	 */
+	public static function strip_core_prefix( $type ) {
+		return self::is_core_type( $type ) ? substr( $type, strlen( self::CORE_PREFIX ) ) : $type;
+	}
 
 	/**
 	 * Get single instance of the class.
@@ -127,7 +170,10 @@ class Arcadia_Block_Registry {
 	 */
 	public function is_registered( $type ) {
 		// Core/* blocks are always accepted (pass-through to Gutenberg native).
-		if ( str_starts_with( $type, 'core/' ) ) {
+		// Defense in depth: validate_block_recursive() now short-circuits core/*
+		// before reaching here, but this guard keeps is_registered() correct for
+		// any other (external/future) caller that passes a prefixed core type.
+		if ( self::is_core_type( $type ) ) {
 			return true;
 		}
 
