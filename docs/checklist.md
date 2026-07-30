@@ -1,8 +1,8 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-07-30 (v0.1.38 ; Phases 34/36/37/38 **terminées** ; **Phase 39** markdown inline dans les sous-champs wysiwyg de répéteur **terminée côté code** — reste la vérification du type ACF de `cell` sur site client ; **Phase 40** rename `/articles`→`/contents` **⏸ bloqué** (à grouper avec le lot post_type P1b, non tracké ici) ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-07-30 (v0.1.38 ; Phases 34/36/37/38 **terminées** ; **Phase 39** markdown inline dans les sous-champs wysiwyg de répéteur **terminée côté code** — relevé du type ACF de `cell` en cours côté AA ; **Phase 41** lot P1b (3 défauts `post_type` root-causés) **à faire, débloquée** ; **Phase 40** rename `/articles`→`/contents` livrée avec la Phase 41 ; Phase 29 E2E AA-side pending)
 
-> **Aucune tâche de code plugin n'est débloquée à ce jour.** Tout ce qui reste d'actionnable demande soit un accès au site client (validations manuelles), soit une décision/action côté AA.
+> **Prochain front de travail : Phase 41.** AA a routé le périmètre plugin du lot P1b le 2026-07-30, ce qui débloque à la fois la Phase 41 et la Phase 40 (release groupée).
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -474,7 +474,7 @@ Le build échouait au check #14 depuis la Phase 31 (commit `2daca44`, celui-là 
 
 Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** dans le groupe ACF iSelection. La fixture de test du repo le déclarait `text`, et aucune capture locale ne porte le vrai type.
 
-- [ ] **Vérifier le type réel** : `GET /blocks` → `acf/table` → `row.sub_fields[cols].sub_fields[cell].type`
+- [ ] **Vérifier le type réel** : `GET /blocks` → `acf/table` → `row.sub_fields[cols].sub_fields[cell].type` — **relevé live en cours côté AA** (réponse 2026-07-30). Indication non vérifiée, à ne pas traiter comme la réponse : leur capture `_capture_iselection/mapping.md:43` décrit `title`/`text`/`text-bottom` en wysiwyg **sans** marquer `cell`.
 - [ ] Si `wysiwyg` → valider le rendu sur preprod WP#88200, puis prod WP#48869
 - [ ] Si `text` → le bug est un **conflit de contrat côté AA** (markdown envoyé dans un champ ACF texte brut). Deux sorties possibles : passer le champ en `wysiwyg` côté ACF, ou arrêter d'émettre du markdown dans ce champ côté AA. Ne pas élargir la conversion aux champs `text` côté plugin (double-échappement).
 
@@ -488,7 +488,7 @@ Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** 
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
 
-**⏸ Ne pas livrer isolément.** Décision produit : ce rename embarque dans la **même release que les garanties post_type** (surface contenu agnostique au `post_type` — `page`, `landing-page`, `page-investir`), lot **P1b** du chantier pages business. Une seule campagne de déploiement sur les 3 sites clients (iSelection preprod + www, trottinette). Tant que le lot post_type n'est pas prêt, **ne pas shipper `/contents` seul**.
+**⏸ Ne pas livrer isolément.** Décision produit : ce rename embarque dans la **même release que les garanties post_type**, lot **P1b** du chantier pages business — désormais tracké en **[Phase 41](#phase-41--lot-p1b--garanties-post_type-3-défauts-root-causés)**. Une seule campagne de déploiement sur les 3 sites clients (iSelection preprod + www, trottinette). **Débloquer la Phase 41 d'abord, puis livrer les deux ensemble.**
 
 **Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin doit suivre.
 
@@ -499,6 +499,53 @@ Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** 
 - [ ] Maintenir `/articles*` au moins une version de grâce (pas de bascule atomique AA↔plugin)
 - [ ] Tests : parité de réponse `/articles*` ↔ `/contents*` sur chaque endpoint
 - [ ] Coordination : le connector AA bascule sur `/contents` une fois la release déployée sur les 3 sites
+
+---
+
+## Phase 41 : Lot P1b — garanties `post_type` (3 défauts root-causés)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
+*Source AA : `docs/tasks_backlog/agent-seo/next/_capture_business_pages/findings.md`, sondé en réel sur iSelection préprod le 2026-07-02.*
+
+Le périmètre plugin de P1b, qui bloquait la Phase 40. Les 3 défauts sont **vérifiés dans le code** de cette session (pas seulement rapportés).
+
+### 41.1 — `is_allowed_post_type` rejette les types hiérarchiques
+
+**Confirmé** : `trait-api-posts.php:922` → `return $post_type_obj->public && ! $post_type_obj->hierarchical;`
+
+Le CPT `page` est hiérarchique, donc les 4 appelants (`trait-api-posts.php:327/420/565/672` — create, update, `get_article_blocks`, delete) répondent `404 post_not_found`. Le listing et `blocks/usage` servent pourtant ces mêmes posts : **la surface est incohérente avec elle-même**, c'est ça le vrai défaut.
+
+- [ ] Autoriser les `post_type` hiérarchiques dans `is_allowed_post_type()`
+- [ ] Protéger `post_parent`, `menu_order`, `page_template` en update — non éditoriaux, AA ne doit pas pouvoir les bouger (ignorés silencieusement ou 422 explicite : trancher, préférer le 422)
+- [ ] Vérifier que les 4 appelants se comportent identiquement (le bug vient de la garde partagée, la correction doit l'être aussi)
+- [ ] Tests : `page` acceptée en update/blocks/delete ; `post_parent`/`menu_order`/`page_template` non modifiables ; un type non-public reste rejeté
+
+### 41.2 — Preview de révision rendue au mauvais template
+
+**Confirmé** : `class-preview.php:434-436` construit les candidats depuis `$post->post_type`. Pour une révision, ce post **est** le `aa_revision` → candidats `single-aa_revision*.php` → repli générique. Observé : body class `single-aa_revision postid-88553`, contre `single-page-investir page-investir-template-default` en live.
+
+Conséquence : le client valide la révision dans un template qui n'est pas celui de la page — **HITL aveugle** sur des pages à layout riche. Touche aussi les articles, moins visiblement.
+
+- [ ] Résoudre le template depuis le **post parent** (`post_parent`) et non depuis le `aa_revision` : `post_type`, `page_template`, `post_name`
+- [ ] Aligner aussi les body class et le `queried_object` pour que le thème se comporte comme en live
+- [ ] Vérifier la cohabitation avec la page de fallback minimale (Phase 19) — un template parent introuvable ne doit pas régresser en Content-Length 0
+- [ ] Tests : candidats de template dérivés du parent ; article ET page à template custom
+
+### 41.3 — `word_count` = 0 sur les posts à blocs ACF
+
+**Confirmé** : `trait-api-formatters.php:47-48` → `str_word_count( wp_strip_all_tags( $post->post_content ) )`. Quand le contenu vit dans les attributs de blocs ACF, `post_content` ne porte que des commentaires de bloc → 0.
+
+Ce n'est pas une donnée manquante mais un **faux signal** : un audit qui lit `word_count = 0` conclut « thin content » sur une page de 30k caractères. **Absence de champ préférable à zéro.**
+
+- [ ] Omettre `word_count` (ou `null`) plutôt que renvoyer `0` quand il n'est pas calculable de façon fiable — trancher omission vs `null` selon ce que le contrat expose déjà
+- [ ] Évaluer un comptage réel depuis les valeurs de champs ACF (on a déjà `get_field_values_for_post()` juste à côté, ligne 68) — à faire seulement si le coût perf est nul, sinon s'en tenir à l'omission
+- [ ] **Défaut adjacent repéré** : `str_word_count()` n'est pas UTF-8 safe — il coupe sur les accents français. À corriger dans le même passage si on garde un comptage.
+- [ ] Tests : post à blocs ACF (pas de faux zéro) ; post classique (comptage inchangé) ; texte accentué
+
+### 41.4 — Release groupée
+
+- [ ] Livrer **Phase 41 + Phase 40** dans la même release, une seule campagne de déploiement sur les 3 sites
+- [ ] `./build.sh` + annonce dans `backlog-for-backend.md`
 
 ---
 
