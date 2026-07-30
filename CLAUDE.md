@@ -22,7 +22,7 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 |---------|---------|
 | `README.md` | Hub : purpose, protocole, liens vers tous les fichiers |
 | `backlog.md` | **AA → Plugin** : file d'attente actionnelle (vidée après intégration plugin) |
-| `upstream.md` | **Plugin → AA** : questions, blocages, annonces de release (vidé par la session AA) |
+| `backlog-for-backend.md` | **Plugin → AA** : questions, blocages, annonces de release (vidé par la session AA) |
 | `api-contract.md` | Endpoints, params, réponses (28 endpoints: 15 MVP + 13 v2) |
 | `auth.md` | JWT RS256, handshake, scopes |
 | `content-model.md` | JSON schema blocs (ADR-013), mapping ACF, multi-builder |
@@ -41,11 +41,11 @@ Communication **pull-based** entre les sessions AA et Plugin, **un fichier par s
 3. Plugin vide `backlog.md`
 4. **Backlog vide = plugin à jour**
 
-**Plugin → AA (`upstream.md`)**
-1. Plugin écrit ses questions, blocages et annonces de release dans `upstream.md`
+**Plugin → AA (`backlog-for-backend.md`)**
+1. Plugin écrit ses questions, blocages et annonces de release dans `backlog-for-backend.md`
 2. AA lit, répond ou agit (souvent en écrivant dans `backlog.md`)
-3. AA vide `upstream.md`
-4. **Upstream vide = AA n'a rien en attente du plugin**
+3. AA vide `backlog-for-backend.md`
+4. **Backlog-for-backend vide = AA n'a rien en attente du plugin**
 
 Ne jamais écrire dans le fichier de l'autre sens : un canal bidirectionnel casse l'invariant
 « vide = rien en attente ».
@@ -115,9 +115,9 @@ Le script exécute ces checks avant de créer le zip :
 | 13 | Création du zip | Oui |
 | 14 | Zip content audit (pas de tests/dev deps) | Oui |
 | 15 | Zip size en octets (warning si > 500KB) | Warning |
-| – | Restauration dev deps (trap EXIT) | - |
+| – | Restauration dev deps + rollback version (trap EXIT) | - |
 
-Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
+Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`, et le bump de version est annulé — un build avorté ne doit pas laisser l'arbre sur une version jamais packagée (c'est exactement ce qui s'est produit des Phases 31 à 38 : 0.1.30 → 0.1.37 sans aucun zip).
 
 **Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
 

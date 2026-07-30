@@ -22,7 +22,7 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 |---------|---------|
 | `README.md` | Hub : purpose, protocole, liens vers tous les fichiers |
 | `backlog.md` | **AA → Plugin** : file d'attente actionnelle (vidée après intégration plugin) |
-| `upstream.md` | **Plugin → AA** : questions, blocages, annonces de release (vidé par la session AA) |
+| `backlog-for-backend.md` | **Plugin → AA** : questions, blocages, annonces de release (vidé par la session AA) |
 | `api-contract.md` | Endpoints, params, réponses (28 endpoints: 15 MVP + 13 v2) |
 | `auth.md` | JWT RS256, handshake, scopes |
 | `content-model.md` | JSON schema blocs (ADR-013), mapping ACF, multi-builder |
@@ -41,11 +41,11 @@ Communication **pull-based** entre les sessions AA et Plugin, **un fichier par s
 3. Plugin vide `backlog.md`
 4. **Backlog vide = plugin à jour**
 
-**Plugin → AA (`upstream.md`)**
-1. Plugin écrit ses questions, blocages et annonces de release dans `upstream.md`
+**Plugin → AA (`backlog-for-backend.md`)**
+1. Plugin écrit ses questions, blocages et annonces de release dans `backlog-for-backend.md`
 2. AA lit, répond ou agit (souvent en écrivant dans `backlog.md`)
-3. AA vide `upstream.md`
-4. **Upstream vide = AA n'a rien en attente du plugin**
+3. AA vide `backlog-for-backend.md`
+4. **Backlog-for-backend vide = AA n'a rien en attente du plugin**
 
 Ne jamais écrire dans le fichier de l'autre sens : un canal bidirectionnel casse l'invariant
 « vide = rien en attente ».
@@ -96,24 +96,32 @@ composer require firebase/php-jwt
 ./build.sh
 ```
 
-Le script exécute 12 checks avant de créer le zip :
+Le script exécute ces checks avant de créer le zip :
 
 | # | Check | Bloquant |
 |---|-------|----------|
 | 1 | Docker running | Oui |
-| 2 | PHPUnit tests | Oui |
-| 3 | `composer install --no-dev` | Oui |
-| 4 | PHP lint (tous les .php) | Oui |
-| 5 | Autoloader audit (pas de phpunit/myclabs) | Oui |
-| 6 | Vendor completeness (firebase/php-jwt) | Oui |
-| 7 | Boot test (autoloader charge) | Oui |
-| 8 | Version bump (auto-increment patch X.Y.**Z**) | Oui |
-| 9 | Création du zip | Oui |
-| 10 | Zip content audit (pas de tests/dev deps) | Oui |
-| 11 | Zip size (warning si > 500KB) | Warning |
-| 12 | Restauration dev deps (trap EXIT) | - |
+| 2 | **wp_slash safety gate** (`bin/check-wp-slash.php`) | Oui |
+| 3 | PHPUnit tests | Oui |
+| 4 | **Real-WordPress fidelity check** (`test/fidelity-check.php`) | Oui |
+| 5 | `composer install --no-dev` | Oui |
+| 6 | PHP lint (tous les .php) | Oui |
+| 7 | **Debug-code scan** (pas de `var_dump`/`print_r` echo) | Oui |
+| 8 | **Uninstall completeness** (options/CPT/cron nettoyés) | Oui |
+| 9 | Autoloader audit (pas de dev deps) | Oui |
+| 10 | Vendor completeness (firebase/php-jwt) | Oui |
+| 11 | Boot test (autoloader charge) | Oui |
+| 12 | Version bump + sync readme `Stable tag` | Oui |
+| 13 | Création du zip | Oui |
+| 14 | Zip content audit (pas de tests/dev deps) | Oui |
+| 15 | Zip size en octets (warning si > 500KB) | Warning |
+| – | Restauration dev deps + rollback version (trap EXIT) | - |
 
-Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`.
+Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`, et le bump de version est annulé — un build avorté ne doit pas laisser l'arbre sur une version jamais packagée.
+
+**Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`.
+
+**Analyse statique (CI uniquement) :** PHPStan (niveau 5 + `phpstan-wordpress` + baseline) tourne dans la CI GitHub, pas dans `./build.sh` (le conteneur local manque de RAM). Voir `.github/workflows/ci.yml` et `phpstan.neon.dist`.
 
 **RÈGLE : Toujours lancer `./build.sh` après tout changement de code.** Le zip doit rester à jour.
 
