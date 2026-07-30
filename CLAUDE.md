@@ -21,7 +21,8 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 | Fichier | Contenu |
 |---------|---------|
 | `README.md` | Hub : purpose, protocole, liens vers tous les fichiers |
-| `backlog.md` | File d'attente actionnelle (vidée après intégration plugin) |
+| `backlog.md` | **AA → Plugin** : file d'attente actionnelle (vidée après intégration plugin) |
+| `upstream.md` | **Plugin → AA** : questions, blocages, annonces de release (vidé par la session AA) |
 | `api-contract.md` | Endpoints, params, réponses (28 endpoints: 15 MVP + 13 v2) |
 | `auth.md` | JWT RS256, handshake, scopes |
 | `content-model.md` | JSON schema blocs (ADR-013), mapping ACF, multi-builder |
@@ -31,11 +32,23 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 
 ### Protocole backlog (inter-repo)
 
-Communication **pull-based** entre les sessions AA et Plugin :
+Communication **pull-based** entre les sessions AA et Plugin, **un fichier par sens** — pour que
+« vide = rien en attente » reste vrai des deux côtés.
+
+**AA → Plugin (`backlog.md`)**
 1. AA écrit des items dans `backlog.md`
 2. Plugin lit `backlog.md`, intègre dans `docs/checklist.md`
 3. Plugin vide `backlog.md`
 4. **Backlog vide = plugin à jour**
+
+**Plugin → AA (`upstream.md`)**
+1. Plugin écrit ses questions, blocages et annonces de release dans `upstream.md`
+2. AA lit, répond ou agit (souvent en écrivant dans `backlog.md`)
+3. AA vide `upstream.md`
+4. **Upstream vide = AA n'a rien en attente du plugin**
+
+Ne jamais écrire dans le fichier de l'autre sens : un canal bidirectionnel casse l'invariant
+« vide = rien en attente ».
 
 ## Conventions
 

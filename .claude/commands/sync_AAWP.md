@@ -12,7 +12,8 @@ Cette session lit directement les fichiers maîtres (pas de copie locale).
 | Fichier | Contenu |
 |---------|---------|
 | `README.md` | Hub : purpose, protocole, liens |
-| `backlog.md` | File d'attente actionnelle |
+| `backlog.md` | **AA → Plugin** : file d'attente actionnelle (on lit, on intègre, on vide) |
+| `upstream.md` | **Plugin → AA** : questions, blocages, annonces de release (on écrit, AA lit et vide) |
 | `api-contract.md` | Endpoints, params, réponses |
 | `auth.md` | JWT RS256, handshake, scopes |
 | `content-model.md` | JSON schema blocs, mapping ACF, multi-builder |
@@ -47,6 +48,25 @@ Lis le fichier backlog :
      _No pending items._
      ```
   4. Signale à l'utilisateur les items intégrés et où ils ont été placés dans la checklist
+
+### Étape 1b : Vérifier l'upstream (canal Plugin → AA)
+
+Lis le fichier upstream :
+```
+/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/upstream.md
+```
+
+C'est le seul canal par lequel cette session peut remonter quelque chose à AA. Un fichier par
+sens — on n'écrit **jamais** dans `backlog.md`, on n'attend jamais de réponse dans `upstream.md`.
+
+- **Si des items y sont encore** : ils n'ont pas été traités par la session AA. Rappelle-le à
+  l'utilisateur dans la synthèse — c'est probablement ce qui bloque l'avancement.
+- **Si vide** : AA a tout traité.
+
+**Quand écrire dedans.** Dès qu'un blocage de cette session dépend d'AA : une question sur le
+contrat, un champ dont on ignore le type réel côté site client, un lot AA non tracké ici, une
+release à déployer. Ne pas garder ces questions dans la conversation — elles se perdent entre
+deux sessions. Écrire, c'est ce qui les rend récupérables.
 
 ### Étape 2 : État du repo (en parallèle)
 
