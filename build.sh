@@ -16,6 +16,14 @@ ZIP_NAME="arcadia-agents.zip"
 CONTAINER_PLUGIN_PATH="/var/www/html/wp-content/plugins/arcadia-agents"
 MAX_ZIP_SIZE_KB=500
 
+# Version-bump rollback state. The bump runs before the zip is produced and
+# audited, so an abort after it would silently burn a version number: the tree
+# would claim a version that never shipped. The EXIT trap reverts it unless the
+# build reached the end.
+BUILD_OK=0
+VERSION_BUMPED=0
+PREV_VERSION=""
+
 # ─── Colors ─────────────────────────────────────────────────────────────────
 
 RED='\033[0;31m'
@@ -44,6 +52,17 @@ docker_exec() {
 # ─── Trap: always restore dev dependencies ──────────────────────────────────
 
 cleanup() {
+	# Roll the version back when the build aborted after the bump — otherwise a
+	# failed run leaves the tree on a version that was never packaged.
+	if [ "$BUILD_OK" -eq 0 ] && [ "$VERSION_BUMPED" -eq 1 ]; then
+		echo -e "\n${BLUE}[cleanup]${NC} Reverting version bump (build aborted)..."
+		bumped=$(sed -n "s/.*define( 'ARCADIA_AGENTS_VERSION', '\([0-9]*\.[0-9]*\.[0-9]*\)' ).*/\1/p" "${PLUGIN_DIR}/arcadia-agents.php")
+		sed -i '' "s/define( 'ARCADIA_AGENTS_VERSION', '${bumped}' )/define( 'ARCADIA_AGENTS_VERSION', '${PREV_VERSION}' )/" "${PLUGIN_DIR}/arcadia-agents.php"
+		sed -i '' "s/ \* Version: ${bumped}/ * Version: ${PREV_VERSION}/" "${PLUGIN_DIR}/arcadia-agents.php"
+		sed -i '' "s/^Stable tag: .*/Stable tag: ${PREV_VERSION}/" "${PLUGIN_DIR}/readme.txt"
+		pass "Version restored to ${PREV_VERSION}."
+	fi
+
 	echo -e "\n${BLUE}[cleanup]${NC} Restoring dev dependencies..."
 	if docker compose exec -T wordpress php -v &>/dev/null; then
 		docker_exec "composer install --quiet 2>/dev/null" && pass "Dev dependencies restored." || warn "Failed to restore dev deps. Run manually: docker compose exec wordpress bash -c 'cd ${CONTAINER_PLUGIN_PATH} && composer install'"
@@ -220,6 +239,10 @@ PATCH="${CURRENT_VERSION##*.}"
 NEW_PATCH=$((PATCH + 1))
 NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
 
+# Arm the rollback before touching any file (see cleanup()).
+PREV_VERSION="$CURRENT_VERSION"
+VERSION_BUMPED=1
+
 # Update define() constant
 sed -i '' "s/define( 'ARCADIA_AGENTS_VERSION', '${CURRENT_VERSION}' )/define( 'ARCADIA_AGENTS_VERSION', '${NEW_VERSION}' )/" "$MAIN_FILE"
 # Update plugin header
@@ -248,6 +271,10 @@ if zip -r "$ZIP_NAME" "$PLUGIN_DIR/" \
 	-x "${PLUGIN_DIR}/phpunit.xml" \
 	-x "${PLUGIN_DIR}/composer.json" \
 	-x "${PLUGIN_DIR}/composer.lock" \
+	-x "${PLUGIN_DIR}/phpstan.neon.dist" \
+	-x "${PLUGIN_DIR}/phpstan-baseline.neon" \
+	-x "${PLUGIN_DIR}/phpcs.xml" \
+	-x "${PLUGIN_DIR}/.phpunit.cache/*" \
 	-x "*/composer.json" \
 	-x "*/composer.lock" \
 	-x "${PLUGIN_DIR}/.git/*" \
@@ -325,6 +352,8 @@ else
 fi
 
 # ─── Done ───────────────────────────────────────────────────────────────────
+
+BUILD_OK=1
 
 echo -e "\n${GREEN}━━━ BUILD SUCCESSFUL ━━━${NC}"
 echo -e "  Output: ${ZIP_NAME} (${zip_size_kb}KB)"

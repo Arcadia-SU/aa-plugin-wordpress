@@ -1,6 +1,6 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-06-27 (v0.1.37 ; Phase 34 `core/*` **terminée** ; Phase 36 parser markdown bloc+inline **terminée** ; Phase 37 review Phases 34-35 **terminée** ; **Phase 38 review-de-la-review** (durcissement passthrough round-trip : XSS nom de bloc + `inner_content` sanitisé, null-placeholders, no-silent-loss) **terminée** — 14 findings, 2 questions coordination backend ouvertes ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-07-30 (v0.1.37 ; Phases 34/36/37/38 **terminées** — parser markdown bloc+inline + durcissement passthrough round-trip ; **Phase 39** markdown inline dans les cellules `acf/table` **à faire** ; **Phase 40** rename `/articles`→`/contents` **⏸ bloqué** (à grouper avec le lot post_type P1b) ; Phase 29 E2E AA-side pending)
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -432,6 +432,71 @@ Dans un champ `wysiwyg` ACF, l'agent envoie du **markdown de structure** :
 ### 🔵 Coordination backend (questions ouvertes — voir decisions.md 2026-06-27)
 - [x] **Null placeholders** : ~~décider~~ **tranché (Oscar)** — note basse-priorité à AA, **non-bloquant**. Le reader AA dé-nulle `inner_content` → ordre deviné pour un conteneur avec HTML brut entre enfants (jamais perdu, repli lossless ; cas rare). Plugin déjà forward-compatible : si AA **préserve** les null placeholders un jour, reconstruction exacte sans changement plugin.
 - [x] **Embeds/iframes** : ~~décider~~ **tranché (Oscar)** — on garde le strip `wp_kses_post` des `<iframe>`/embeds sur round-trip. Sécurité > préservation verbatim.
+
+---
+
+## Phase 39 : Markdown inline dans les cellules de table ACF (`acf/table` → `row.cols.cell`)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
+*Bug live : `www.iselection.com` WP#48869 + preprod WP#88200 — les `**gras**` s'affichent littéralement dans les cellules.*
+
+**Contexte.** Contrat ACF wysiwyg = le champ porte du markdown, le plugin convertit en HTML à l'écriture (Phase 36, commit AA `0a8f852a`). La conversion s'applique aux champs texte (`acf/text` → champ `text`) mais **pas aux cellules de répéteur** (`acf/table` → `row.cols.cell`) : le transform AA envoie volontairement le markdown brut, et le thème (`blocks/table/template.php`) ne le passe jamais au convertisseur.
+
+**Attendu.** Appliquer la même conversion markdown→HTML au champ `cell` du répéteur `row.cols` — et à tout autre champ wysiwyg de répéteur si le cas se présente.
+
+**Hors périmètre.** Structure et compteurs de répéteur (garantis côté AA, fix `_repeater_counts.py`). Ce ticket ne concerne que la conversion inline du contenu.
+
+**Cause racine.** `Arcadia_ACF_Adapter::flatten_repeater()` était un passthrough brut : il calculait déjà `$sub_types` (pour détecter les répéteurs imbriqués) mais ne s'en servait jamais pour transformer les valeurs feuilles. Un sous-champ `wysiwyg` ne voyait donc **aucun** convertisseur, contrairement aux propriétés de premier niveau (`custom_block()` → `case 'wysiwyg'` depuis la Phase 36).
+
+**Décision — conversion INLINE, pas bloc.** Les feuilles de répéteur reçoivent `parse_markdown()` (inline-only : `strong`/`em`/`code`/`a`), **pas** `parse_rich()` comme au premier niveau. Une ligne de répéteur **est** déjà la structure ; la feuille est un texte court pré-encapsulé par le thème dans un `<td>`/`<li>`. Le parsing bloc envelopperait chaque cellule d'une seule ligne dans un `<p>` (marges dans tous les `<td>`) et promouvrait une cellule commençant par `- ` en `<ul>`. Même règle que l'adaptateur Gutenberg natif, qui convertit déjà chaque cellule avec `parse_markdown()` (content-model.md § « Cellules de tableau = chaînes markdown inline »).
+
+**Périmètre de types.** Uniquement `wysiwyg`. Les types `text`/`url`/`select`/`image` restent intouchés — contrat ADR-013 (content-model.md L92) : le plugin n'injecte jamais de HTML dans un champ dont le template de thème peut l'échapper (double-échappement → balises visibles à l'écran).
+
+- [x] Localiser le chemin d'écriture des sous-champs de répéteur → `flatten_repeater()` dans `includes/adapters/class-adapter-acf.php` (chemin blocs). Le chemin `acf_fields` post-level est un cas distinct, voir « Reste à faire » ci-dessous.
+- [x] Critère de détection = **field schema ACF** (`sub_fields[].type`), pas d'allowlist de noms — poka-yoke, aucun cas spécial « cell »
+- [x] Nouvelle méthode `transform_sub_field_value()` appliquée dans `flatten_repeater()` ; docblock qui justifie inline-vs-bloc
+- [x] Tests unitaires (6, dans `BlockRegistryTest.php`) : `**gras**` / `[lien](url)` / `` `code` `` / `*italique*` ; inline-only (pas de `<p>`, pas de `<ul>`, pas de `<h2>`) ; cellule vide + cellule `"0"` préservées ; sous-champ `text` non converti ; XSS strippée ; répéteur plat (`acf/faq` → `answer`) en plus du nested `row.cols.cell`
+- [x] Mutation-check : la ligne du fix remise en passthrough → 3 tests rouges (non-vacants)
+- [x] Suite complète verte : **446 tests** (440 → +6)
+- [x] `./build.sh` → v0.1.38 (380KB) — a nécessité de réparer deux défauts du build, voir ci-dessous
+
+### Réparation de `build.sh` (découverte en lançant le build)
+
+Le build échouait au check #14 depuis la Phase 31 (commit `2daca44`, celui-là même qui a ajouté les gates) — **aucun zip n'a pu être produit depuis**. Deux défauts, tous deux corrigés :
+
+- [x] **Gate #14 en faux positif.** `phpstan.neon.dist`, `phpstan-baseline.neon` et `phpcs.xml` vivent dans `arcadia-agents/` et n'étaient pas exclus du zip. Le grep `phpstan|szepeviktor|wordpress-stubs|parallel-lint` matchait ces **fichiers de config** (pas de vraies dev deps — `composer install --no-dev` faisait bien son travail) → abort systématique. Exclusions ajoutées (+ `.phpunit.cache/`).
+- [x] **Le bump de version brûlait un numéro à chaque échec.** Le check #12 (bump) s'exécute *avant* la création (#13) et l'audit (#14) du zip, sans rollback : chaque build avorté laissait l'arbre sur une version jamais packagée. C'est ainsi que l'arbre est arrivé à 0.1.37 sans zip correspondant. Le trap `EXIT` restaure désormais la version quand le build n'a pas atteint la fin (`BUILD_OK`/`VERSION_BUMPED`/`PREV_VERSION`).
+- [x] Rollback **vérifié** par injection d'un `fail` juste après le bump : `0.1.38 → 0.1.39` puis « Version restored to 0.1.38 » dans les 3 sources (define, header, `Stable tag`).
+
+### ⚠️ Reste à faire — vérification bloquante côté site client
+
+Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** dans le groupe ACF iSelection. La fixture de test du repo le déclarait `text`, et aucune capture locale ne porte le vrai type.
+
+- [ ] **Vérifier le type réel** : `GET /blocks` → `acf/table` → `row.sub_fields[cols].sub_fields[cell].type`
+- [ ] Si `wysiwyg` → valider le rendu sur preprod WP#88200, puis prod WP#48869
+- [ ] Si `text` → le bug est un **conflit de contrat côté AA** (markdown envoyé dans un champ ACF texte brut). Deux sorties possibles : passer le champ en `wysiwyg` côté ACF, ou arrêter d'émettre du markdown dans ce champ côté AA. Ne pas élargir la conversion aux champs `text` côté plugin (double-échappement).
+
+### Gap adjacent identifié (hors périmètre, non corrigé)
+
+`process_acf_fields()` (chemin `acf_fields` post-level, pas blocs) a exactement la même cécité : `case 'repeater'` est un passthrough et `build_acf_field_type_map()` ne descend pas dans les `sub_fields`. Un répéteur envoyé via `acf_fields` avec des sous-champs wysiwyg garde son markdown brut. Pas de preuve que AA emprunte ce chemin pour des répéteurs → laissé en l'état plutôt que corrigé à l'aveugle.
+
+---
+
+## Phase 40 : Rename surface `/articles` → `/contents` — ⏸ BLOQUÉ (à grouper avec le lot post_type P1b)
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
+
+**⏸ Ne pas livrer isolément.** Décision produit : ce rename embarque dans la **même release que les garanties post_type** (surface contenu agnostique au `post_type` — `page`, `landing-page`, `page-investir`), lot **P1b** du chantier pages business. Une seule campagne de déploiement sur les 3 sites clients (iSelection preprod + www, trottinette). Tant que le lot post_type n'est pas prêt, **ne pas shipper `/contents` seul**.
+
+**Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin doit suivre.
+
+**Attendu.** Pur rename de chemin + alias rétrocompatible — aucun changement de payload ni de comportement, mutations toujours ID-driven. `meta.post_type` reste inchangé (vocabulaire WordPress, pas le nôtre).
+
+- [ ] Exposer chaque endpoint `/articles*` aussi sous `/contents*` (mêmes handlers, même contrat, mêmes payloads)
+- [ ] Marquer `/articles*` **déprécié** : docs + header de dépréciation sur la réponse
+- [ ] Maintenir `/articles*` au moins une version de grâce (pas de bascule atomique AA↔plugin)
+- [ ] Tests : parité de réponse `/articles*` ↔ `/contents*` sur chaque endpoint
+- [ ] Coordination : le connector AA bascule sur `/contents` une fois la release déployée sur les 3 sites
 
 ---
 

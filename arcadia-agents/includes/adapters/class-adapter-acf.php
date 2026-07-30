@@ -310,7 +310,7 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 					$nested        = $this->flatten_repeater( $key, $value, $nested_schema );
 					$result        = array_merge( $result, $nested );
 				} else {
-					$result[ $key ] = $value;
+					$result[ $key ] = $this->transform_sub_field_value( $sub_type, $value );
 				}
 
 				// Inject sub-field key reference.
@@ -321,6 +321,38 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Apply the write-path transformation for a leaf repeater sub-field value.
+	 *
+	 * Until Phase 39 every sub-field was a raw passthrough, so a `wysiwyg` sub-field
+	 * kept its markdown literally: `**gras**` rendered as two asterisks on screen
+	 * (live on iSelection WP#48869 — `acf/table` → `row.cols.cell`). Top-level
+	 * wysiwyg properties have gone through the markdown parser since Phase 36; the
+	 * repeater path was the remaining gap.
+	 *
+	 * INLINE-only conversion here, deliberately — not parse_rich() as at top level.
+	 * A repeater row IS the structure; the leaf is short pre-encapsulated text
+	 * rendered inside a cell/item by the theme. Block parsing would wrap a one-line
+	 * cell in `<p>` (margins inside every `<td>`) and could turn a cell starting
+	 * with `- ` into a `<ul>`. This mirrors the native Gutenberg table adapter,
+	 * which already converts each cell with parse_markdown() (content-model.md §
+	 * "Cellules de tableau = chaînes markdown inline").
+	 *
+	 * Non-wysiwyg types stay untouched, per the ADR-013 scope: the plugin never
+	 * injects HTML into a field whose theme template may escape it.
+	 *
+	 * @param string $sub_type Declared ACF type of the sub-field.
+	 * @param mixed  $value    Raw agent-supplied value.
+	 * @return mixed Transformed value (unchanged for every non-wysiwyg type).
+	 */
+	private function transform_sub_field_value( $sub_type, $value ) {
+		if ( 'wysiwyg' !== $sub_type || ! is_string( $value ) || '' === $value ) {
+			return $value;
+		}
+
+		return Arcadia_Markdown_Parser::parse_markdown( $value );
 	}
 
 	/**
