@@ -1,6 +1,8 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-07-30 (v0.1.37 ; Phases 34/36/37/38 **terminées** — parser markdown bloc+inline + durcissement passthrough round-trip ; **Phase 39** markdown inline dans les cellules `acf/table` **à faire** ; **Phase 40** rename `/articles`→`/contents` **⏸ bloqué** (à grouper avec le lot post_type P1b) ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-07-30 (v0.1.38 ; Phases 34/36/37/38 **terminées** ; **Phase 39** markdown inline dans les sous-champs wysiwyg de répéteur **terminée côté code** — reste la vérification du type ACF de `cell` sur site client ; **Phase 40** rename `/articles`→`/contents` **⏸ bloqué** (à grouper avec le lot post_type P1b, non tracké ici) ; Phase 29 E2E AA-side pending)
+
+> **Aucune tâche de code plugin n'est débloquée à ce jour.** Tout ce qui reste d'actionnable demande soit un accès au site client (validations manuelles), soit une décision/action côté AA.
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -393,7 +395,7 @@ Dans un champ `wysiwyg` ACF, l'agent envoie du **markdown de structure** :
 
 ### P2 — Contrat / découverte
 - [x] **#3** `core/quote`/`separator`/`table` ajoutés à `BUILTIN_BLOCKS` (GET /blocks les liste, nom nu ne 422 plus ; description table documente `headers`/`rows`).
-- [ ] **#4** Tokenizer inline flanking/escapes → **différé (tranché backend, hors scope)**. Le parser applique des regex sûres (code-span protégé avant emphase) mais ne réécrit pas l'emphase au flanking CommonMark.
+- [x] **#4** Tokenizer inline flanking/escapes → **clos, pas de changement de code** (différé, tranché backend, hors scope). Le parser applique des regex sûres (code-span protégé avant emphase) mais ne réécrit pas l'emphase au flanking CommonMark. À rouvrir uniquement si un cas réel remonte du terrain.
 
 ### P3 — Sécurité / tests / perf / maintenabilité
 - [x] **#5** wysiwyg persiste `<img>` : **accepté** (cohérent post_content, agent JWT). Test `test_wysiwyg_img_survives`.
@@ -427,7 +429,7 @@ Dans un champ `wysiwyg` ACF, l'agent envoie du **markdown de structure** :
 - [x] **#13** `content` non vide prime sur un `inner_content` parasite (discriminateur round-trip).
 - [x] **#14** Test `skip_markdown` non-vacant (input markdown nu, prouve le threading du flag dans les 2 branches).
 - [x] **#15** `passthrough_block` utilise `strip_core_prefix()` (plus de `preg_replace('#^core/#')` dupliqué).
-- [ ] **#12** Prose wysiwyg `## `/`- `/`| |` → élément structurel : **by-design** (contrat Phase 36, le wysiwyg porte du markdown). Pas de changement de code.
+- [x] **#12** Prose wysiwyg `## `/`- `/`| |` → élément structurel : **clos, by-design** (contrat Phase 36, le wysiwyg porte du markdown — ADR-013/ADR-022). Pas de changement de code.
 
 ### 🔵 Coordination backend (questions ouvertes — voir decisions.md 2026-06-27)
 - [x] **Null placeholders** : ~~décider~~ **tranché (Oscar)** — note basse-priorité à AA, **non-bloquant**. Le reader AA dé-nulle `inner_content` → ordre deviné pour un conteneur avec HTML brut entre enfants (jamais perdu, repli lossless ; cas rare). Plugin déjà forward-compatible : si AA **préserve** les null placeholders un jour, reconstruction exacte sans changement plugin.
