@@ -218,6 +218,39 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
+	 * Read the transversal `skip_markdown` flag from the request.
+	 *
+	 * When true, ACF wysiwyg values are treated as already-rendered HTML and are
+	 * NOT run through the markdown parser — only sanitised (wp_kses_post). The
+	 * agent sets this when pushing content it read back from the site verbatim
+	 * (round-trip), where re-parsing final HTML would mangle stray `*` pairs or
+	 * `[..](..)` markers (ADR-013 amendment 2026-06-27, backend item aa-u6nl).
+	 *
+	 * Same dual-source read as is_dry_run() for symmetry (query + body + the
+	 * precedence-resolved param). Unlike dry_run there is no inherently "safe"
+	 * direction, but the agent only ever sends `skip_markdown=true` for content it
+	 * knows is already HTML, so honouring an explicit true from any source is
+	 * correct and never strips structure the agent intended as markdown.
+	 *
+	 * @param WP_REST_Request $request The request.
+	 * @return bool True when the caller asked to skip markdown parsing.
+	 */
+	private function is_skip_markdown( $request ) {
+		$sources = array(
+			$request->get_query_params(),
+			$request->get_json_params(),
+		);
+		foreach ( $sources as $source ) {
+			if ( is_array( $source ) && isset( $source['skip_markdown'] )
+				&& filter_var( $source['skip_markdown'], FILTER_VALIDATE_BOOLEAN ) ) {
+				return true;
+			}
+		}
+
+		return filter_var( $request->get_param( 'skip_markdown' ), FILTER_VALIDATE_BOOLEAN );
+	}
+
+	/**
 	 * Run the article write pipeline without persisting and return what would
 	 * have been stored.
 	 *
@@ -334,7 +367,10 @@ trait Arcadia_API_Posts_Handler {
 			$post_type,
 			$rendered_post_content,
 			$this,
-			array( 'is_create' => true )
+			array(
+				'is_create'     => true,
+				'skip_markdown' => $this->is_skip_markdown( $request ),
+			)
 		);
 		if ( is_wp_error( $finalize ) ) {
 			return $finalize;
@@ -475,7 +511,10 @@ trait Arcadia_API_Posts_Handler {
 			$post->post_type,
 			$rendered_post_content,
 			$this,
-			array( 'is_create' => false )
+			array(
+				'is_create'     => false,
+				'skip_markdown' => $this->is_skip_markdown( $request ),
+			)
 		);
 		if ( is_wp_error( $finalize ) ) {
 			return $finalize;

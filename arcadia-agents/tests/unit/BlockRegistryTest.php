@@ -50,18 +50,25 @@ class BlockRegistryTest extends TestCase {
 	// =========================================================================
 
 	/**
-	 * Test that builtin blocks list contains exactly 4 types.
+	 * Test that builtin blocks list advertises every adapter-handled core block.
+	 *
+	 * Phase 37 #3: quote/separator/table render natively (process_block) and must
+	 * also be advertised so GET /blocks lists them and a bare {type:"quote"} stops
+	 * 422-ing.
 	 */
-	public function test_builtin_blocks_contains_four_types(): void {
+	public function test_builtin_blocks_contains_all_core_types(): void {
 		$builtins = $this->registry->get_builtin_blocks();
 
-		$this->assertCount( 4, $builtins );
+		$this->assertCount( 7, $builtins );
 
 		$types = array_column( $builtins, 'type' );
 		$this->assertContains( 'core/paragraph', $types );
 		$this->assertContains( 'core/heading', $types );
 		$this->assertContains( 'core/image', $types );
 		$this->assertContains( 'core/list', $types );
+		$this->assertContains( 'core/quote', $types );
+		$this->assertContains( 'core/separator', $types );
+		$this->assertContains( 'core/table', $types );
 	}
 
 	/**
@@ -354,6 +361,228 @@ class BlockRegistryTest extends TestCase {
 		$this->assertEquals( 'field_cell', $data['_row_1_cols_1_cell'] );
 		// Parent field key reference.
 		$this->assertEquals( 'field_row', $data['_row'] );
+	}
+
+	// =========================================================================
+	// Phase 39 — markdown in repeater sub-fields
+	// =========================================================================
+
+	/**
+	 * Register an `acf/table` block whose `row.cols.cell` leaf has the given type.
+	 *
+	 * Mirrors the iSelection schema: row (repeater) → cols (repeater) → cell.
+	 *
+	 * @param string $cell_type ACF type declared for the `cell` sub-field.
+	 */
+	private function register_table_block_with_cell_type( string $cell_type ): void {
+		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		$_test_acf_block_types = array(
+			'acf/table' => array( 'name' => 'acf/table', 'title' => 'Table' ),
+		);
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_table',
+				'title'    => 'Table',
+				'location' => array( array( array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/table' ) ) ),
+			),
+		);
+		$_test_acf_fields_by_group = array(
+			'group_table' => array(
+				array(
+					'name'       => 'row',
+					'type'       => 'repeater',
+					'key'        => 'field_row',
+					'required'   => 0,
+					'label'      => 'Row',
+					'sub_fields' => array(
+						array(
+							'name'       => 'cols',
+							'type'       => 'repeater',
+							'key'        => 'field_cols',
+							'sub_fields' => array(
+								array( 'name' => 'cell', 'type' => $cell_type, 'key' => 'field_cell' ),
+							),
+						),
+					),
+				),
+			),
+		);
+
+		$ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+	}
+
+	/**
+	 * Build an `acf/table` block from one row of cells and return its `data` payload.
+	 *
+	 * @param array $cells Cell values for a single row.
+	 * @return array Decoded ACF block data.
+	 */
+	private function table_data_for_cells( array $cells ): array {
+		$cols = array();
+		foreach ( $cells as $cell ) {
+			$cols[] = array( 'cell' => $cell );
+		}
+
+		$adapter = new \Arcadia_ACF_Adapter();
+		$result  = $adapter->custom_block( 'acf/table', array(
+			'row' => array( array( 'cols' => $cols ) ),
+		) );
+
+		preg_match( '/<!-- wp:acf\/table (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches, 'ACF block comment not produced' );
+
+		return json_decode( $matches[1], true )['data'];
+	}
+
+	/**
+	 * Phase 39: inline markdown in a wysiwyg repeater cell is converted to HTML.
+	 *
+	 * Regression guard for the live bug (iSelection WP#48869 / preprod WP#88200):
+	 * `**gras**` was stored literally and rendered as asterisks on screen.
+	 */
+	public function test_wysiwyg_repeater_cell_converts_inline_markdown(): void {
+		$this->register_table_block_with_cell_type( 'wysiwyg' );
+
+		$data = $this->table_data_for_cells( array(
+			'Gros **œuvre**',
+			'[voir le guide](https://example.com/guide)',
+			'valeur `brute`',
+			'texte *penché*',
+		) );
+
+		$this->assertSame( 'Gros <strong>œuvre</strong>', $data['row_0_cols_0_cell'] );
+		$this->assertStringContainsString( '<a href="https://example.com/guide"', $data['row_0_cols_1_cell'] );
+		$this->assertStringContainsString( 'voir le guide</a>', $data['row_0_cols_1_cell'] );
+		$this->assertSame( 'valeur <code>brute</code>', $data['row_0_cols_2_cell'] );
+		$this->assertSame( 'texte <em>penché</em>', $data['row_0_cols_3_cell'] );
+	}
+
+	/**
+	 * Phase 39: conversion is inline-only — no <p> wrapper, no block promotion.
+	 *
+	 * A repeater row already IS the structure; wrapping every cell in <p> would
+	 * add margins inside each <td>, and a cell starting with "- " must not become
+	 * a list. This is the documented divergence from the top-level wysiwyg path.
+	 */
+	public function test_wysiwyg_repeater_cell_conversion_is_inline_only(): void {
+		$this->register_table_block_with_cell_type( 'wysiwyg' );
+
+		$data = $this->table_data_for_cells( array(
+			'Cellule simple',
+			'- pas une liste',
+			'## pas un titre',
+		) );
+
+		$this->assertSame( 'Cellule simple', $data['row_0_cols_0_cell'] );
+		$this->assertStringNotContainsString( '<p>', $data['row_0_cols_0_cell'] );
+		$this->assertStringNotContainsString( '<ul>', $data['row_0_cols_1_cell'] );
+		$this->assertStringNotContainsString( '<h2>', $data['row_0_cols_2_cell'] );
+	}
+
+	/**
+	 * Phase 39: falsy-but-present cell values survive the transform intact.
+	 *
+	 * "0" is a legitimate table value — it must not be swallowed by an empty()
+	 * style guard (same trap as Phase 38 #9).
+	 */
+	public function test_wysiwyg_repeater_cell_preserves_empty_and_zero(): void {
+		$this->register_table_block_with_cell_type( 'wysiwyg' );
+
+		$data = $this->table_data_for_cells( array( '', '0', 'x' ) );
+
+		$this->assertSame( '', $data['row_0_cols_0_cell'] );
+		$this->assertSame( '0', $data['row_0_cols_1_cell'] );
+		$this->assertSame( 'x', $data['row_0_cols_2_cell'] );
+	}
+
+	/**
+	 * Phase 39: markdown conversion is scoped to wysiwyg — a `text` cell is untouched.
+	 *
+	 * ADR-013 contract: the plugin never injects HTML into a non-wysiwyg field,
+	 * whose theme template may escape it (double-escape → visible tags).
+	 */
+	public function test_text_repeater_cell_is_not_converted(): void {
+		$this->register_table_block_with_cell_type( 'text' );
+
+		$data = $this->table_data_for_cells( array( 'Gros **œuvre**' ) );
+
+		$this->assertSame( 'Gros **œuvre**', $data['row_0_cols_0_cell'] );
+	}
+
+	/**
+	 * Phase 39: XSS in a wysiwyg cell is stripped by the inline allowlist.
+	 */
+	public function test_wysiwyg_repeater_cell_strips_xss(): void {
+		$this->register_table_block_with_cell_type( 'wysiwyg' );
+
+		$data = $this->table_data_for_cells( array( '**<img src=x onerror=alert(1)>**' ) );
+
+		$this->assertStringNotContainsString( '<img', $data['row_0_cols_0_cell'] );
+		$this->assertStringNotContainsString( 'onerror', $data['row_0_cols_0_cell'] );
+		$this->assertStringContainsString( '<strong>', $data['row_0_cols_0_cell'] );
+	}
+
+	/**
+	 * Phase 39: the fix is generic — a flat (non-nested) wysiwyg sub-field too.
+	 *
+	 * Guards against a table-only special case: an `acf/faq` answer gets the same
+	 * treatment as a table cell.
+	 */
+	public function test_wysiwyg_subfield_converted_in_flat_repeater(): void {
+		global $_test_acf_block_types, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		$_test_acf_block_types = array(
+			'acf/faq' => array( 'name' => 'acf/faq', 'title' => 'FAQ' ),
+		);
+		$_test_acf_field_groups = array(
+			array(
+				'key'      => 'group_faq',
+				'title'    => 'FAQ',
+				'location' => array( array( array( 'param' => 'block', 'operator' => '==', 'value' => 'acf/faq' ) ) ),
+			),
+		);
+		$_test_acf_fields_by_group = array(
+			'group_faq' => array(
+				array(
+					'name'       => 'faq',
+					'type'       => 'repeater',
+					'key'        => 'field_faq',
+					'required'   => 0,
+					'label'      => 'FAQ',
+					'sub_fields' => array(
+						array( 'name' => 'question', 'type' => 'text', 'key' => 'field_q' ),
+						array( 'name' => 'answer', 'type' => 'wysiwyg', 'key' => 'field_a' ),
+					),
+				),
+			),
+		);
+
+		$ref  = new \ReflectionClass( \Arcadia_Block_Registry::class );
+		$prop = $ref->getProperty( 'instance' );
+		$prop->setAccessible( true );
+		$prop->setValue( null, null );
+
+		$adapter = new \Arcadia_ACF_Adapter();
+		$result  = $adapter->custom_block( 'acf/faq', array(
+			'faq' => array(
+				array(
+					'question' => 'Combien de **temps** ?',
+					'answer'   => 'Environ **30 ans**.',
+				),
+			),
+		) );
+
+		preg_match( '/<!-- wp:acf\/faq (\{.*\}) \/-->/', $result, $matches );
+		$this->assertNotEmpty( $matches );
+		$data = json_decode( $matches[1], true )['data'];
+
+		$this->assertSame( 'Environ <strong>30 ans</strong>.', $data['faq_0_answer'] );
+		// text sub-field untouched.
+		$this->assertSame( 'Combien de **temps** ?', $data['faq_0_question'] );
 	}
 
 	/**

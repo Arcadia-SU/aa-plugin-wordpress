@@ -45,14 +45,15 @@ class AcfFieldsTestHarness {
 	/**
 	 * Public proxy for process_acf_fields().
 	 *
-	 * @param int    $post_id      The post ID.
-	 * @param array  $acf_fields   Field name => value pairs.
-	 * @param string $post_type    The post type.
-	 * @param string $post_content The rendered post content.
+	 * @param int    $post_id       The post ID.
+	 * @param array  $acf_fields    Field name => value pairs.
+	 * @param string $post_type     The post type.
+	 * @param string $post_content  The rendered post content.
+	 * @param bool   $skip_markdown Treat wysiwyg values as already-HTML (round-trip).
 	 * @return true|\WP_Error
 	 */
-	public function test_process_acf_fields( $post_id, $acf_fields, $post_type, $post_content ) {
-		return $this->process_acf_fields( $post_id, $acf_fields, $post_type, $post_content );
+	public function test_process_acf_fields( $post_id, $acf_fields, $post_type, $post_content, $skip_markdown = false ) {
+		return $this->process_acf_fields( $post_id, $acf_fields, $post_type, $post_content, $skip_markdown );
 	}
 
 	/**
@@ -446,6 +447,97 @@ class AcfFieldsTest extends TestCase {
 		$this->assertStringContainsString( '<strong>bold</strong>', $_test_acf_update_field_calls[0]['value'] );
 		$this->assertStringContainsString( '<em>italic</em>', $_test_acf_update_field_calls[0]['value'] );
 		$this->assertStringNotContainsString( '**bold**', $_test_acf_update_field_calls[0]['value'] );
+	}
+
+	/**
+	 * Phase 35 — the explicit ACF wysiwyg write path preserves structural HTML
+	 * (<h2>, <ul>) so a natively-authored article round-trips faithfully.
+	 */
+	public function test_wysiwyg_preserves_structural_html(): void {
+		global $_test_acf_update_field_calls, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		$_test_acf_field_groups = array(
+			array(
+				'key'   => 'group_1',
+				'title' => 'Test',
+			),
+		);
+
+		$_test_acf_fields_by_group = array(
+			'group_1' => array(
+				array( 'name' => 'contenu', 'type' => 'wysiwyg' ),
+			),
+		);
+
+		$result = $this->harness->test_process_acf_fields(
+			50,
+			array( 'contenu' => '<h2>Titre</h2><ul><li>a</li></ul>' ),
+			'article',
+			''
+		);
+
+		$this->assertTrue( $result );
+		$value = $_test_acf_update_field_calls[0]['value'];
+		$this->assertStringContainsString( '<h2>Titre</h2>', $value );
+		$this->assertStringContainsString( '<li>a</li>', $value );
+	}
+
+	/**
+	 * Phase 36 #A3 — skip_markdown=true treats the wysiwyg value as already-HTML
+	 * (round-trip, aa-u6nl): no markdown parsing, just sanitisation. A literal
+	 * `## x` and a stray `*pair*` survive untouched instead of being mangled.
+	 */
+	public function test_wysiwyg_skip_markdown_does_not_parse(): void {
+		global $_test_acf_update_field_calls, $_test_acf_field_groups, $_test_acf_fields_by_group;
+
+		$_test_acf_field_groups = array(
+			array(
+				'key'   => 'group_1',
+				'title' => 'Test',
+			),
+		);
+
+		$_test_acf_fields_by_group = array(
+			'group_1' => array(
+				array( 'name' => 'contenu', 'type' => 'wysiwyg' ),
+			),
+		);
+
+		// BARE markdown (no leading HTML tag) so the two branches genuinely differ:
+		// the HTML-passthrough net would NOT mask a dropped skip_markdown argument
+		// here (review #14 — the old `<p>…</p>` input passed through either way).
+		$markdown = "## Titre\n\nune *paire*";
+
+		// skip_markdown = true → stored verbatim (only wp_kses_post), NOT parsed.
+		$skipped = $this->harness->test_process_acf_fields(
+			50,
+			array( 'contenu' => $markdown ),
+			'article',
+			'',
+			true
+		);
+		$this->assertTrue( $skipped );
+		$value = $_test_acf_update_field_calls[0]['value'];
+		$this->assertStringContainsString( '## Titre', $value );
+		$this->assertStringContainsString( '*paire*', $value );
+		$this->assertStringNotContainsString( '<h2>', $value );
+		$this->assertStringNotContainsString( '<em>', $value );
+
+		// skip_markdown = false (default) → the SAME input IS parsed. This proves
+		// the flag is threaded through finalize_post → process_acf_fields: drop the
+		// argument and this branch fails.
+		$_test_acf_update_field_calls = array();
+		$parsed                       = $this->harness->test_process_acf_fields(
+			50,
+			array( 'contenu' => $markdown ),
+			'article',
+			'',
+			false
+		);
+		$this->assertTrue( $parsed );
+		$parsed_value = $_test_acf_update_field_calls[0]['value'];
+		$this->assertStringContainsString( '<h2>Titre</h2>', $parsed_value );
+		$this->assertStringContainsString( '<em>paire</em>', $parsed_value );
 	}
 
 	/**

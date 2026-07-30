@@ -74,6 +74,49 @@ class AcfAdapterTest extends TestCase {
 	}
 
 	/**
+	 * Phase 36 — a wysiwyg field carries STRUCTURAL MARKDOWN (## headings, lists,
+	 * GFM tables) which the plugin parses to HTML so the REST write reproduces the
+	 * native render (ADR-013: AA produces content, the plugin produces HTML).
+	 * Inline tokens are converted alongside the block structure.
+	 */
+	public function test_wysiwyg_converts_structural_markdown(): void {
+		$this->register_acf_block( 'acf/text', array(
+			array( 'name' => 'contenu', 'type' => 'wysiwyg', 'key' => 'field_contenu' ),
+		) );
+
+		$markdown = "## Titre\n\nPara with **bold**\n\n- un\n\n| H |\n| --- |\n| cell |";
+		$result   = $this->adapter->custom_block( 'acf/text', array( 'contenu' => $markdown ) );
+
+		$this->assertStringContainsString( '<h2>Titre</h2>', $result );
+		$this->assertStringContainsString( '<ul>', $result );
+		$this->assertStringContainsString( '<li>un</li>', $result );
+		$this->assertStringContainsString( '<table>', $result );
+		$this->assertStringContainsString( '<td>cell</td>', $result );
+		// Inline markdown is converted too.
+		$this->assertStringContainsString( '<strong>bold</strong>', $result );
+		// The raw markdown markers are gone.
+		$this->assertStringNotContainsString( '## Titre', $result );
+	}
+
+	/**
+	 * Phase 35 — wysiwyg rich path still strips dangerous markup (wp_kses_post is
+	 * not a downgrade): <script>/<iframe>/on* are removed.
+	 */
+	public function test_wysiwyg_strips_dangerous_html(): void {
+		$this->register_acf_block( 'acf/text', array(
+			array( 'name' => 'contenu', 'type' => 'wysiwyg', 'key' => 'field_contenu' ),
+		) );
+
+		$html   = 'Safe <script>alert(1)</script> and <iframe src="x"></iframe> '
+			. 'and <img src="x" onerror="alert(1)">';
+		$result = $this->adapter->custom_block( 'acf/text', array( 'contenu' => $html ) );
+
+		$this->assertStringNotContainsString( '<script', $result );
+		$this->assertStringNotContainsString( '<iframe', $result );
+		$this->assertStringNotContainsString( 'onerror', $result );
+	}
+
+	/**
 	 * Regression (block-comment injection): agent content containing `-->` or a
 	 * forged `<!-- wp:` must not break out of the ACF block comment. Only the
 	 * opening and trailing delimiters are allowed to be comment markers.

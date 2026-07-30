@@ -149,4 +149,86 @@ class Arcadia_Gutenberg_Adapter implements Arcadia_Block_Adapter {
 			$tag
 		);
 	}
+
+	/**
+	 * Convert a quote to a native Gutenberg quote block.
+	 *
+	 * Renders the core/quote block: a wp-block-quote blockquote wrapping an
+	 * inner paragraph block (so the quote text keeps inline markdown formatting).
+	 * Not part of Arcadia_Block_Adapter — core blocks are always native Gutenberg
+	 * regardless of the site's active builder.
+	 *
+	 * @param string $content The quote text (may contain inline markdown).
+	 * @return string Block markup.
+	 */
+	public function quote( $content ) {
+		// Scalar guard: a non-scalar payload (array/object) would stringify to
+		// "Array" + a PHP warning. Degrade to empty content instead.
+		$content = is_scalar( $content ) ? (string) $content : '';
+
+		return '<!-- wp:quote -->' . "\n" .
+			'<blockquote class="wp-block-quote">' . "\n" .
+			$this->paragraph( $content ) .
+			'</blockquote>' . "\n" .
+			'<!-- /wp:quote -->' . "\n\n";
+	}
+
+	/**
+	 * Convert a separator to a native Gutenberg separator block.
+	 *
+	 * @return string Block markup.
+	 */
+	public function separator() {
+		return '<!-- wp:separator -->' . "\n" .
+			'<hr class="wp-block-separator has-alpha-channel-opacity"/>' . "\n" .
+			'<!-- /wp:separator -->' . "\n\n";
+	}
+
+	/**
+	 * Convert tabular data to a native Gutenberg table block.
+	 *
+	 * Cells carry inline markdown (not raw HTML), so each cell is run through
+	 * Arcadia_Markdown_Parser::parse_markdown() — which already wp_kses() its
+	 * output to the inline allowlist, so cells are NOT additionally escaped
+	 * (that would double-escape the legitimate <strong>/<em>/<a> markup).
+	 *
+	 * @param array|null $headers Header cells, or null/empty for a headerless table.
+	 * @param array      $rows    Body rows, each an array of cell strings.
+	 * @return string Block markup.
+	 */
+	public function table( $headers, $rows ) {
+		$thead = '';
+		if ( ! empty( $headers ) && is_array( $headers ) ) {
+			$cells = '';
+			foreach ( $headers as $cell ) {
+				$cell   = is_scalar( $cell ) ? (string) $cell : '';
+				$cells .= '<th>' . Arcadia_Markdown_Parser::parse_markdown( $cell ) . '</th>';
+			}
+			$thead = '<thead><tr>' . $cells . '</tr></thead>';
+		}
+
+		$body = '';
+		if ( is_array( $rows ) ) {
+			foreach ( $rows as $row ) {
+				if ( ! is_array( $row ) ) {
+					continue;
+				}
+				$cells = '';
+				foreach ( $row as $cell ) {
+					// Scalar guard: a non-scalar cell would stringify to "Array".
+					$cell   = is_scalar( $cell ) ? (string) $cell : '';
+					$cells .= '<td>' . Arcadia_Markdown_Parser::parse_markdown( $cell ) . '</td>';
+				}
+				$body .= '<tr>' . $cells . '</tr>';
+			}
+		}
+
+		return sprintf(
+			'<!-- wp:table -->' . "\n" .
+			'<figure class="wp-block-table"><table>%s<tbody>%s</tbody></table></figure>' . "\n" .
+			'<!-- /wp:table -->' . "\n\n",
+			$thead,
+			$body
+		);
+	}
 }
