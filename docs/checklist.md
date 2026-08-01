@@ -515,10 +515,29 @@ Le périmètre plugin de P1b, qui bloquait la Phase 40. Les 3 défauts sont **v�
 
 Le CPT `page` est hiérarchique, donc les 4 appelants (`trait-api-posts.php:327/420/565/672` — create, update, `get_article_blocks`, delete) répondent `404 post_not_found`. Le listing et `blocks/usage` servent pourtant ces mêmes posts : **la surface est incohérente avec elle-même**, c'est ça le vrai défaut.
 
-- [ ] Autoriser les `post_type` hiérarchiques dans `is_allowed_post_type()`
-- [ ] Protéger `post_parent`, `menu_order`, `page_template` en update — non éditoriaux, AA ne doit pas pouvoir les bouger (ignorés silencieusement ou 422 explicite : trancher, préférer le 422)
-- [ ] Vérifier que les 4 appelants se comportent identiquement (le bug vient de la garde partagée, la correction doit l'être aussi)
-- [ ] Tests : `page` acceptée en update/blocks/delete ; `post_parent`/`menu_order`/`page_template` non modifiables ; un type non-public reste rejeté
+**Décision (2026-08-01) : politique unique = `public` moins `attachment`**, strictement identique à celle
+de `get_blocks_usage()`. Trois politiques divergentes cohabitaient ; il n'en reste qu'une, appliquée
+sur toutes les coutures. Effet de bord découvert au passage : `attachment` est public *et* non
+hiérarchique, donc l'ancienne garde le laissait passer alors que son docblock affirmait l'exclure.
+La nouvelle garde le ferme pour de bon.
+
+- [x] Autoriser les `post_type` hiérarchiques dans `is_allowed_post_type()` — `trait-api-posts.php:906-940`
+- [x] Aligner `get_posts()` sur la même garde (`:30-47`) — le `post_type` de requête partait en `WP_Query`
+      sans validation alors que `orderby`/`order` étaient allowlistés cinq lignes plus bas
+- [x] Rejet **422 `forbidden_structural_field`** sur `post_parent` / `menu_order` / `page_template`,
+      scanné au top-level, dans `meta` **et** dans `content.meta` (forme imbriquée, promue plus tard) —
+      `class-post-builder.php:38-56` (constante) + `reject_structural_fields()`
+- [x] Vérifier que les 4 appelants se comportent identiquement (garde partagée → correction partagée)
+- [x] Tests — `ContentTypePolicyTest.php`, 34 tests / 97 assertions
+
+**Non-vacuité vérifiée** (4 mutants, chacun tue des tests) : politique remise à `public && !hierarchical`
+→ 21 rouges ; garde `get_posts()` retirée → 3 ; rejet 422 retiré → 9 ; `build_post_data()` qui émet une
+clé hors liste → 1.
+
+**Verrou anti-refactor.** Le 422 est un *signal*, pas la barrière. La barrière, c'est que
+`build_post_data()` construit sa payload clé par clé (construction positive, jamais copy-then-filter).
+Les deux propriétés sont testées **séparément** : un refactor vers un filtre garderait le test du 422
+au vert tout en rouvrant le trou pour tout champ que le filtre oublierait.
 
 ### 41.2 — Preview de révision rendue au mauvais template
 

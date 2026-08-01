@@ -28,9 +28,26 @@ trait Arcadia_API_Posts_Handler {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_posts( $request ) {
-		$post_type = $request->get_param( 'post_type' ) ?? 'post';
-		$per_page  = (int) ( $request->get_param( 'per_page' ) ?? 20 );
-		$per_page  = max( 1, min( 100, $per_page ) );
+		$post_type = sanitize_text_field( $request->get_param( 'post_type' ) ?? 'post' );
+
+		// Same content-type policy as the write path (Phase 41.1). This listing
+		// used to pass the requested type straight to WP_Query while `orderby`
+		// and `order` five lines below were allowlisted — an agent could list a
+		// type it was then refused the right to read blocks from or edit.
+		if ( ! $this->is_allowed_post_type( $post_type ) ) {
+			return new WP_Error(
+				'invalid_post_type',
+				sprintf(
+					/* translators: %s: post type slug */
+					__( "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page).", 'arcadia-agents' ),
+					$post_type
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		$per_page = (int) ( $request->get_param( 'per_page' ) ?? 20 );
+		$per_page = max( 1, min( 100, $per_page ) );
 
 		// Whitelist orderby to prevent arbitrary column queries.
 		$orderby_whitelist = array( 'date', 'title', 'modified' );
@@ -46,7 +63,7 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$args = array(
-			'post_type'      => sanitize_text_field( $post_type ),
+			'post_type'      => $post_type,
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
 			'posts_per_page' => $per_page,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
@@ -329,7 +346,7 @@ trait Arcadia_API_Posts_Handler {
 				'invalid_post_type',
 				sprintf(
 					/* translators: %s: post type slug */
-					__( "Post type '%s' is not allowed. Must be a public, non-hierarchical type (e.g. post).", 'arcadia-agents' ),
+					__( "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page).", 'arcadia-agents' ),
 					$post_type
 				),
 				array( 'status' => 400 )
@@ -904,21 +921,38 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
-	 * Check if a post type is allowed for post operations.
+	 * Check if a post type is allowed for content operations.
 	 *
-	 * Allows public, non-hierarchical post types (posts, articles, etc.)
-	 * but excludes pages (hierarchical) and attachments.
+	 * Single content-type policy for the whole plugin: any public post type
+	 * except `attachment`. Deliberately identical to the policy applied by
+	 * get_blocks_usage() (trait-api-blocks.php) — three divergent policies used
+	 * to coexist, which let an agent list a page and read its content but not
+	 * fetch its blocks nor edit it (Phase 41.1).
+	 *
+	 * Hierarchical types (pages, hierarchical CPTs) are allowed: `page` is a
+	 * native WordPress type present on every install, and business pages are
+	 * exactly the content the agent is asked to maintain. Site structure is
+	 * still out of scope — `post_parent`, `menu_order` and `page_template` are
+	 * rejected with a 422 by Arcadia_Post_Builder::build_post_data().
+	 *
+	 * `attachment` stays excluded: it is public and non-hierarchical (so the
+	 * previous guard let it through despite its docblock claiming otherwise),
+	 * but a media item is not editorial content and has no block payload.
 	 *
 	 * @param string $post_type The post type to check.
 	 * @return bool
 	 */
 	private function is_allowed_post_type( $post_type ) {
+		if ( 'attachment' === $post_type ) {
+			return false;
+		}
+
 		$post_type_obj = get_post_type_object( $post_type );
 
 		if ( ! $post_type_obj ) {
 			return false;
 		}
 
-		return $post_type_obj->public && ! $post_type_obj->hierarchical;
+		return (bool) $post_type_obj->public;
 	}
 }

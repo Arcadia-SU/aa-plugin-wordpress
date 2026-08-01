@@ -871,7 +871,10 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 
         $id = isset( $post_data['ID'] ) ? (int) $post_data['ID'] : 0;
         if ( isset( $_test_posts[ $id ] ) ) {
-            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name' );
+            // post_parent / menu_order are listed so a test asserting they are
+            // NOT written is non-vacant: without them the stub would drop the
+            // fields silently and the assertion would pass for the wrong reason.
+            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name', 'post_parent', 'menu_order' );
             foreach ( $updatable as $field ) {
                 if ( isset( $post_data[ $field ] ) ) {
                     $_test_posts[ $id ]->$field = $post_data[ $field ];
@@ -900,8 +903,16 @@ if ( ! function_exists( 'esc_url_raw' ) ) {
 if ( ! function_exists( 'get_post_type_object' ) ) {
     global $_test_post_type_objects;
     $_test_post_type_objects = array(
-        'post' => (object) array( 'name' => 'post', 'public' => true, 'hierarchical' => false ),
-        'page' => (object) array( 'name' => 'page', 'public' => true, 'hierarchical' => true ),
+        'post'       => (object) array( 'name' => 'post', 'public' => true, 'hierarchical' => false ),
+        'page'       => (object) array( 'name' => 'page', 'public' => true, 'hierarchical' => true ),
+        // Public + non-hierarchical, yet never editorial content: the old guard
+        // let it through despite its docblock claiming otherwise (Phase 41.1).
+        'attachment' => (object) array( 'name' => 'attachment', 'public' => true, 'hierarchical' => false ),
+        // Hierarchical CPT — proves the policy is about `public`, not about the
+        // `page` slug in particular.
+        'landing'    => (object) array( 'name' => 'landing', 'public' => true, 'hierarchical' => true ),
+        // Non-public CPT — must stay rejected on every seam.
+        'aa_secret'  => (object) array( 'name' => 'aa_secret', 'public' => false, 'hierarchical' => false ),
     );
 
     function get_post_type_object( $post_type ) {

@@ -36,6 +36,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class Arcadia_Post_Builder {
 
 	/**
+	 * Post fields that describe the *structure* of the site rather than the
+	 * content of a document. Rejected with a 422 wherever they appear in a
+	 * write body (Phase 41.1).
+	 *
+	 * Opening the write surface to hierarchical types (pages, hierarchical
+	 * CPTs) made these reachable-looking: an agent that can edit a page could
+	 * reasonably assume it can re-parent it or swap its template. It cannot —
+	 * site architecture is the site owner's, not the agent's.
+	 *
+	 * build_post_data() constructs its payload key by key (positive
+	 * construction, never copy-then-filter), so these fields are already
+	 * unreachable. The 422 is therefore a *signal*, not a hole-plug: silently
+	 * ignoring them would let the agent believe the write took effect.
+	 *
+	 * @var string[]
+	 */
+	const FORBIDDEN_STRUCTURAL_FIELDS = array( 'post_parent', 'menu_order', 'page_template' );
+
+	/**
 	 * Block generator used to render structured content (h1/sections/children)
 	 * into Gutenberg block markup before inserting/updating a post.
 	 *
@@ -76,6 +95,11 @@ final class Arcadia_Post_Builder {
 	 * @return array{post_data:array, rendered_content:string, force_draft_applied:bool}|WP_Error
 	 */
 	public function build_post_data( array $body, array &$meta, $post_type, $existing = null, $dry_run = false ) {
+		$structural_error = $this->reject_structural_fields( $body, $meta );
+		if ( is_wp_error( $structural_error ) ) {
+			return $structural_error;
+		}
+
 		$post_data           = array();
 		$force_draft_applied = false;
 		$is_create           = ( null === $existing );
@@ -171,6 +195,55 @@ final class Arcadia_Post_Builder {
 			'rendered_content'    => $rendered_content,
 			'force_draft_applied' => $force_draft_applied,
 		);
+	}
+
+	/**
+	 * Reject a write body that carries a site-structure field.
+	 *
+	 * Scans every place a write body can name a field: the top level, `meta`,
+	 * and the legacy nested-content shape `content.meta` (promoted to `$meta`
+	 * later in build_post_data(), so checking `$meta` alone would miss it).
+	 *
+	 * Deliberately inconsistent with the silent ignore applied to unknown
+	 * fields: these three are not unknown, they are forbidden. See
+	 * FORBIDDEN_STRUCTURAL_FIELDS for why.
+	 *
+	 * @param array $body Decoded request JSON.
+	 * @param array $meta Top-level meta.
+	 * @return WP_Error|null WP_Error on the first offending field, null if clean.
+	 */
+	private function reject_structural_fields( array $body, array $meta ) {
+		$scopes = array(
+			''              => $body,
+			'meta.'         => $meta,
+			'content.meta.' => ( isset( $body['content']['meta'] ) && is_array( $body['content']['meta'] ) )
+				? $body['content']['meta']
+				: array(),
+		);
+
+		foreach ( $scopes as $prefix => $fields ) {
+			foreach ( self::FORBIDDEN_STRUCTURAL_FIELDS as $forbidden ) {
+				if ( ! array_key_exists( $forbidden, $fields ) ) {
+					continue;
+				}
+
+				return new WP_Error(
+					'forbidden_structural_field',
+					sprintf(
+						/* translators: %s: request field path, e.g. meta.post_parent */
+						__( "Field '%s' controls site structure and cannot be set through this API. Content is editable; the page tree, menu order and page template are not.", 'arcadia-agents' ),
+						$prefix . $forbidden
+					),
+					array(
+						'status'           => 422,
+						'field'            => $prefix . $forbidden,
+						'forbidden_fields' => self::FORBIDDEN_STRUCTURAL_FIELDS,
+					)
+				);
+			}
+		}
+
+		return null;
 	}
 
 	/**
