@@ -327,6 +327,12 @@ if ( ! class_exists( 'WP_Query' ) ) {
         public $is_single = false;
 
         /**
+         * Whether this is a page query. Declared in real WP_Query; the stub
+         * was missing it, so assigning it raised a dynamic-property notice.
+         */
+        public $is_page = false;
+
+        /**
          * Whether this is a singular query.
          */
         public $is_singular = false;
@@ -631,9 +637,16 @@ if ( ! function_exists( 'wp_set_object_terms' ) ) {
 }
 
 // get_page_template_slug() stub.
+// Configurable per post ID: the hard-coded '' it used to return made every
+// custom-template assertion vacant (Phase 41.2).
 if ( ! function_exists( 'get_page_template_slug' ) ) {
+    global $_test_page_template_slugs;
+    $_test_page_template_slugs = array();
+
     function get_page_template_slug( $post_id ) {
-        return '';
+        global $_test_page_template_slugs;
+        $post_id = is_object( $post_id ) ? (int) $post_id->ID : (int) $post_id;
+        return isset( $_test_page_template_slugs[ $post_id ] ) ? $_test_page_template_slugs[ $post_id ] : '';
     }
 }
 

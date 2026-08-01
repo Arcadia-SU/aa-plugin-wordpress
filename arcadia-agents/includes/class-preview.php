@@ -182,11 +182,14 @@ class Arcadia_Preview {
 			return;
 		}
 
+		// A revision renders in its parent's clothes, not its own (Phase 41.2).
+		$context = $this->resolve_render_context( $post );
+
 		// Set up rendering state (headers, post data, wp_query).
-		$this->setup_preview_state( $post );
+		$this->setup_preview_state( $post, $context );
 
 		// Resolve template via WordPress hierarchy.
-		$templates = $this->get_preview_template_hierarchy( $post );
+		$templates = $this->get_preview_template_hierarchy( $context );
 		$template  = locate_template( $templates );
 
 		if ( ! $template ) {
@@ -195,7 +198,7 @@ class Arcadia_Preview {
 
 		// Debug mode: return JSON diagnostic instead of rendering.
 		if ( $this->is_debug_request() ) {
-			$this->send_debug_report( $post, $templates, $template );
+			$this->send_debug_report( $post, $templates, $template, $context );
 			// send_debug_report calls exit.
 		}
 
@@ -226,9 +229,15 @@ class Arcadia_Preview {
 	 * Separated from handle_preview() so unit tests can verify the state
 	 * setup without triggering template inclusion and exit.
 	 *
-	 * @param object $post The post object (modified in place: status → publish).
+	 * @param object      $post    The post object (modified in place: status → publish).
+	 * @param object|null $context Rendering context (the parent, for a revision).
+	 *                             Defaults to $post.
 	 */
-	public function setup_preview_state( $post ) {
+	public function setup_preview_state( $post, $context = null ) {
+		if ( null === $context ) {
+			$context = $post;
+		}
+
 		// Override 404 status that WordPress may have set for draft CPTs.
 		status_header( 200 );
 
@@ -249,17 +258,27 @@ class Arcadia_Preview {
 		// Without posts/post_count, have_posts() returns false and
 		// the template renders an empty body (Content-Length: 0).
 		if ( isset( $GLOBALS['wp_query'] ) ) {
-			$GLOBALS['wp_query']->post              = $post;
-			$GLOBALS['wp_query']->posts             = array( $post );
-			$GLOBALS['wp_query']->post_count        = 1;
-			$GLOBALS['wp_query']->found_posts       = 1;
-			$GLOBALS['wp_query']->max_num_pages     = 1;
-			$GLOBALS['wp_query']->current_post      = -1;
-			$GLOBALS['wp_query']->queried_object    = $post;
-			$GLOBALS['wp_query']->queried_object_id = $post->ID;
-			$GLOBALS['wp_query']->is_single         = true;
-			$GLOBALS['wp_query']->is_singular       = true;
-			$GLOBALS['wp_query']->is_404            = false;
+			$is_page = ( 'page' === $context->post_type );
+
+			$GLOBALS['wp_query']->post          = $post;
+			$GLOBALS['wp_query']->posts         = array( $post );
+			$GLOBALS['wp_query']->post_count    = 1;
+			$GLOBALS['wp_query']->found_posts   = 1;
+			$GLOBALS['wp_query']->max_num_pages = 1;
+			$GLOBALS['wp_query']->current_post  = -1;
+
+			// The loop yields the revision (that's the content under review),
+			// but the queried object is the context. body_class(), is_page()
+			// and every theme conditional read the queried object, so this is
+			// what makes the preview wear the parent's classes instead of
+			// `single-aa_revision postid-<revision>` (Phase 41.2).
+			$GLOBALS['wp_query']->queried_object    = $context;
+			$GLOBALS['wp_query']->queried_object_id = $context->ID;
+
+			$GLOBALS['wp_query']->is_page     = $is_page;
+			$GLOBALS['wp_query']->is_single   = ! $is_page;
+			$GLOBALS['wp_query']->is_singular = true;
+			$GLOBALS['wp_query']->is_404      = false;
 		}
 	}
 
@@ -299,11 +318,16 @@ class Arcadia_Preview {
 	 * Captures what the template would render (via ob_start) to report
 	 * the output size without actually sending it to the browser.
 	 *
-	 * @param object $post      The post object.
-	 * @param array  $templates Template candidates that were tried.
-	 * @param string $template  Resolved template path (empty if none found).
+	 * @param object      $post      The post object.
+	 * @param array       $templates Template candidates that were tried.
+	 * @param string      $template  Resolved template path (empty if none found).
+	 * @param object|null $context   Rendering context (the parent, for a revision).
 	 */
-	private function send_debug_report( $post, $templates, $template ) {
+	private function send_debug_report( $post, $templates, $template, $context = null ) {
+		if ( null === $context ) {
+			$context = $post;
+		}
+
 		// Try rendering the template to measure output.
 		$output_length = 0;
 		$output_sample = '';
@@ -348,6 +372,20 @@ class Arcadia_Preview {
 				'post_status'  => $post->post_status,
 				'post_name'    => $post->post_name,
 				'post_title'   => $post->post_title,
+			),
+			// What actually drove template resolution. Without this the fix of
+			// Phase 41.2 is unverifiable on a client site: the report would
+			// show the right candidates with no way to tell why.
+			'render_context'   => array(
+				'is_revision'    => 'aa_revision' === $post->post_type,
+				'context_id'     => $context->ID,
+				'context_type'   => $context->post_type,
+				'context_name'   => $context->post_name,
+				'parent_id'      => isset( $post->post_parent ) ? (int) $post->post_parent : 0,
+				'parent_missing' => 'aa_revision' === $post->post_type
+					&& ! empty( $post->post_parent )
+					&& $context->ID === $post->ID,
+				'template_slug'  => get_page_template_slug( $context->ID ),
 			),
 			'theme'            => array(
 				'stylesheet'       => get_stylesheet(),
@@ -418,23 +456,80 @@ class Arcadia_Preview {
 	}
 
 	/**
+	 * Resolve the post that provides the *rendering context* for a preview.
+	 *
+	 * For an ordinary post this is the post itself. For an `aa_revision` it is
+	 * the parent it was taken from (Phase 41.2).
+	 *
+	 * A revision carries the proposed *content*, never the site's *presentation*:
+	 * its own post_type is `aa_revision`, so deriving the template from it lands
+	 * on `single-aa_revision*.php`, misses, and falls back to the generic
+	 * template. Observed on iSelection preprod: body class
+	 * `single-aa_revision postid-88553` where live renders
+	 * `single-page-investir page-investir-template-default`. The client then
+	 * approves a revision in a layout that is not the page's — HITL rendered
+	 * blind.
+	 *
+	 * `post_parent` is set at insertion (class-revisions.php:122-133) and never
+	 * mutated afterwards, so it is reliable. It is still guarded: nothing
+	 * cascades revision deletion when the parent is deleted, so an orphan
+	 * revision must degrade to its own context rather than fatal.
+	 *
+	 * @param object $post The previewed post.
+	 * @return object The post whose type, slug and template drive rendering.
+	 */
+	private function resolve_render_context( $post ) {
+		if ( 'aa_revision' !== $post->post_type || empty( $post->post_parent ) ) {
+			return $post;
+		}
+
+		$parent = get_post( (int) $post->post_parent );
+
+		return $parent ? $parent : $post;
+	}
+
+	/**
 	 * Build the template hierarchy for a preview post.
 	 *
 	 * Constructs the hierarchy from the post object directly, avoiding
 	 * get_queried_object() which may return null when WordPress is in 404 state.
 	 *
-	 * @param object $post The post object.
+	 * Mirrors the WordPress template hierarchy rather than approximating it:
+	 * the editor-assigned page template wins (WP ≥ 4.7 allows one on any post
+	 * type), then the `page-*` branch for `page` and the `single-*` branch for
+	 * everything else. Both branches were missing before Phase 41.2 — a preview
+	 * of a plain page fell through to `single.php`, which is not a template
+	 * WordPress would ever pick for it.
+	 *
+	 * Pass the *render context* here, not the previewed post — see
+	 * resolve_render_context().
+	 *
+	 * @param object $post The post object providing the rendering context.
 	 * @return array Ordered list of template filenames to try.
 	 */
 	private function get_preview_template_hierarchy( $post ) {
 		$templates = array();
 		$type      = $post->post_type;
 
-		if ( ! empty( $post->post_name ) ) {
-			$templates[] = "single-{$type}-{$post->post_name}.php";
+		$template_slug = get_page_template_slug( $post->ID );
+		if ( is_string( $template_slug ) && '' !== $template_slug ) {
+			$templates[] = $template_slug;
 		}
-		$templates[] = "single-{$type}.php";
-		$templates[] = 'single.php';
+
+		if ( 'page' === $type ) {
+			if ( ! empty( $post->post_name ) ) {
+				$templates[] = "page-{$post->post_name}.php";
+			}
+			$templates[] = "page-{$post->ID}.php";
+			$templates[] = 'page.php';
+		} else {
+			if ( ! empty( $post->post_name ) ) {
+				$templates[] = "single-{$type}-{$post->post_name}.php";
+			}
+			$templates[] = "single-{$type}.php";
+			$templates[] = 'single.php';
+		}
+
 		$templates[] = 'singular.php';
 
 		return $templates;

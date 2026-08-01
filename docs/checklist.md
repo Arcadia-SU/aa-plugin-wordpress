@@ -545,10 +545,31 @@ au vert tout en rouvrant le trou pour tout champ que le filtre oublierait.
 
 Conséquence : le client valide la révision dans un template qui n'est pas celui de la page — **HITL aveugle** sur des pages à layout riche. Touche aussi les articles, moins visiblement.
 
-- [ ] Résoudre le template depuis le **post parent** (`post_parent`) et non depuis le `aa_revision` : `post_type`, `page_template`, `post_name`
-- [ ] Aligner aussi les body class et le `queried_object` pour que le thème se comporte comme en live
-- [ ] Vérifier la cohabitation avec la page de fallback minimale (Phase 19) — un template parent introuvable ne doit pas régresser en Content-Length 0
-- [ ] Tests : candidats de template dérivés du parent ; article ET page à template custom
+**Deux défauts adjacents trouvés dans la même fonction**, aussi corrigés : elle ne lisait jamais
+le gabarit assigné en éditeur (`get_page_template_slug()`), et elle n'avait **aucune branche
+`page-*.php`** — même une preview de page simple tombait sur `single.php`, un template que
+WordPress ne choisirait jamais pour elle.
+
+- [x] Résoudre le contexte de rendu depuis le **post parent** — `resolve_render_context()`,
+      `class-preview.php`. Guard null conservé : rien ne cascade la suppression d'une révision
+      quand le parent disparaît, une révision orpheline retombe sur son propre contexte.
+- [x] Hiérarchie fidèle à WordPress : gabarit éditeur d'abord (tout type, WP ≥ 4.7), puis branche
+      `page-{slug}/page-{id}/page.php` pour `page`, branche `single-*` sinon
+- [x] `queried_object` = le parent, la boucle = la révision — c'est le `queried_object` que lisent
+      `body_class()` et `is_page()`. `is_page`/`is_single` positionnés depuis le contexte.
+- [x] Fallback minimal Phase 19 non touché (le chemin `render_fallback()` est inchangé)
+- [x] Rapport `aa_debug=1` étendu d'une section `render_context` (`is_revision`, `context_id/type/name`,
+      `parent_id`, `parent_missing`, `template_slug`) — sans elle le correctif est invérifiable sur
+      site client : le rapport montrerait les bons candidats sans dire pourquoi
+- [x] Tests — `PreviewRenderContextTest.php`, 15 tests
+
+**Non-vacuité vérifiée** (5 mutants) : contexte toujours le post lui-même → 3 rouges ; gabarit éditeur
+ignoré → 3 ; branche page supprimée → 4 ; `queried_object` remis sur la révision → 1 ; `is_page`
+jamais posé → 1.
+
+**Stub corrigé** : `get_page_template_slug()` retournait `''` en dur en ignorant son argument — toute
+assertion sur le gabarit aurait été vacante. Rendu configurable via `$_test_page_template_slugs`.
+`WP_Query::$is_page` ajouté au stub (déclarée dans le vrai `WP_Query`).
 
 ### 41.3 — `word_count` = 0 sur les posts à blocs ACF
 
