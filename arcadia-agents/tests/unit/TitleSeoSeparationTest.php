@@ -288,11 +288,16 @@ class TitleSeoSeparationTest extends TestCase {
 	}
 
 	// ------------------------------------------------------------------
-	// update_page tests
+	// Page write path
+	//
+	// `PUT /pages/{id}` used to run its own hand-rolled update_page(). It was
+	// deleted in Phase 40 and the route re-registered on update_post(), so a
+	// page now takes exactly the same write path as any other document. This
+	// test keeps the title/SEO separation pinned across that migration.
 	// ------------------------------------------------------------------
 
 	/**
-	 * Test: body.title takes priority over meta.title in update_page.
+	 * Test: body.title takes priority over meta.title when updating a page.
 	 */
 	public function test_update_page_body_title_priority(): void {
 		global $_test_posts, $_test_post_meta;
@@ -323,11 +328,14 @@ class TitleSeoSeparationTest extends TestCase {
 			),
 		) );
 
-		$result = $this->helper->update_page( $request );
+		$result = $this->helper->update_post( $request );
 
 		$this->assertInstanceOf( \WP_REST_Response::class, $result );
 
-		// _yoast_wpseo_title for the page should come from meta.title.
+		// post_title (the H1) comes from body.title…
+		$this->assertEquals( 'New Page H1', $_test_posts[80]->post_title );
+
+		// …while _yoast_wpseo_title comes from meta.title.
 		$this->assertEquals(
 			'Page SEO Title',
 			$_test_post_meta[80]['_yoast_wpseo_title']

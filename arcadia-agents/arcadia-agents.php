@@ -108,6 +108,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revisions.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-post-builder.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api-deprecations.php';
 
 		// Admin.
 		if ( is_admin() ) {
@@ -126,6 +127,11 @@ class Arcadia_Agents {
 
 		// Register REST API endpoints.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+
+		// Stamp Deprecation/Sunset headers on superseded paths (/articles*,
+		// PUT /pages/{id}). Filter-based rather than callback-wrapped so the
+		// canonical and aliased routes keep the same callback instance.
+		Arcadia_API_Deprecations::init();
 
 		// Register custom taxonomy for source tracking.
 		add_action( 'init', array( $this, 'register_arcadia_source_taxonomy' ) );

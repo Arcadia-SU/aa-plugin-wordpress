@@ -169,6 +169,27 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
         public function get_query_params() {
             return $this->query_params;
         }
+
+        // Route + method, needed by the deprecation filter which dispatches on
+        // them (Phase 40).
+        private $route  = '';
+        private $method = 'GET';
+
+        public function set_route( $route ) {
+            $this->route = $route;
+        }
+
+        public function get_route() {
+            return $this->route;
+        }
+
+        public function set_method( $method ) {
+            $this->method = strtoupper( $method );
+        }
+
+        public function get_method() {
+            return $this->method;
+        }
     }
 }
 
@@ -264,6 +285,23 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
         public function get_status() {
             return $this->status;
+        }
+
+        /**
+         * Set a header. $replace = false appends, matching WP_HTTP_Response —
+         * Link headers are concatenated, not overwritten.
+         */
+        public function header( $key, $value, $replace = true ) {
+            if ( $replace || ! isset( $this->headers[ $key ] ) ) {
+                $this->headers[ $key ] = $value;
+                return;
+            }
+
+            $this->headers[ $key ] .= ', ' . $value;
+        }
+
+        public function get_headers() {
+            return $this->headers;
         }
     }
 }
@@ -1378,6 +1416,39 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
         global $_test_post_meta;
         unset( $_test_post_meta[ $post_id ][ $meta_key ] );
         return true;
+    }
+}
+
+// register_rest_route() recording stub (Phase 40).
+//
+// There was no way to assert "route X is registered" before this: the function
+// simply did not exist under test. Normalizes the single-endpoint shape into a
+// list the way WordPress does, so a test never has to care which form the
+// caller used.
+if ( ! function_exists( 'register_rest_route' ) ) {
+    global $_test_registered_routes;
+    $_test_registered_routes = array();
+
+    function register_rest_route( $namespace, $route, $args = array(), $override = false ) {
+        global $_test_registered_routes;
+
+        // WordPress wraps a bare endpoint definition in a list.
+        $endpoints = isset( $args['methods'] ) ? array( $args ) : $args;
+
+        $_test_registered_routes[] = array(
+            'namespace' => $namespace,
+            'route'     => $route,
+            'endpoints' => $endpoints,
+        );
+
+        return true;
+    }
+}
+
+// rest_url() stub.
+if ( ! function_exists( 'rest_url' ) ) {
+    function rest_url( $path = '' ) {
+        return 'http://localhost/wp-json/' . ltrim( $path, '/' );
     }
 }
 

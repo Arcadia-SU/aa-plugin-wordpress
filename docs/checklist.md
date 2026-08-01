@@ -484,21 +484,76 @@ Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** 
 
 ---
 
-## Phase 40 : Rename surface `/articles` → `/contents` — ⏸ BLOQUÉ (à grouper avec le lot post_type P1b)
+## Phase 40 : Rename surface `/articles` → `/contents` — ✅ FAIT (2026-08-01)
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
 
-**⏸ Ne pas livrer isolément.** Décision produit : ce rename embarque dans la **même release que les garanties post_type**, lot **P1b** du chantier pages business — désormais tracké en **[Phase 41](#phase-41--lot-p1b--garanties-post_type-3-défauts-root-causés)**. Une seule campagne de déploiement sur les 3 sites clients (iSelection preprod + www, trottinette). **Débloquer la Phase 41 d'abord, puis livrer les deux ensemble.**
+**Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin suit.
 
-**Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin doit suivre.
+Livré avec la Phase 41 dans une release unique, comme la décision produit l'exigeait.
 
-**Attendu.** Pur rename de chemin + alias rétrocompatible — aucun changement de payload ni de comportement, mutations toujours ID-driven. `meta.post_type` reste inchangé (vocabulaire WordPress, pas le nôtre).
-
-- [ ] Exposer chaque endpoint `/articles*` aussi sous `/contents*` (mêmes handlers, même contrat, mêmes payloads)
-- [ ] Marquer `/articles*` **déprécié** : docs + header de dépréciation sur la réponse
-- [ ] Maintenir `/articles*` au moins une version de grâce (pas de bascule atomique AA↔plugin)
-- [ ] Tests : parité de réponse `/articles*` ↔ `/contents*` sur chaque endpoint
+- [x] Chaque endpoint exposé sous `/contents*` **et** `/articles*` — table `content_route_definitions()`
+      + boucle `CONTENT_ROUTE_PREFIXES`, `class-api.php`
+- [x] `/articles*` déprécié : `Deprecation` (RFC 9745), `Sunset` (RFC 8594, 2027-02-01),
+      `Link; rel="successor-version"` (RFC 5829) — `class-api-deprecations.php`
+- [x] Grâce de six mois, ≥ un cycle de release complet
+- [x] Tests — `ContentRouteParityTest.php` (12) + `DeprecationHeadersTest.php` (33)
 - [ ] Coordination : le connector AA bascule sur `/contents` une fois la release déployée sur les 3 sites
+
+### Comment la parité est garantie
+
+`build_endpoints()` est appelé **une fois par route** et son résultat monté sous les deux préfixes :
+les jumeaux partagent la **même instance de Closure**. La divergence de scope devient impossible
+*par identité*, pas par discipline — et le test l'assert avec `assertSame()`, pas en comparant deux
+littéraux qui se ressemblent aujourd'hui.
+
+**Deux pièges évités, chacun épinglé par un test :**
+1. `/revisions` et `/revisions/{revision_id}` vivaient dans leur propre `register_revision_routes()`.
+   Aliaser le seul groupe article les aurait oubliées **sans aucune erreur**. Fondues dans la table.
+2. `/…/{id}/featured-image` utilise **`media:write`**, pas `articles:write`. C'est la seule ligne de la
+   table qui casse le motif, donc celle qu'un copier-coller élargit en silence.
+
+**Scopes non renommés.** `articles:*` est persisté dans une option WP et affiché en checkboxes admin
+(`class-auth.php`, `admin/settings.php`) ; des `contents:*` imposeraient une migration de settings sur
+chaque site client pour zéro gain fonctionnel.
+
+**Filtre `rest_post_dispatch`, pas un wrapper de callback** — un wrapper casserait la parité (les
+jumeaux n'auraient plus le même callback), et surtout il **ne s'exécute pas sur 401/403** :
+`permission_callback` court-circuite avant, or un client refusé pour scope est exactement celui qu'on
+veut avertir. Règles par **préfixe** avec frontière de segment obligatoire (sinon `/articles-archive`
+matcherait). Rien dans le corps : des payloads identiques octet pour octet entre jumeaux, c'est ce qui
+rend l'assertion de parité utile.
+
+### `PUT /pages/{id}` déprécié, `GET /pages` conservé
+
+Vérifié côté AA : `GET /pages` alimente le maillage interne, `update_page()` existe dans le connector
+mais **aucun appelant**. La route est réenregistrée sur `update_post` et le corps de `update_page()`
+supprimé — un chemin déprécié ne doit pas garder une mise en forme sur mesure, sinon la migration
+change les sémantiques plus tard au lieu de maintenant.
+
+⚠️ **Ce n'est pas neutre en payload.** La réponse passe de `{ success, page }` (10 champs, dont
+`parent`/`menu_order`/`template`) à `{ success, post }` (21 champs). De nouveaux comportements
+atteignent les pages pour la première fois : `dry_run`, le chemin force-draft → révision (une page
+publiée peut désormais répondre **201 + revision_created** au lieu de 200), le rejet de changement de
+`post_type`, le 422 sur champs structurels, et le finalize complet du builder. **Accepté** (zéro
+appelant), **à annoncer** dans `backlog-for-backend.md`.
+
+**Non-vacuité vérifiée** (9 mutants) : préfixe `/contents` retiré → 5 rouges ; `build_endpoints()` appelé
+par préfixe (identité perdue) → 1 ; scope `featured-image` élargi → 3 ; routes de révision retirées de la
+table → 4 ; frontière de segment retirée → 2 ; règle `/pages` non limitée à PUT → 3 ; check de namespace
+retiré → 2 ; `Link` qui remplace au lieu d'ajouter → 1 ; `PUT /pages` sur un autre handler → 1.
+
+> Le mutant « check de namespace retiré » a d'abord **survécu** : mes cas étrangers (`/wp/v2/posts`,
+> `/other/v1/articles`) se dégradaient en chaînes inoffensives une fois strippés naïvement. Il a fallu un
+> namespace étranger de **même longueur** qu'`/arcadia/v1` (`/foobar/v11/articles`) pour l'atteindre. Sans
+> la passe de mutation, ce trou serait passé pour couvert.
+
+### Suppression au sunset (4 endroits, tous dans les fichiers touchés ici)
+
+1. `CONTENT_ROUTE_PREFIXES` → ne garder que `/contents`
+2. `Arcadia_API_Deprecations::rules()` → vider
+3. `register_page_routes()` → retirer `/pages/(?P<id>\d+)`
+4. `ContentRouteParityTest` → la direction inverse de la bijection
 
 ---
 
