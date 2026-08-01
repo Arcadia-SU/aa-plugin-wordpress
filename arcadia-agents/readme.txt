@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.1.38
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,14 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.2.0 =
+* New `/contents*` endpoints — canonical name for the content surface
+* `/articles*` and `PUT /pages/{id}` deprecated; both keep working until 2027-02-01 and now carry Deprecation/Sunset/Link headers
+* Pages and hierarchical custom post types are now editable through the content endpoints (previously 404)
+* `post_parent`, `menu_order` and `page_template` are refused with an explicit 422 instead of being silently ignored — site structure is not the agent's to change
+* Revision previews now render in their parent's template instead of falling back to a generic one
+* `word_count` is omitted rather than reported as 0 when the content lives in block attributes, and no longer miscounts accented text
+
 = 0.1.0 =
 * Initial release
 * REST API endpoints for posts, pages, media, taxonomies
@@ -74,6 +82,9 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 * Admin settings page with permission management
 
 == Upgrade Notice ==
+
+= 0.2.0 =
+Adds the `/contents*` endpoints and deprecates `/articles*` and `PUT /pages/{id}` (removal no earlier than 2027-02-01). `PUT /pages/{id}` now returns the same payload as `/contents/{id}`.
 
 = 0.1.0 =
 Initial release of Arcadia Agents plugin.

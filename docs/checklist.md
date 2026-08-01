@@ -1,8 +1,11 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-07-30 (v0.1.38 ; Phases 34/36/37/38 **terminées** ; **Phase 39** markdown inline dans les sous-champs wysiwyg de répéteur **terminée côté code** — relevé du type ACF de `cell` en cours côté AA ; **Phase 41** lot P1b (3 défauts `post_type` root-causés) **à faire, débloquée** ; **Phase 40** rename `/articles`→`/contents` livrée avec la Phase 41 ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-08-01 (**v0.2.0 buildée** ; Phases 34/36/37/38/39 terminées ; **Phase 41** lot P1b (3 défauts `post_type`) **terminée** ; **Phase 40** surface `/contents` + dépréciations **terminée** ; Phase 29 E2E AA-side pending)
 
-> **Prochain front de travail : Phase 41.** AA a routé le périmètre plugin du lot P1b le 2026-07-30, ce qui débloque à la fois la Phase 41 et la Phase 40 (release groupée).
+> **Prochain front de travail : déploiement.** v0.2.0 est buildée et prête. Il reste la campagne sur
+> les 3 sites clients (iSelection preprod + www, trottinette) et la bascule du connector AA vers
+> `/contents` une fois déployé. La validation site client des 3 correctifs P1b se fait après déploiement
+> — voir « Vérification sur site client » en bas de la Phase 41.
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -656,8 +659,33 @@ documentation, avec sa nature déclarative écrite noir sur blanc.
 
 ### 41.4 — Release groupée
 
-- [ ] Livrer **Phase 41 + Phase 40** dans la même release, une seule campagne de déploiement sur les 3 sites
-- [ ] `./build.sh` + annonce dans `backlog-for-backend.md`
+- [x] **Phase 41 + Phase 40** livrées dans la même release — v0.2.0
+- [x] `./build.sh 0.2.0` — 15 gates verts, zip produit, 556 tests
+- [x] Annonce écrite dans `backlog-for-backend.md`
+- [ ] Campagne de déploiement sur les 3 sites (iSelection preprod + www, trottinette)
+
+**`build.sh` étendu.** Le script n'incrémentait que le patch, donc `0.2.0` était hors de sa portée et
+il aurait fallu éditer les trois sources de version à la main — précisément la dérive que son check #12
+existe pour attraper. Il accepte maintenant une version cible explicite (`./build.sh 0.2.0`), validée
+en format et **strictement supérieure** à la courante (re-publier un numéro, c'est comment deux zips
+différents finissent par se déclarer identiques). Un seul écrivain des versions, toujours.
+
+### Vérification sur site client (après déploiement)
+
+- [ ] **41.1** — `PUT /contents/{id}` sur une page métier → 200 ; un body avec `post_parent` → 422
+- [ ] **41.2** — preview de révision avec `&aa_debug=1` : `render_context.context_type` doit valoir `page`
+      (pas `aa_revision`), `template_resolution.candidates` basculer sur la liste dérivée du parent,
+      `resolved` pointer le vrai gabarit, `render.output_length` être non nul
+- [ ] **41.3** — `GET /contents?post_type=page` : plus de `word_count: 0` sur les pages à blocs
+- [ ] **40** — `curl -i` sur `/articles` montre `Deprecation` + `Sunset` ; sur `/contents`, aucun des deux
+
+### Anomalie non élucidée (à surveiller)
+
+Un run de `./build.sh` a rapporté **1 test en échec** (556 tests, 1789 assertions au lieu de 1791).
+Je n'avais capturé que la fin de la sortie, donc l'identité du test est perdue. **Non reproduit en
+45 exécutions** ensuite — dont 5 passes complètes du pipeline de build et 3 cycles reproduisant le
+va-et-vient `composer --no-dev` / restore. Rien n'indique un défaut du code livré, mais l'anomalie
+est réelle et n'a pas d'explication. Si elle revient : capturer **toute** la sortie du build, pas le tail.
 
 ---
 

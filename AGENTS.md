@@ -93,8 +93,13 @@ composer require firebase/php-jwt
 **TOUJOURS utiliser le script de build.** Ne jamais builder manuellement.
 
 ```bash
-./build.sh
+./build.sh          # incrémente le patch (0.1.38 → 0.1.39)
+./build.sh 0.2.0    # release une version précise (bump mineur/majeur)
 ```
+
+L'argument de version est **validé** : format `MAJOR.MINOR.PATCH`, et strictement supérieur à
+la version courante. Éditer les trois sources de version à la main est précisément la dérive
+que le check #12 existe pour attraper — passer la cible au script garde un seul écrivain.
 
 Le script exécute ces checks avant de créer le zip :
 
