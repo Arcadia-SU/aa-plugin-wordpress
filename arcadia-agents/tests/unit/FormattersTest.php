@@ -19,13 +19,19 @@ use PHPUnit\Framework\TestCase;
 class FormattersTest extends TestCase {
 
     /**
-     * Test that a post object is formatted correctly.
+     * Documents the expected shape of a formatted post.
      *
-     * Note: This is a simplified test that verifies the format structure.
-     * Full integration testing would require WordPress environment.
+     * This assertion is deliberately declarative — it compares a hand-written
+     * list with itself and would stay green through any change to
+     * format_post(). The real, output-driven assertion lives in
+     * WordCountTest::test_format_post_payload_shape(), which calls the
+     * formatter and pins array_keys() on what comes back. Keep this list in
+     * sync with that one; it is documentation, not a guard.
      */
     public function test_format_post_structure(): void {
         // Expected fields in a formatted post (v2 enriched + Phase 10 + K1 + FS-1).
+        // `word_count` is omitted from the response when the content carries no
+        // prose (Phase 41.3) — see WordCountTest.
         $expected_fields = array(
             'id',
             'title',

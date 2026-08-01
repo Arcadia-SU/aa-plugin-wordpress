@@ -577,10 +577,27 @@ assertion sur le gabarit aurait été vacante. Rendu configurable via `$_test_pa
 
 Ce n'est pas une donnée manquante mais un **faux signal** : un audit qui lit `word_count = 0` conclut « thin content » sur une page de 30k caractères. **Absence de champ préférable à zéro.**
 
-- [ ] Omettre `word_count` (ou `null`) plutôt que renvoyer `0` quand il n'est pas calculable de façon fiable — trancher omission vs `null` selon ce que le contrat expose déjà
-- [ ] Évaluer un comptage réel depuis les valeurs de champs ACF (on a déjà `get_field_values_for_post()` juste à côté, ligne 68) — à faire seulement si le coût perf est nul, sinon s'en tenir à l'omission
-- [ ] **Défaut adjacent repéré** : `str_word_count()` n'est pas UTF-8 safe — il coupe sur les accents français. À corriger dans le même passage si on garde un comptage.
-- [ ] Tests : post à blocs ACF (pas de faux zéro) ; post classique (comptage inchangé) ; texte accentué
+- [x] **Omission** retenue (pas `null`) — `count_words()` retourne `null`, la clé est retirée de la
+      réponse. Décision AA : « absence de champ préférable à zéro ».
+- [x] Comptage depuis les blocs parsés **écarté** : coûterait un `parse_blocks()` par post dans le
+      listing. À noter — l'idée initiale de compter depuis `get_field_values_for_post()` **ne marchait
+      pas** : cette fonction retourne les champs ACF *post-level*, le contenu des blocs vit dans
+      `$block['data']` à l'intérieur de `post_content`.
+- [x] **Défaut adjacent corrigé** : `str_word_count()` traite les octets accentués comme des séparateurs
+      — « Réhabilitation énergétique » comptait **4** mots au lieu de 2. Remplacé par un `preg_split`
+      sur `\s+` avec le flag `/u`. Profite à tous les posts, pas seulement aux pages business.
+- [x] Tests — `WordCountTest.php`, 16 tests
+
+**Non-vacuité vérifiée** (3 mutants) : `0` au lieu de `null` → 6 rouges ; retour à `str_word_count()`
+→ 4 ; `unset` retiré → 6.
+
+**Test vacant repéré au passage** : `FormattersTest::test_format_post_structure` comparait un tableau
+écrit à la main **avec lui-même** (`assertCount(21, $expected_fields)`) — il serait resté vert à travers
+n'importe quel changement du formateur. La vraie assertion, pilotée par la sortie de `format_post()`,
+est maintenant dans `WordCountTest::test_format_post_payload_shape`. L'ancienne est conservée comme
+documentation, avec sa nature déclarative écrite noir sur blanc.
+
+⚠️ **Changement de contrat à annoncer à AA** : `word_count` peut désormais être absent de la réponse.
 
 ### 41.4 — Release groupée
 
