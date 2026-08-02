@@ -126,7 +126,15 @@ Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaur
 
 **Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
 
-**Analyse statique (CI uniquement) :** PHPStan (niveau 5 + `phpstan-wordpress` + baseline) tourne dans la CI GitHub, pas dans `./build.sh` (le conteneur local manque de RAM pour analyser tout le code d'un coup). Voir `.github/workflows/ci.yml` et `phpstan.neon.dist`.
+**Analyse statique (hors `./build.sh`) :** PHPStan (niveau 5 + `phpstan-wordpress` + baseline) tourne dans la CI GitHub. Voir `.github/workflows/ci.yml` et `phpstan.neon.dist`.
+
+Il tourne **aussi en local** à condition de relever la mémoire explicitement — c'est le défaut du conteneur qui est trop bas, pas la machine :
+
+```bash
+docker compose exec -T wordpress bash -c "cd /var/www/html/wp-content/plugins/arcadia-agents && php -d memory_limit=3G vendor/bin/phpstan analyse --no-progress --memory-limit=3G"
+```
+
+**Le lancer avant de pousser sur `main`.** Deux classes d'erreurs n'apparaissent qu'ici, jamais dans les tests : les entrées de baseline devenues orphelines (supprimer le code fautif fait échouer l'analyse), et les propriétés inconnues sur un `@param object` mal typé.
 
 **RÈGLE : Toujours lancer `./build.sh` après tout changement de code.** Le zip doit rester à jour.
 
