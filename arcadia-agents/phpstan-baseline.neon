@@ -21,11 +21,6 @@ parameters:
 			path: includes/class-acf-validator.php
 
 		-
-			message: "#^Parameter \\#1 \\$id of function wp_set_current_user expects int\\|null, string given\\.$#"
-			count: 1
-			path: includes/class-api.php
-
-		-
 			message: "#^Strict comparison using \\=\\=\\= between '0' and mixed~\\(0\\|0\\.0\\|''\\|'0'\\|array\\{\\}\\|false\\|null\\) will always evaluate to false\\.$#"
 			count: 1
 			path: includes/class-api.php

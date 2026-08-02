@@ -229,9 +229,9 @@ class Arcadia_Preview {
 	 * Separated from handle_preview() so unit tests can verify the state
 	 * setup without triggering template inclusion and exit.
 	 *
-	 * @param object      $post    The post object (modified in place: status → publish).
-	 * @param object|null $context Rendering context (the parent, for a revision).
-	 *                             Defaults to $post.
+	 * @param \WP_Post      $post    The post object (modified in place: status → publish).
+	 * @param \WP_Post|null $context Rendering context (the parent, for a revision).
+	 *                               Defaults to $post.
 	 */
 	public function setup_preview_state( $post, $context = null ) {
 		if ( null === $context ) {
@@ -318,10 +318,10 @@ class Arcadia_Preview {
 	 * Captures what the template would render (via ob_start) to report
 	 * the output size without actually sending it to the browser.
 	 *
-	 * @param object      $post      The post object.
-	 * @param array       $templates Template candidates that were tried.
-	 * @param string      $template  Resolved template path (empty if none found).
-	 * @param object|null $context   Rendering context (the parent, for a revision).
+	 * @param \WP_Post      $post      The post object.
+	 * @param array         $templates Template candidates that were tried.
+	 * @param string        $template  Resolved template path (empty if none found).
+	 * @param \WP_Post|null $context   Rendering context (the parent, for a revision).
 	 */
 	private function send_debug_report( $post, $templates, $template, $context = null ) {
 		if ( null === $context ) {
@@ -381,7 +381,7 @@ class Arcadia_Preview {
 				'context_id'     => $context->ID,
 				'context_type'   => $context->post_type,
 				'context_name'   => $context->post_name,
-				'parent_id'      => isset( $post->post_parent ) ? (int) $post->post_parent : 0,
+				'parent_id'      => (int) $post->post_parent,
 				'parent_missing' => 'aa_revision' === $post->post_type
 					&& ! empty( $post->post_parent )
 					&& $context->ID === $post->ID,
@@ -475,8 +475,8 @@ class Arcadia_Preview {
 	 * cascades revision deletion when the parent is deleted, so an orphan
 	 * revision must degrade to its own context rather than fatal.
 	 *
-	 * @param object $post The previewed post.
-	 * @return object The post whose type, slug and template drive rendering.
+	 * @param \WP_Post $post The previewed post.
+	 * @return \WP_Post The post whose type, slug and template drive rendering.
 	 */
 	private function resolve_render_context( $post ) {
 		if ( 'aa_revision' !== $post->post_type || empty( $post->post_parent ) ) {

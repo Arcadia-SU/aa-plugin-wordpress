@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -66,6 +66,9 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.2.1 =
+* No functional change — static-analysis and CI hygiene only (accurate type annotations in the preview renderer, stale analysis baseline entry removed, coding-standards job repaired)
+
 = 0.2.0 =
 * New `/contents*` endpoints — canonical name for the content surface
 * `/articles*` and `PUT /pages/{id}` deprecated; both keep working until 2027-02-01 and now carry Deprecation/Sunset/Link headers
@@ -82,6 +85,9 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 * Admin settings page with permission management
 
 == Upgrade Notice ==
+
+= 0.2.1 =
+Maintenance release. Identical behaviour to 0.2.0 — deploy this one instead if you have not shipped 0.2.0 yet.
 
 = 0.2.0 =
 Adds the `/contents*` endpoints and deprecates `/articles*` and `PUT /pages/{id}` (removal no earlier than 2027-02-01). `PUT /pages/{id}` now returns the same payload as `/contents/{id}`.

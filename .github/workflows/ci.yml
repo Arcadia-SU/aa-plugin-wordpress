@@ -61,11 +61,18 @@ jobs:
           php-version: '8.2'
           tools: composer, cs2pr
 
+      # One require, explicit constraints. Three unpinned sequential requires
+      # broke the day PHPCS 4.0 shipped: the first call installed 4.x, then no
+      # wp-coding-standards/wpcs release could satisfy it (3.4.1 needs ^3.13.5)
+      # and the job went red on install — nothing to do with the code under
+      # review. Resolving all three at once lets Composer pick a coherent set.
       - name: Install PHPCS and WordPress standards
         run: |
-          composer global require --no-progress squizlabs/php_codesniffer
-          composer global require --no-progress wp-coding-standards/wpcs
-          composer global require --no-progress phpcompatibility/phpcompatibility-wp
+          composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require --no-progress \
+            "squizlabs/php_codesniffer:^3.13" \
+            "wp-coding-standards/wpcs:^3.1" \
+            "phpcompatibility/phpcompatibility-wp:^2.1"
           ~/.composer/vendor/bin/phpcs --config-set installed_paths ~/.composer/vendor/wp-coding-standards/wpcs,~/.composer/vendor/phpcompatibility/phpcompatibility-wp,~/.composer/vendor/phpcompatibility/php-compatibility
 
       - name: Run PHPCS
