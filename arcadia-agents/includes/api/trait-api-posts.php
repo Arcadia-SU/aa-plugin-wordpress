@@ -28,9 +28,26 @@ trait Arcadia_API_Posts_Handler {
 	 * @return WP_REST_Response|WP_Error
 	 */
 	public function get_posts( $request ) {
-		$post_type = $request->get_param( 'post_type' ) ?? 'post';
-		$per_page  = (int) ( $request->get_param( 'per_page' ) ?? 20 );
-		$per_page  = max( 1, min( 100, $per_page ) );
+		$post_type = sanitize_text_field( $request->get_param( 'post_type' ) ?? 'post' );
+
+		// Same content-type policy as the write path (Phase 41.1). This listing
+		// used to pass the requested type straight to WP_Query while `orderby`
+		// and `order` five lines below were allowlisted — an agent could list a
+		// type it was then refused the right to read blocks from or edit.
+		if ( ! $this->is_allowed_post_type( $post_type ) ) {
+			return new WP_Error(
+				'invalid_post_type',
+				sprintf(
+					/* translators: %s: post type slug */
+					__( "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page).", 'arcadia-agents' ),
+					$post_type
+				),
+				array( 'status' => 400 )
+			);
+		}
+
+		$per_page = (int) ( $request->get_param( 'per_page' ) ?? 20 );
+		$per_page = max( 1, min( 100, $per_page ) );
 
 		// Whitelist orderby to prevent arbitrary column queries.
 		$orderby_whitelist = array( 'date', 'title', 'modified' );
@@ -46,7 +63,7 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$args = array(
-			'post_type'      => sanitize_text_field( $post_type ),
+			'post_type'      => $post_type,
 			'post_status'    => array( 'publish', 'draft', 'pending', 'private' ),
 			'posts_per_page' => $per_page,
 			'paged'          => $request->get_param( 'page' ) ?? 1,
@@ -329,7 +346,7 @@ trait Arcadia_API_Posts_Handler {
 				'invalid_post_type',
 				sprintf(
 					/* translators: %s: post type slug */
-					__( "Post type '%s' is not allowed. Must be a public, non-hierarchical type (e.g. post).", 'arcadia-agents' ),
+					__( "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page).", 'arcadia-agents' ),
 					$post_type
 				),
 				array( 'status' => 400 )
@@ -745,125 +762,6 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
-	 * Update a page.
-	 *
-	 * @param WP_REST_Request $request The request.
-	 * @return WP_REST_Response|WP_Error
-	 */
-	public function update_page( $request ) {
-		$page_id = (int) $request->get_param( 'id' );
-		$page    = get_post( $page_id );
-
-		if ( ! $page || 'page' !== $page->post_type ) {
-			return new WP_Error(
-				'page_not_found',
-				sprintf(
-					/* translators: %d: page ID */
-					__( 'Page with ID %d not found.', 'arcadia-agents' ),
-					$page_id
-				),
-				array( 'status' => 404 )
-			);
-		}
-
-		$body = $request->get_json_params();
-		$meta = isset( $body['meta'] ) ? $body['meta'] : array();
-
-		$post_data = array( 'ID' => $page_id );
-
-		// Title: body.title = H1 (visible heading), meta.title = SEO meta-title.
-		// body.title takes priority for post_title; meta.title is only a fallback.
-		if ( ! empty( $body['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
-		}
-
-		// Update slug.
-		if ( ! empty( $meta['slug'] ) ) {
-			$post_data['post_name'] = sanitize_title( $meta['slug'] );
-		}
-
-		// Update status.
-		if ( ! empty( $body['status'] ) ) {
-			$status           = sanitize_text_field( $body['status'] );
-			$allowed_statuses = array( 'publish', 'draft', 'pending', 'private' );
-			if ( ! in_array( $status, $allowed_statuses, true ) ) {
-				return new WP_Error(
-					'invalid_status',
-					sprintf(
-						/* translators: 1: received status, 2: allowed statuses */
-						__( "Invalid post status '%1\$s'. Allowed: %2\$s.", 'arcadia-agents' ),
-						$status,
-						implode( ', ', $allowed_statuses )
-					),
-					array( 'status' => 400 )
-				);
-			}
-			$post_data['post_status'] = $status;
-		}
-
-		// Update content.
-		if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $body );
-			if ( is_wp_error( $content ) ) {
-				return $content;
-			}
-			$post_data['post_content'] = $content;
-		} elseif ( isset( $body['content'] ) && is_string( $body['content'] ) ) {
-			$post_data['post_content'] = wp_kses_post( $body['content'] );
-		}
-
-		// Set current user so wp_update_post() grants unfiltered_html capability.
-		$original_user_id = get_current_user_id();
-		$page             = get_post( $page_id );
-		if ( $page ) {
-			wp_set_current_user( $page->post_author );
-		}
-
-		// Slash data for wp_update_post() which internally calls wp_unslash().
-		$post_data = wp_slash( $post_data );
-
-		$result = wp_update_post( $post_data, true );
-
-		wp_set_current_user( $original_user_id );
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		// Store SEO meta: meta.title = SEO meta-title (distinct from post_title/H1).
-		if ( ! empty( $meta['title'] ) ) {
-			update_post_meta( $page_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
-		}
-		if ( ! empty( $meta['description'] ) ) {
-			update_post_meta( $page_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
-		}
-
-		$page = get_post( $page_id );
-
-		if ( ! $page ) {
-			return new WP_Error(
-				'page_read_failed',
-				sprintf(
-					/* translators: %d: page ID */
-					__( 'Failed to read page %d after update.', 'arcadia-agents' ),
-					$page_id
-				),
-				array( 'status' => 500 )
-			);
-		}
-
-		return new WP_REST_Response(
-			array(
-				'success' => true,
-				'page'    => $this->format_page( $page ),
-			),
-			200
-		);
-	}
-
-	/**
 	 * Resolve the post author from meta.author (email or login).
 	 *
 	 * Falls back to the first administrator on the site if meta.author
@@ -904,21 +802,38 @@ trait Arcadia_API_Posts_Handler {
 	}
 
 	/**
-	 * Check if a post type is allowed for post operations.
+	 * Check if a post type is allowed for content operations.
 	 *
-	 * Allows public, non-hierarchical post types (posts, articles, etc.)
-	 * but excludes pages (hierarchical) and attachments.
+	 * Single content-type policy for the whole plugin: any public post type
+	 * except `attachment`. Deliberately identical to the policy applied by
+	 * get_blocks_usage() (trait-api-blocks.php) — three divergent policies used
+	 * to coexist, which let an agent list a page and read its content but not
+	 * fetch its blocks nor edit it (Phase 41.1).
+	 *
+	 * Hierarchical types (pages, hierarchical CPTs) are allowed: `page` is a
+	 * native WordPress type present on every install, and business pages are
+	 * exactly the content the agent is asked to maintain. Site structure is
+	 * still out of scope — `post_parent`, `menu_order` and `page_template` are
+	 * rejected with a 422 by Arcadia_Post_Builder::build_post_data().
+	 *
+	 * `attachment` stays excluded: it is public and non-hierarchical (so the
+	 * previous guard let it through despite its docblock claiming otherwise),
+	 * but a media item is not editorial content and has no block payload.
 	 *
 	 * @param string $post_type The post type to check.
 	 * @return bool
 	 */
 	private function is_allowed_post_type( $post_type ) {
+		if ( 'attachment' === $post_type ) {
+			return false;
+		}
+
 		$post_type_obj = get_post_type_object( $post_type );
 
 		if ( ! $post_type_obj ) {
 			return false;
 		}
 
-		return $post_type_obj->public && ! $post_type_obj->hierarchical;
+		return (bool) $post_type_obj->public;
 	}
 }

@@ -5,9 +5,13 @@
 # Runs validation checks before creating the distributable zip.
 # If any check fails, the zip is NOT created.
 #
-# Usage: ./build.sh
+# Usage: ./build.sh            → auto-increment the patch (0.1.38 → 0.1.39)
+#        ./build.sh 0.2.0     → release that exact version (minor/major bumps)
 #
 set -euo pipefail
+
+# Explicit target version, empty when auto-incrementing.
+TARGET_VERSION="${1:-}"
 
 # ─── Configuration ──────────────────────────────────────────────────────────
 
@@ -226,7 +230,7 @@ else
 	fail "Autoloader fails to boot. A required class/file is missing."
 fi
 
-# ─── 8. Version bump (auto-increment patch) ───────────────────────────────
+# ─── 8. Version bump (patch by default, explicit target on request) ───────
 
 check "Version bump"
 MAIN_FILE="${PLUGIN_DIR}/arcadia-agents.php"
@@ -234,10 +238,30 @@ CURRENT_VERSION=$(sed -n "s/.*define( 'ARCADIA_AGENTS_VERSION', '\([0-9]*\.[0-9]
 if [ -z "$CURRENT_VERSION" ]; then
 	fail "Could not read current version from ${MAIN_FILE}."
 fi
-MAJOR_MINOR="${CURRENT_VERSION%.*}"
-PATCH="${CURRENT_VERSION##*.}"
-NEW_PATCH=$((PATCH + 1))
-NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
+
+# A minor or major release cannot be reached by incrementing the patch, and
+# editing the three version sources by hand is exactly the drift check #12
+# exists to catch. Passing the target here keeps the single writer.
+if [ -n "$TARGET_VERSION" ]; then
+	if ! printf '%s' "$TARGET_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+		fail "Invalid version '${TARGET_VERSION}'. Expected MAJOR.MINOR.PATCH."
+	fi
+	# Refuse anything that isn't strictly ahead of the tree: re-releasing a
+	# version number is how two different zips end up claiming to be the same
+	# build. `sort -V` orders semver correctly; equality is caught first.
+	if [ "$TARGET_VERSION" = "$CURRENT_VERSION" ]; then
+		fail "Version ${TARGET_VERSION} is already the current version."
+	fi
+	if [ "$(printf '%s\n%s\n' "$CURRENT_VERSION" "$TARGET_VERSION" | sort -V | head -1)" != "$CURRENT_VERSION" ]; then
+		fail "Version ${TARGET_VERSION} is older than the current ${CURRENT_VERSION}."
+	fi
+	NEW_VERSION="$TARGET_VERSION"
+else
+	MAJOR_MINOR="${CURRENT_VERSION%.*}"
+	PATCH="${CURRENT_VERSION##*.}"
+	NEW_PATCH=$((PATCH + 1))
+	NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
+fi
 
 # Arm the rollback before touching any file (see cleanup()).
 PREV_VERSION="$CURRENT_VERSION"

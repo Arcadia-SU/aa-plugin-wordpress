@@ -1,8 +1,11 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-07-30 (v0.1.38 ; Phases 34/36/37/38 **terminées** ; **Phase 39** markdown inline dans les sous-champs wysiwyg de répéteur **terminée côté code** — relevé du type ACF de `cell` en cours côté AA ; **Phase 41** lot P1b (3 défauts `post_type` root-causés) **à faire, débloquée** ; **Phase 40** rename `/articles`→`/contents` livrée avec la Phase 41 ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-08-01 (**v0.2.0 buildée** ; Phases 34/36/37/38/39 terminées ; **Phase 41** lot P1b (3 défauts `post_type`) **terminée** ; **Phase 40** surface `/contents` + dépréciations **terminée** ; Phase 29 E2E AA-side pending)
 
-> **Prochain front de travail : Phase 41.** AA a routé le périmètre plugin du lot P1b le 2026-07-30, ce qui débloque à la fois la Phase 41 et la Phase 40 (release groupée).
+> **Prochain front de travail : déploiement.** v0.2.0 est buildée et prête. Il reste la campagne sur
+> les 3 sites clients (iSelection preprod + www, trottinette) et la bascule du connector AA vers
+> `/contents` une fois déployé. La validation site client des 3 correctifs P1b se fait après déploiement
+> — voir « Vérification sur site client » en bas de la Phase 41.
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -484,21 +487,76 @@ Le fix ne se déclenche que si le sous-champ `cell` est déclaré **`wysiwyg`** 
 
 ---
 
-## Phase 40 : Rename surface `/articles` → `/contents` — ⏸ BLOQUÉ (à grouper avec le lot post_type P1b)
+## Phase 40 : Rename surface `/articles` → `/contents` — ✅ FAIT (2026-08-01)
 
 *Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-07-30*
 
-**⏸ Ne pas livrer isolément.** Décision produit : ce rename embarque dans la **même release que les garanties post_type**, lot **P1b** du chantier pages business — désormais tracké en **[Phase 41](#phase-41--lot-p1b--garanties-post_type-3-défauts-root-causés)**. Une seule campagne de déploiement sur les 3 sites clients (iSelection preprod + www, trottinette). **Débloquer la Phase 41 d'abord, puis livrer les deux ensemble.**
+**Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin suit.
 
-**Contexte.** Côté AA le langage a été renommé (déployé prod 2026-07-02) : « article » devient `EditorialContent` (types `article` | `business_page`). La surface REST du plugin doit suivre.
+Livré avec la Phase 41 dans une release unique, comme la décision produit l'exigeait.
 
-**Attendu.** Pur rename de chemin + alias rétrocompatible — aucun changement de payload ni de comportement, mutations toujours ID-driven. `meta.post_type` reste inchangé (vocabulaire WordPress, pas le nôtre).
-
-- [ ] Exposer chaque endpoint `/articles*` aussi sous `/contents*` (mêmes handlers, même contrat, mêmes payloads)
-- [ ] Marquer `/articles*` **déprécié** : docs + header de dépréciation sur la réponse
-- [ ] Maintenir `/articles*` au moins une version de grâce (pas de bascule atomique AA↔plugin)
-- [ ] Tests : parité de réponse `/articles*` ↔ `/contents*` sur chaque endpoint
+- [x] Chaque endpoint exposé sous `/contents*` **et** `/articles*` — table `content_route_definitions()`
+      + boucle `CONTENT_ROUTE_PREFIXES`, `class-api.php`
+- [x] `/articles*` déprécié : `Deprecation` (RFC 9745), `Sunset` (RFC 8594, 2027-02-01),
+      `Link; rel="successor-version"` (RFC 5829) — `class-api-deprecations.php`
+- [x] Grâce de six mois, ≥ un cycle de release complet
+- [x] Tests — `ContentRouteParityTest.php` (12) + `DeprecationHeadersTest.php` (33)
 - [ ] Coordination : le connector AA bascule sur `/contents` une fois la release déployée sur les 3 sites
+
+### Comment la parité est garantie
+
+`build_endpoints()` est appelé **une fois par route** et son résultat monté sous les deux préfixes :
+les jumeaux partagent la **même instance de Closure**. La divergence de scope devient impossible
+*par identité*, pas par discipline — et le test l'assert avec `assertSame()`, pas en comparant deux
+littéraux qui se ressemblent aujourd'hui.
+
+**Deux pièges évités, chacun épinglé par un test :**
+1. `/revisions` et `/revisions/{revision_id}` vivaient dans leur propre `register_revision_routes()`.
+   Aliaser le seul groupe article les aurait oubliées **sans aucune erreur**. Fondues dans la table.
+2. `/…/{id}/featured-image` utilise **`media:write`**, pas `articles:write`. C'est la seule ligne de la
+   table qui casse le motif, donc celle qu'un copier-coller élargit en silence.
+
+**Scopes non renommés.** `articles:*` est persisté dans une option WP et affiché en checkboxes admin
+(`class-auth.php`, `admin/settings.php`) ; des `contents:*` imposeraient une migration de settings sur
+chaque site client pour zéro gain fonctionnel.
+
+**Filtre `rest_post_dispatch`, pas un wrapper de callback** — un wrapper casserait la parité (les
+jumeaux n'auraient plus le même callback), et surtout il **ne s'exécute pas sur 401/403** :
+`permission_callback` court-circuite avant, or un client refusé pour scope est exactement celui qu'on
+veut avertir. Règles par **préfixe** avec frontière de segment obligatoire (sinon `/articles-archive`
+matcherait). Rien dans le corps : des payloads identiques octet pour octet entre jumeaux, c'est ce qui
+rend l'assertion de parité utile.
+
+### `PUT /pages/{id}` déprécié, `GET /pages` conservé
+
+Vérifié côté AA : `GET /pages` alimente le maillage interne, `update_page()` existe dans le connector
+mais **aucun appelant**. La route est réenregistrée sur `update_post` et le corps de `update_page()`
+supprimé — un chemin déprécié ne doit pas garder une mise en forme sur mesure, sinon la migration
+change les sémantiques plus tard au lieu de maintenant.
+
+⚠️ **Ce n'est pas neutre en payload.** La réponse passe de `{ success, page }` (10 champs, dont
+`parent`/`menu_order`/`template`) à `{ success, post }` (21 champs). De nouveaux comportements
+atteignent les pages pour la première fois : `dry_run`, le chemin force-draft → révision (une page
+publiée peut désormais répondre **201 + revision_created** au lieu de 200), le rejet de changement de
+`post_type`, le 422 sur champs structurels, et le finalize complet du builder. **Accepté** (zéro
+appelant), **à annoncer** dans `backlog-for-backend.md`.
+
+**Non-vacuité vérifiée** (9 mutants) : préfixe `/contents` retiré → 5 rouges ; `build_endpoints()` appelé
+par préfixe (identité perdue) → 1 ; scope `featured-image` élargi → 3 ; routes de révision retirées de la
+table → 4 ; frontière de segment retirée → 2 ; règle `/pages` non limitée à PUT → 3 ; check de namespace
+retiré → 2 ; `Link` qui remplace au lieu d'ajouter → 1 ; `PUT /pages` sur un autre handler → 1.
+
+> Le mutant « check de namespace retiré » a d'abord **survécu** : mes cas étrangers (`/wp/v2/posts`,
+> `/other/v1/articles`) se dégradaient en chaînes inoffensives une fois strippés naïvement. Il a fallu un
+> namespace étranger de **même longueur** qu'`/arcadia/v1` (`/foobar/v11/articles`) pour l'atteindre. Sans
+> la passe de mutation, ce trou serait passé pour couvert.
+
+### Suppression au sunset (4 endroits, tous dans les fichiers touchés ici)
+
+1. `CONTENT_ROUTE_PREFIXES` → ne garder que `/contents`
+2. `Arcadia_API_Deprecations::rules()` → vider
+3. `register_page_routes()` → retirer `/pages/(?P<id>\d+)`
+4. `ContentRouteParityTest` → la direction inverse de la bijection
 
 ---
 
@@ -515,10 +573,29 @@ Le périmètre plugin de P1b, qui bloquait la Phase 40. Les 3 défauts sont **v�
 
 Le CPT `page` est hiérarchique, donc les 4 appelants (`trait-api-posts.php:327/420/565/672` — create, update, `get_article_blocks`, delete) répondent `404 post_not_found`. Le listing et `blocks/usage` servent pourtant ces mêmes posts : **la surface est incohérente avec elle-même**, c'est ça le vrai défaut.
 
-- [ ] Autoriser les `post_type` hiérarchiques dans `is_allowed_post_type()`
-- [ ] Protéger `post_parent`, `menu_order`, `page_template` en update — non éditoriaux, AA ne doit pas pouvoir les bouger (ignorés silencieusement ou 422 explicite : trancher, préférer le 422)
-- [ ] Vérifier que les 4 appelants se comportent identiquement (le bug vient de la garde partagée, la correction doit l'être aussi)
-- [ ] Tests : `page` acceptée en update/blocks/delete ; `post_parent`/`menu_order`/`page_template` non modifiables ; un type non-public reste rejeté
+**Décision (2026-08-01) : politique unique = `public` moins `attachment`**, strictement identique à celle
+de `get_blocks_usage()`. Trois politiques divergentes cohabitaient ; il n'en reste qu'une, appliquée
+sur toutes les coutures. Effet de bord découvert au passage : `attachment` est public *et* non
+hiérarchique, donc l'ancienne garde le laissait passer alors que son docblock affirmait l'exclure.
+La nouvelle garde le ferme pour de bon.
+
+- [x] Autoriser les `post_type` hiérarchiques dans `is_allowed_post_type()` — `trait-api-posts.php:906-940`
+- [x] Aligner `get_posts()` sur la même garde (`:30-47`) — le `post_type` de requête partait en `WP_Query`
+      sans validation alors que `orderby`/`order` étaient allowlistés cinq lignes plus bas
+- [x] Rejet **422 `forbidden_structural_field`** sur `post_parent` / `menu_order` / `page_template`,
+      scanné au top-level, dans `meta` **et** dans `content.meta` (forme imbriquée, promue plus tard) —
+      `class-post-builder.php:38-56` (constante) + `reject_structural_fields()`
+- [x] Vérifier que les 4 appelants se comportent identiquement (garde partagée → correction partagée)
+- [x] Tests — `ContentTypePolicyTest.php`, 34 tests / 97 assertions
+
+**Non-vacuité vérifiée** (4 mutants, chacun tue des tests) : politique remise à `public && !hierarchical`
+→ 21 rouges ; garde `get_posts()` retirée → 3 ; rejet 422 retiré → 9 ; `build_post_data()` qui émet une
+clé hors liste → 1.
+
+**Verrou anti-refactor.** Le 422 est un *signal*, pas la barrière. La barrière, c'est que
+`build_post_data()` construit sa payload clé par clé (construction positive, jamais copy-then-filter).
+Les deux propriétés sont testées **séparément** : un refactor vers un filtre garderait le test du 422
+au vert tout en rouvrant le trou pour tout champ que le filtre oublierait.
 
 ### 41.2 — Preview de révision rendue au mauvais template
 
@@ -526,10 +603,31 @@ Le CPT `page` est hiérarchique, donc les 4 appelants (`trait-api-posts.php:327/
 
 Conséquence : le client valide la révision dans un template qui n'est pas celui de la page — **HITL aveugle** sur des pages à layout riche. Touche aussi les articles, moins visiblement.
 
-- [ ] Résoudre le template depuis le **post parent** (`post_parent`) et non depuis le `aa_revision` : `post_type`, `page_template`, `post_name`
-- [ ] Aligner aussi les body class et le `queried_object` pour que le thème se comporte comme en live
-- [ ] Vérifier la cohabitation avec la page de fallback minimale (Phase 19) — un template parent introuvable ne doit pas régresser en Content-Length 0
-- [ ] Tests : candidats de template dérivés du parent ; article ET page à template custom
+**Deux défauts adjacents trouvés dans la même fonction**, aussi corrigés : elle ne lisait jamais
+le gabarit assigné en éditeur (`get_page_template_slug()`), et elle n'avait **aucune branche
+`page-*.php`** — même une preview de page simple tombait sur `single.php`, un template que
+WordPress ne choisirait jamais pour elle.
+
+- [x] Résoudre le contexte de rendu depuis le **post parent** — `resolve_render_context()`,
+      `class-preview.php`. Guard null conservé : rien ne cascade la suppression d'une révision
+      quand le parent disparaît, une révision orpheline retombe sur son propre contexte.
+- [x] Hiérarchie fidèle à WordPress : gabarit éditeur d'abord (tout type, WP ≥ 4.7), puis branche
+      `page-{slug}/page-{id}/page.php` pour `page`, branche `single-*` sinon
+- [x] `queried_object` = le parent, la boucle = la révision — c'est le `queried_object` que lisent
+      `body_class()` et `is_page()`. `is_page`/`is_single` positionnés depuis le contexte.
+- [x] Fallback minimal Phase 19 non touché (le chemin `render_fallback()` est inchangé)
+- [x] Rapport `aa_debug=1` étendu d'une section `render_context` (`is_revision`, `context_id/type/name`,
+      `parent_id`, `parent_missing`, `template_slug`) — sans elle le correctif est invérifiable sur
+      site client : le rapport montrerait les bons candidats sans dire pourquoi
+- [x] Tests — `PreviewRenderContextTest.php`, 15 tests
+
+**Non-vacuité vérifiée** (5 mutants) : contexte toujours le post lui-même → 3 rouges ; gabarit éditeur
+ignoré → 3 ; branche page supprimée → 4 ; `queried_object` remis sur la révision → 1 ; `is_page`
+jamais posé → 1.
+
+**Stub corrigé** : `get_page_template_slug()` retournait `''` en dur en ignorant son argument — toute
+assertion sur le gabarit aurait été vacante. Rendu configurable via `$_test_page_template_slugs`.
+`WP_Query::$is_page` ajouté au stub (déclarée dans le vrai `WP_Query`).
 
 ### 41.3 — `word_count` = 0 sur les posts à blocs ACF
 
@@ -537,15 +635,57 @@ Conséquence : le client valide la révision dans un template qui n'est pas celu
 
 Ce n'est pas une donnée manquante mais un **faux signal** : un audit qui lit `word_count = 0` conclut « thin content » sur une page de 30k caractères. **Absence de champ préférable à zéro.**
 
-- [ ] Omettre `word_count` (ou `null`) plutôt que renvoyer `0` quand il n'est pas calculable de façon fiable — trancher omission vs `null` selon ce que le contrat expose déjà
-- [ ] Évaluer un comptage réel depuis les valeurs de champs ACF (on a déjà `get_field_values_for_post()` juste à côté, ligne 68) — à faire seulement si le coût perf est nul, sinon s'en tenir à l'omission
-- [ ] **Défaut adjacent repéré** : `str_word_count()` n'est pas UTF-8 safe — il coupe sur les accents français. À corriger dans le même passage si on garde un comptage.
-- [ ] Tests : post à blocs ACF (pas de faux zéro) ; post classique (comptage inchangé) ; texte accentué
+- [x] **Omission** retenue (pas `null`) — `count_words()` retourne `null`, la clé est retirée de la
+      réponse. Décision AA : « absence de champ préférable à zéro ».
+- [x] Comptage depuis les blocs parsés **écarté** : coûterait un `parse_blocks()` par post dans le
+      listing. À noter — l'idée initiale de compter depuis `get_field_values_for_post()` **ne marchait
+      pas** : cette fonction retourne les champs ACF *post-level*, le contenu des blocs vit dans
+      `$block['data']` à l'intérieur de `post_content`.
+- [x] **Défaut adjacent corrigé** : `str_word_count()` traite les octets accentués comme des séparateurs
+      — « Réhabilitation énergétique » comptait **4** mots au lieu de 2. Remplacé par un `preg_split`
+      sur `\s+` avec le flag `/u`. Profite à tous les posts, pas seulement aux pages business.
+- [x] Tests — `WordCountTest.php`, 16 tests
+
+**Non-vacuité vérifiée** (3 mutants) : `0` au lieu de `null` → 6 rouges ; retour à `str_word_count()`
+→ 4 ; `unset` retiré → 6.
+
+**Test vacant repéré au passage** : `FormattersTest::test_format_post_structure` comparait un tableau
+écrit à la main **avec lui-même** (`assertCount(21, $expected_fields)`) — il serait resté vert à travers
+n'importe quel changement du formateur. La vraie assertion, pilotée par la sortie de `format_post()`,
+est maintenant dans `WordCountTest::test_format_post_payload_shape`. L'ancienne est conservée comme
+documentation, avec sa nature déclarative écrite noir sur blanc.
+
+⚠️ **Changement de contrat à annoncer à AA** : `word_count` peut désormais être absent de la réponse.
 
 ### 41.4 — Release groupée
 
-- [ ] Livrer **Phase 41 + Phase 40** dans la même release, une seule campagne de déploiement sur les 3 sites
-- [ ] `./build.sh` + annonce dans `backlog-for-backend.md`
+- [x] **Phase 41 + Phase 40** livrées dans la même release — v0.2.0
+- [x] `./build.sh 0.2.0` — 15 gates verts, zip produit, 556 tests
+- [x] Annonce écrite dans `backlog-for-backend.md`
+- [ ] Campagne de déploiement sur les 3 sites (iSelection preprod + www, trottinette)
+
+**`build.sh` étendu.** Le script n'incrémentait que le patch, donc `0.2.0` était hors de sa portée et
+il aurait fallu éditer les trois sources de version à la main — précisément la dérive que son check #12
+existe pour attraper. Il accepte maintenant une version cible explicite (`./build.sh 0.2.0`), validée
+en format et **strictement supérieure** à la courante (re-publier un numéro, c'est comment deux zips
+différents finissent par se déclarer identiques). Un seul écrivain des versions, toujours.
+
+### Vérification sur site client (après déploiement)
+
+- [ ] **41.1** — `PUT /contents/{id}` sur une page métier → 200 ; un body avec `post_parent` → 422
+- [ ] **41.2** — preview de révision avec `&aa_debug=1` : `render_context.context_type` doit valoir `page`
+      (pas `aa_revision`), `template_resolution.candidates` basculer sur la liste dérivée du parent,
+      `resolved` pointer le vrai gabarit, `render.output_length` être non nul
+- [ ] **41.3** — `GET /contents?post_type=page` : plus de `word_count: 0` sur les pages à blocs
+- [ ] **40** — `curl -i` sur `/articles` montre `Deprecation` + `Sunset` ; sur `/contents`, aucun des deux
+
+### Anomalie non élucidée (à surveiller)
+
+Un run de `./build.sh` a rapporté **1 test en échec** (556 tests, 1789 assertions au lieu de 1791).
+Je n'avais capturé que la fin de la sortie, donc l'identité du test est perdue. **Non reproduit en
+45 exécutions** ensuite — dont 5 passes complètes du pipeline de build et 3 cycles reproduisant le
+va-et-vient `composer --no-dev` / restore. Rien n'indique un défaut du code livré, mais l'anomalie
+est réelle et n'a pas d'explication. Si elle revient : capturer **toute** la sortie du build, pas le tail.
 
 ---
 

@@ -30,14 +30,34 @@ All endpoints are prefixed with `/wp-json/arcadia/v1/`
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check (no auth) |
-| `/posts` | GET, POST | List/create posts |
-| `/posts/{id}` | PUT, DELETE | Update/delete post |
+| `/contents` | GET, POST | List/create content |
+| `/contents/{id}` | PUT, DELETE | Update/delete content |
+| `/contents/{id}/blocks` | GET | Parsed block tree + ACF field values |
+| `/contents/{id}/preview-url` | GET | Tokenised preview URL |
+| `/contents/{id}/featured-image` | PUT | Set featured image |
+| `/contents/{id}/revisions` | GET | List pending revisions |
+| `/contents/{id}/revisions/{revision_id}` | GET | Read one revision |
 | `/pages` | GET | List pages |
-| `/pages/{id}` | PUT | Update page |
-| `/media` | POST | Upload media via URL |
+| `/media` | GET, POST | List/upload media |
 | `/categories` | GET, POST | List/create categories |
 | `/tags` | GET | List tags |
 | `/site-info` | GET | Site information |
+
+`/contents` serves any public post type except `attachment` — posts, pages and
+hierarchical CPTs alike. Site structure stays out of scope: a body carrying
+`post_parent`, `menu_order` or `page_template` is refused with a 422.
+
+### Deprecated paths
+
+Both still work and will keep working until **2027-02-01**. Responses carry
+`Deprecation`, `Sunset` and `Link; rel="successor-version"` headers.
+
+| Deprecated | Replacement |
+|------------|-------------|
+| `/articles*` (every method) | the matching `/contents*` path |
+| `/pages/{id}` (PUT only) | `/contents/{id}` |
+
+`GET /pages` is **not** deprecated.
 
 ## Development
 

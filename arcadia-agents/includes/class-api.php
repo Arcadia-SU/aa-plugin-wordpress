@@ -110,7 +110,7 @@ class Arcadia_API {
 	 * Route definitions are split per domain to keep the file navigable.
 	 */
 	public function register_routes() {
-		$this->register_article_routes();
+		$this->register_content_routes();
 		$this->register_page_routes();
 		$this->register_media_routes();
 		$this->register_taxonomy_routes();
@@ -118,7 +118,6 @@ class Arcadia_API {
 		$this->register_redirect_routes();
 		$this->register_field_schema_routes();
 		$this->register_block_routes();
-		$this->register_revision_routes();
 	}
 
 	// =========================================================================
@@ -145,77 +144,183 @@ class Arcadia_API {
 	// =========================================================================
 
 	/**
-	 * Article routes: /articles, /articles/{id}, /articles/{id}/blocks,
-	 * /articles/{id}/preview-url, /articles/{id}/featured-image.
+	 * The content surface, declared once and mounted under every prefix.
+	 *
+	 * `/contents` is canonical; `/articles` is the deprecated alias kept for a
+	 * grace period (AA renamed the concept to EditorialContent, deployed
+	 * 2026-07-02). Order matters only for readability — the canonical name
+	 * comes first.
+	 *
+	 * @var string[]
 	 */
-	private function register_article_routes() {
-		register_rest_route(
-			$this->namespace,
-			'/articles',
-			array(
-				array(
-					'methods'             => 'GET',
-					'callback'            => array( $this, 'get_posts' ),
-					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
-				),
-				array(
-					'methods'             => 'POST',
-					'callback'            => array( $this, 'create_post' ),
-					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
-				),
-			)
-		);
+	const CONTENT_ROUTE_PREFIXES = array( '/contents', '/articles' );
 
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)',
+	/**
+	 * Declarative definition of the content surface.
+	 *
+	 * Each entry is a path suffix plus its endpoints. Adding a route here
+	 * mounts it under every prefix at once — which is the point: hand-copying
+	 * nine routes would give parity *by convention*, and convention is exactly
+	 * what drifts silently.
+	 *
+	 * The revision routes live here too. They used to sit in their own
+	 * register_revision_routes(), and aliasing only the article group would
+	 * have left them behind with no error.
+	 *
+	 * @return array<int, array{path:string, endpoints:array}>
+	 */
+	private function content_route_definitions() {
+		return array(
 			array(
-				array(
-					'methods'             => 'PUT',
-					'callback'            => array( $this, 'update_post' ),
-					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
+				'path'      => '',
+				'endpoints' => array(
+					array(
+						'methods'  => 'GET',
+						'callback' => 'get_posts',
+						'scope'    => 'articles:read',
+					),
+					array(
+						'methods'  => 'POST',
+						'callback' => 'create_post',
+						'scope'    => 'articles:write',
+					),
 				),
-				array(
-					'methods'             => 'DELETE',
-					'callback'            => array( $this, 'delete_post' ),
-					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:delete' ),
+			),
+			array(
+				'path'      => '/(?P<id>\d+)',
+				'endpoints' => array(
+					array(
+						'methods'  => 'PUT',
+						'callback' => 'update_post',
+						'scope'    => 'articles:write',
+					),
+					array(
+						'methods'  => 'DELETE',
+						'callback' => 'delete_post',
+						'scope'    => 'articles:delete',
+					),
 				),
-			)
-		);
-
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)/blocks',
+			),
 			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_article_blocks' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
-			)
-		);
-
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)/preview-url',
+				'path'      => '/(?P<id>\d+)/blocks',
+				'endpoints' => array(
+					array(
+						'methods'  => 'GET',
+						'callback' => 'get_article_blocks',
+						'scope'    => 'articles:read',
+					),
+				),
+			),
 			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_preview_url' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
-			)
-		);
-
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)/featured-image',
+				'path'      => '/(?P<id>\d+)/preview-url',
+				'endpoints' => array(
+					array(
+						'methods'  => 'GET',
+						'callback' => 'get_preview_url',
+						'scope'    => 'articles:read',
+					),
+				),
+			),
 			array(
-				'methods'             => 'PUT',
-				'callback'            => array( $this, 'set_featured_image' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'media:write' ),
-			)
+				'path'      => '/(?P<id>\d+)/featured-image',
+				'endpoints' => array(
+					array(
+						'methods'  => 'PUT',
+						'callback' => 'set_featured_image',
+						// NOT articles:write. This is the one line in the table
+						// that breaks the pattern, so it is the one a
+						// copy-paste would silently widen. Pinned by
+						// ContentRouteParityTest.
+						'scope'    => 'media:write',
+					),
+				),
+			),
+			array(
+				'path'      => '/(?P<id>\d+)/revisions',
+				'endpoints' => array(
+					array(
+						'methods'  => 'GET',
+						'callback' => 'get_article_revisions',
+						'scope'    => 'articles:read',
+					),
+				),
+			),
+			array(
+				'path'      => '/(?P<id>\d+)/revisions/(?P<revision_id>\d+)',
+				'endpoints' => array(
+					array(
+						'methods'  => 'GET',
+						'callback' => 'get_article_revision',
+						'scope'    => 'articles:read',
+					),
+				),
+			),
 		);
 	}
 
 	/**
-	 * Page routes: /pages, /pages/{id}.
+	 * Turn a definition's endpoint list into the array WordPress expects.
+	 *
+	 * Called **once per route** and reused for every prefix, so the twins hold
+	 * the *same Closure instance*. Scope divergence between `/contents/x` and
+	 * `/articles/x` then becomes impossible by identity rather than by
+	 * discipline — and the parity test can assert it with assertSame() instead
+	 * of comparing two literals that happen to match today.
+	 *
+	 * @param array $endpoints Endpoint descriptors (methods, callback, scope).
+	 * @return array WordPress endpoint definitions.
+	 */
+	private function build_endpoints( array $endpoints ) {
+		$built = array();
+
+		foreach ( $endpoints as $endpoint ) {
+			$scope = $endpoint['scope'];
+
+			$built[] = array(
+				'methods'             => $endpoint['methods'],
+				'callback'            => array( $this, $endpoint['callback'] ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, $scope ),
+			);
+		}
+
+		return $built;
+	}
+
+	/**
+	 * Content routes: /contents* (canonical) and /articles* (deprecated alias).
+	 *
+	 * Covers /…, /…/{id}, /…/{id}/blocks, /…/{id}/preview-url,
+	 * /…/{id}/featured-image, /…/{id}/revisions and
+	 * /…/{id}/revisions/{revision_id}.
+	 *
+	 * Scopes stay `articles:*` under both prefixes. They are persisted in a WP
+	 * option and rendered as admin checkboxes (class-auth.php,
+	 * admin/settings.php); introducing `contents:*` would force a settings
+	 * migration on every client site for no functional gain.
+	 */
+	private function register_content_routes() {
+		foreach ( $this->content_route_definitions() as $route ) {
+			$endpoints = $this->build_endpoints( $route['endpoints'] );
+
+			foreach ( self::CONTENT_ROUTE_PREFIXES as $prefix ) {
+				register_rest_route( $this->namespace, $prefix . $route['path'], $endpoints );
+			}
+		}
+	}
+
+	/**
+	 * Page routes: /pages (fully supported), /pages/{id} (PUT, deprecated).
+	 *
+	 * `GET /pages` is **not** deprecated — AA feeds its internal-linking map
+	 * from it and there is no replacement.
+	 *
+	 * `PUT /pages/{id}` is. Now that the content surface accepts hierarchical
+	 * types (Phase 41.1), a page is editable through `/contents/{id}` like any
+	 * other document, and a second write path for one post type is a source of
+	 * divergence, not a convenience. It is re-registered on the shared
+	 * update_post handler rather than kept as its own implementation: a
+	 * deprecated path must not keep bespoke behaviour, or the migration
+	 * silently changes semantics later instead of now.
 	 */
 	private function register_page_routes() {
 		register_rest_route(
@@ -231,10 +336,14 @@ class Arcadia_API {
 		register_rest_route(
 			$this->namespace,
 			'/pages/(?P<id>\d+)',
-			array(
-				'methods'             => 'PUT',
-				'callback'            => array( $this, 'update_page' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:write' ),
+			$this->build_endpoints(
+				array(
+					array(
+						'methods'  => 'PUT',
+						'callback' => 'update_post',
+						'scope'    => 'articles:write',
+					),
+				)
 			)
 		);
 	}
@@ -461,31 +570,6 @@ class Arcadia_API {
 				'methods'             => 'GET',
 				'callback'            => array( $this, 'get_blocks_usage' ),
 				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'site:read' ),
-			)
-		);
-	}
-
-	/**
-	 * Revision routes: /articles/{id}/revisions, /articles/{id}/revisions/{revision_id}.
-	 */
-	private function register_revision_routes() {
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)/revisions',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_article_revisions' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
-			)
-		);
-
-		register_rest_route(
-			$this->namespace,
-			'/articles/(?P<id>\d+)/revisions/(?P<revision_id>\d+)',
-			array(
-				'methods'             => 'GET',
-				'callback'            => array( $this, 'get_article_revision' ),
-				'permission_callback' => fn( $request ) => $this->check_permission( $request, 'articles:read' ),
 			)
 		);
 	}

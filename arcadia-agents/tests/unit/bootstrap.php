@@ -169,6 +169,27 @@ if ( ! class_exists( 'WP_REST_Request' ) ) {
         public function get_query_params() {
             return $this->query_params;
         }
+
+        // Route + method, needed by the deprecation filter which dispatches on
+        // them (Phase 40).
+        private $route  = '';
+        private $method = 'GET';
+
+        public function set_route( $route ) {
+            $this->route = $route;
+        }
+
+        public function get_route() {
+            return $this->route;
+        }
+
+        public function set_method( $method ) {
+            $this->method = strtoupper( $method );
+        }
+
+        public function get_method() {
+            return $this->method;
+        }
     }
 }
 
@@ -265,6 +286,23 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
         public function get_status() {
             return $this->status;
         }
+
+        /**
+         * Set a header. $replace = false appends, matching WP_HTTP_Response —
+         * Link headers are concatenated, not overwritten.
+         */
+        public function header( $key, $value, $replace = true ) {
+            if ( $replace || ! isset( $this->headers[ $key ] ) ) {
+                $this->headers[ $key ] = $value;
+                return;
+            }
+
+            $this->headers[ $key ] .= ', ' . $value;
+        }
+
+        public function get_headers() {
+            return $this->headers;
+        }
     }
 }
 
@@ -325,6 +363,12 @@ if ( ! class_exists( 'WP_Query' ) ) {
          * Whether this is a single post query.
          */
         public $is_single = false;
+
+        /**
+         * Whether this is a page query. Declared in real WP_Query; the stub
+         * was missing it, so assigning it raised a dynamic-property notice.
+         */
+        public $is_page = false;
 
         /**
          * Whether this is a singular query.
@@ -631,9 +675,16 @@ if ( ! function_exists( 'wp_set_object_terms' ) ) {
 }
 
 // get_page_template_slug() stub.
+// Configurable per post ID: the hard-coded '' it used to return made every
+// custom-template assertion vacant (Phase 41.2).
 if ( ! function_exists( 'get_page_template_slug' ) ) {
+    global $_test_page_template_slugs;
+    $_test_page_template_slugs = array();
+
     function get_page_template_slug( $post_id ) {
-        return '';
+        global $_test_page_template_slugs;
+        $post_id = is_object( $post_id ) ? (int) $post_id->ID : (int) $post_id;
+        return isset( $_test_page_template_slugs[ $post_id ] ) ? $_test_page_template_slugs[ $post_id ] : '';
     }
 }
 
@@ -871,7 +922,10 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 
         $id = isset( $post_data['ID'] ) ? (int) $post_data['ID'] : 0;
         if ( isset( $_test_posts[ $id ] ) ) {
-            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name' );
+            // post_parent / menu_order are listed so a test asserting they are
+            // NOT written is non-vacant: without them the stub would drop the
+            // fields silently and the assertion would pass for the wrong reason.
+            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name', 'post_parent', 'menu_order' );
             foreach ( $updatable as $field ) {
                 if ( isset( $post_data[ $field ] ) ) {
                     $_test_posts[ $id ]->$field = $post_data[ $field ];
@@ -900,8 +954,16 @@ if ( ! function_exists( 'esc_url_raw' ) ) {
 if ( ! function_exists( 'get_post_type_object' ) ) {
     global $_test_post_type_objects;
     $_test_post_type_objects = array(
-        'post' => (object) array( 'name' => 'post', 'public' => true, 'hierarchical' => false ),
-        'page' => (object) array( 'name' => 'page', 'public' => true, 'hierarchical' => true ),
+        'post'       => (object) array( 'name' => 'post', 'public' => true, 'hierarchical' => false ),
+        'page'       => (object) array( 'name' => 'page', 'public' => true, 'hierarchical' => true ),
+        // Public + non-hierarchical, yet never editorial content: the old guard
+        // let it through despite its docblock claiming otherwise (Phase 41.1).
+        'attachment' => (object) array( 'name' => 'attachment', 'public' => true, 'hierarchical' => false ),
+        // Hierarchical CPT — proves the policy is about `public`, not about the
+        // `page` slug in particular.
+        'landing'    => (object) array( 'name' => 'landing', 'public' => true, 'hierarchical' => true ),
+        // Non-public CPT — must stay rejected on every seam.
+        'aa_secret'  => (object) array( 'name' => 'aa_secret', 'public' => false, 'hierarchical' => false ),
     );
 
     function get_post_type_object( $post_type ) {
@@ -1354,6 +1416,39 @@ if ( ! function_exists( 'delete_post_meta' ) ) {
         global $_test_post_meta;
         unset( $_test_post_meta[ $post_id ][ $meta_key ] );
         return true;
+    }
+}
+
+// register_rest_route() recording stub (Phase 40).
+//
+// There was no way to assert "route X is registered" before this: the function
+// simply did not exist under test. Normalizes the single-endpoint shape into a
+// list the way WordPress does, so a test never has to care which form the
+// caller used.
+if ( ! function_exists( 'register_rest_route' ) ) {
+    global $_test_registered_routes;
+    $_test_registered_routes = array();
+
+    function register_rest_route( $namespace, $route, $args = array(), $override = false ) {
+        global $_test_registered_routes;
+
+        // WordPress wraps a bare endpoint definition in a list.
+        $endpoints = isset( $args['methods'] ) ? array( $args ) : $args;
+
+        $_test_registered_routes[] = array(
+            'namespace' => $namespace,
+            'route'     => $route,
+            'endpoints' => $endpoints,
+        );
+
+        return true;
+    }
+}
+
+// rest_url() stub.
+if ( ! function_exists( 'rest_url' ) ) {
+    function rest_url( $path = '' ) {
+        return 'http://localhost/wp-json/' . ltrim( $path, '/' );
     }
 }
 

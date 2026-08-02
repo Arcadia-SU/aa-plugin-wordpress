@@ -43,9 +43,8 @@ trait Arcadia_API_Formatters {
 		$categories = wp_get_post_categories( $post->ID, array( 'fields' => 'names' ) );
 		$tags       = wp_get_post_tags( $post->ID, array( 'fields' => 'names' ) );
 
-		// Word count from stripped content.
-		$stripped    = wp_strip_all_tags( $post->post_content );
-		$word_count  = str_word_count( $stripped );
+		// Word count — null when post_content carries no prose (see count_words).
+		$word_count = $this->count_words( $post->post_content );
 
 		// Block detection.
 		$has_blocks = has_blocks( $post->post_content );
@@ -67,7 +66,7 @@ trait Arcadia_API_Formatters {
 		// ACF field values for calibration (FS-1).
 		$field_values = $this->get_field_values_for_post( $post->ID );
 
-		return array(
+		$formatted = array(
 			'id'                 => $post->ID,
 			'title'              => $post->post_title,
 			'slug'               => $post->post_name,
@@ -90,6 +89,57 @@ trait Arcadia_API_Formatters {
 			'preview_url'        => $preview_url,
 			'field_values'       => $field_values,
 		);
+
+		// Omit rather than report a false zero (Phase 41.3). Declared in the
+		// literal above so the field keeps its place in the payload, dropped
+		// here when there is nothing honest to put in it.
+		if ( null === $word_count ) {
+			unset( $formatted['word_count'] );
+		}
+
+		return $formatted;
+	}
+
+	/**
+	 * Count words in post content, or null when the count would be a lie.
+	 *
+	 * Two defects fixed here (Phase 41.3):
+	 *
+	 * 1. `0` was returned for every ACF-block post. When the content lives in
+	 *    block attributes, post_content holds only block comments, which
+	 *    wp_strip_all_tags() removes — leaving nothing to count. That is not a
+	 *    missing value, it is a *false signal*: an audit reading
+	 *    `word_count: 0` concludes "thin content" on a 30k-character business
+	 *    page. Absence of a field is honest; zero is not. (AA: "absence de
+	 *    champ préférable à zéro".)
+	 *
+	 * 2. `str_word_count()` is not UTF-8 safe. It treats bytes outside its
+	 *    charlist as word separators, so "Réhabilitation énergétique" counted
+	 *    as 4 words instead of 2 — every accented French post was inflated.
+	 *    Splitting on Unicode whitespace fixes it for all posts, not only the
+	 *    block-based ones.
+	 *
+	 * Counting from the parsed blocks was considered and rejected: it would
+	 * cost a parse_blocks() per post in the listing, and no consumer needs the
+	 * number badly enough to pay for that.
+	 *
+	 * @param string $content Raw post_content.
+	 * @return int|null Word count, or null when the content carries no prose.
+	 */
+	private function count_words( $content ) {
+		$stripped = trim( wp_strip_all_tags( (string) $content ) );
+
+		if ( '' === $stripped ) {
+			return null;
+		}
+
+		$words = preg_split( '/\s+/u', $stripped, -1, PREG_SPLIT_NO_EMPTY );
+
+		if ( ! is_array( $words ) ) {
+			return null;
+		}
+
+		return count( $words );
 	}
 
 	/**

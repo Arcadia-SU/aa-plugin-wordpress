@@ -3,7 +3,7 @@
  * Plugin Name: Arcadia Agents
  * Plugin URI: https://arcadia-agents.com
  * Description: Connect your WordPress site to Arcadia Agents for autonomous SEO content management.
- * Version: 0.1.38
+ * Version: 0.2.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Arcadia
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ARCADIA_AGENTS_VERSION', '0.1.38' );
+define( 'ARCADIA_AGENTS_VERSION', '0.2.0' );
 define( 'ARCADIA_AGENTS_PLUGIN_FILE', __FILE__ );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -108,6 +108,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revisions.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-post-builder.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-api-deprecations.php';
 
 		// Admin.
 		if ( is_admin() ) {
@@ -126,6 +127,11 @@ class Arcadia_Agents {
 
 		// Register REST API endpoints.
 		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
+
+		// Stamp Deprecation/Sunset headers on superseded paths (/articles*,
+		// PUT /pages/{id}). Filter-based rather than callback-wrapped so the
+		// canonical and aliased routes keep the same callback instance.
+		Arcadia_API_Deprecations::init();
 
 		// Register custom taxonomy for source tracking.
 		add_action( 'init', array( $this, 'register_arcadia_source_taxonomy' ) );
