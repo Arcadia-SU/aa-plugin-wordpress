@@ -29,6 +29,31 @@ trait Arcadia_API_Field_Schema_Handler {
 	private static $field_schema_option = 'aa_field_schema';
 
 	/**
+	 * The semantic sources a `type: mapping` entry may draw its value from.
+	 *
+	 * Single source of truth, read by BOTH ends of the feature: PUT
+	 * /field-schema validates against it, and apply_field_schema_mappings()
+	 * builds its value map from exactly these keys. Adding a source means
+	 * adding it in both places in the same commit — a test asserts the two
+	 * agree, so the drift that let unknown sources be stored and then ignored
+	 * cannot come back (Phase 42.4).
+	 *
+	 * A method rather than a constant: constants in traits require PHP 8.2 and
+	 * this plugin supports 8.0. A static property would be publicly mutable.
+	 *
+	 * @return string[]
+	 */
+	public static function mapping_sources() {
+		return array(
+			'excerpt',
+			'h1',
+			'meta_title',
+			'meta_description',
+			'featured_image_url',
+		);
+	}
+
+	/**
 	 * Get field schema for all post types.
 	 *
 	 * Returns ACF field groups per post type with their fields and
@@ -123,6 +148,7 @@ trait Arcadia_API_Field_Schema_Handler {
 		}
 
 		// Validate structure: { "post_type": { "field_name": { "type": "mapping"|"generation", ... } } }
+		// A null value is the de-calibration verb, not a mapping — see below.
 		$allowed_types = array( 'mapping', 'generation' );
 
 		foreach ( $body as $post_type => $fields ) {
@@ -139,6 +165,14 @@ trait Arcadia_API_Field_Schema_Handler {
 			}
 
 			foreach ( $fields as $field_name => $mapping ) {
+				// null = remove this field's calibration. The read side already
+				// treats an empty mapping as "not calibrated" (apply_field_schema_
+				// mappings), so this only adds the missing write verb — without it
+				// the PUT is purely additive and a calibration can never be undone.
+				if ( null === $mapping ) {
+					continue;
+				}
+
 				if ( ! is_array( $mapping ) || empty( $mapping['type'] ) ) {
 					return new WP_Error(
 						'invalid_mapping',
@@ -164,6 +198,31 @@ trait Arcadia_API_Field_Schema_Handler {
 						array( 'status' => 400 )
 					);
 				}
+
+				// An unknown `source` used to be accepted, stored, then ignored in
+				// silence at write time: the calibration agent believed it had
+				// wired a field, nothing happened, and nothing said so (Phase 42.4).
+				// Validated against the same list the write side reads, so the two
+				// can never drift as sources are added.
+				if ( 'mapping' === $mapping['type']
+					&& ! empty( $mapping['source'] )
+					&& ! in_array( $mapping['source'], self::mapping_sources(), true )
+				) {
+					return new WP_Error(
+						'invalid_mapping_source',
+						sprintf(
+							/* translators: 1: received source, 2: field name, 3: allowed sources */
+							__( "Unknown mapping source '%1\$s' for field '%2\$s'. Allowed: %3\$s.", 'arcadia-agents' ),
+							$mapping['source'],
+							$field_name,
+							implode( ', ', self::mapping_sources() )
+						),
+						array(
+							'status'          => 400,
+							'allowed_sources' => self::mapping_sources(),
+						)
+					);
+				}
 			}
 		}
 
@@ -178,6 +237,10 @@ trait Arcadia_API_Field_Schema_Handler {
 				$stored[ $post_type ] = array();
 			}
 			foreach ( $fields as $field_name => $mapping ) {
+				if ( null === $mapping ) {
+					unset( $stored[ $post_type ][ $field_name ] );
+					continue;
+				}
 				$stored[ $post_type ][ $field_name ] = $mapping;
 			}
 		}
@@ -221,7 +284,11 @@ trait Arcadia_API_Field_Schema_Handler {
 		// ACF field type map — needed to handle type-specific values (e.g. image sideload).
 		$acf_type_map = $this->build_acf_field_type_map( $post_type );
 
-		// Build source values map.
+		// Build source values map. Its keys MUST be exactly self::mapping_sources() —
+		// asserted by a test, because a source added here without being declared
+		// there would be rejected at PUT time and unreachable, while one declared
+		// there without a value here would be accepted and then silently ignored:
+		// the very defect Phase 42.4 closes.
 		$sources = array(
 			'excerpt'            => isset( $body['excerpt'] ) ? $body['excerpt'] : ( isset( $meta['description'] ) ? $meta['description'] : '' ),
 			'h1'                 => isset( $body['title'] ) ? $body['title'] : '',

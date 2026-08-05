@@ -152,9 +152,14 @@ class TitleSeoSeparationTest extends TestCase {
 	}
 
 	/**
-	 * Test: only meta.title — backward compat fallback for post_title.
+	 * Test: only meta.title — reaches the SEO snippet and NOTHING else.
+	 *
+	 * This test asserted the opposite until Phase 42.3: meta.title used to fall
+	 * back into post_title, so a caller updating only its meta-title silently
+	 * renamed the post. api-contract.md:171-177 always described the two as
+	 * independent — the implementation, and this test, encoded the crossfeed.
 	 */
-	public function test_create_only_meta_title_fallback(): void {
+	public function test_create_only_meta_title_does_not_set_post_title(): void {
 		global $_test_posts, $_test_post_meta;
 
 		$request = new \WP_REST_Request();
@@ -168,13 +173,52 @@ class TitleSeoSeparationTest extends TestCase {
 		$result = $this->helper->create_post( $request );
 		$data   = $result->get_data();
 
-		$post = $_test_posts[ $data['post_id'] ];
-		$this->assertEquals( 'Title From Meta', $post->post_title );
-
-		// meta.title also sets _yoast_wpseo_title.
+		// One incoming field, one destination: the SEO snippet.
 		$this->assertEquals(
 			'Title From Meta',
 			$_test_post_meta[ $data['post_id'] ]['_yoast_wpseo_title']
+		);
+
+		// post_title was never supplied, so it must not have been written.
+		$post = $_test_posts[ $data['post_id'] ];
+		$this->assertNotEquals( 'Title From Meta', $post->post_title );
+	}
+
+	/**
+	 * Test: an UPDATE carrying only meta.title leaves the existing H1 intact.
+	 *
+	 * The regression that mattered in production — AA pushed meta-title updates
+	 * without body.title, so every PUT renamed the live post.
+	 */
+	public function test_update_only_meta_title_preserves_existing_post_title(): void {
+		global $_test_posts, $_test_post_meta;
+
+		$post_id                 = 4242;
+		$_test_posts[ $post_id ] = (object) array(
+			'ID'           => $post_id,
+			'post_title'   => 'The Real H1',
+			'post_name'    => 'the-real-h1',
+			'post_type'    => 'post',
+			'post_status'  => 'draft',
+			'post_content' => 'Existing body',
+			'post_excerpt'  => '',
+			'post_author'   => 1,
+			'post_date'     => '2026-08-01 10:00:00',
+			'post_modified' => '2026-08-01 10:00:00',
+		);
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', $post_id );
+		$request->set_json_params( array(
+			'meta' => array( 'title' => 'Brand New SEO Title' ),
+		) );
+
+		$this->helper->update_post( $request );
+
+		$this->assertEquals( 'The Real H1', $_test_posts[ $post_id ]->post_title );
+		$this->assertEquals(
+			'Brand New SEO Title',
+			$_test_post_meta[ $post_id ]['_yoast_wpseo_title']
 		);
 	}
 

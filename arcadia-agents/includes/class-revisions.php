@@ -91,7 +91,7 @@ class Arcadia_Revisions {
 	 * @param string|null $rendered_content  The rendered post_content (blocks HTML) or null.
 	 * @return array|WP_Error Array with revision_id, revision_version, preview_url on success.
 	 */
-	public function create_revision( $post_id, $body, $meta, $rendered_content = null ) {
+	public function create_revision( $post_id, $body, $meta, $rendered_content = null, $skip_markdown = false ) {
 		// Existing pending revision is superseded after the new one is inserted,
 		// so its decision note can reference the replacing revision ID.
 		$existing = $this->get_pending_revision( $post_id );
@@ -99,12 +99,12 @@ class Arcadia_Revisions {
 		// Compute next version number.
 		$version = $this->get_next_version( $post_id );
 
-		// Build the title for the revision CPT.
-		$title = '';
+		// Build the title for the revision CPT — a display label in wp-admin, not
+		// a value that reaches the live post. meta.title is deliberately NOT a
+		// fallback here: it is the SEO meta-title, so using it would label the
+		// pending revision with a string that is not the page's H1 (Phase 42.3).
 		if ( ! empty( $body['title'] ) ) {
 			$title = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$title = sanitize_text_field( $meta['title'] );
 		} else {
 			$original = get_post( $post_id );
 			$title    = $original ? $original->post_title : '';
@@ -153,9 +153,12 @@ class Arcadia_Revisions {
 		}
 
 		// Store the complete payload as JSON for replay on approve.
+		// skip_markdown rides along: it is a property of the originating request,
+		// and approve_revision() has no request to read it from.
 		$revision_meta = array(
-			'body' => $body,
-			'meta' => $meta,
+			'body'          => $body,
+			'meta'          => $meta,
+			'skip_markdown' => (bool) $skip_markdown,
 		);
 		update_post_meta( $revision_id, '_aa_revision_version', $version );
 		// wp_slash() is mandatory for the same reason as post_content above:
@@ -262,19 +265,21 @@ class Arcadia_Revisions {
 		$body = $revision_meta['body'] ?? array();
 		$meta = $revision_meta['meta'] ?? array();
 
-		// Non-fatal replay failures (featured image, taxonomies) are collected
-		// here and surfaced to the approver instead of being silently swallowed.
-		// The critical step — the live post update below — still aborts on error.
-		$warnings = array();
-
 		// Build post_data for wp_update_post.
+		//
+		// Only the four fields the revision CPT actually carries are set here.
+		// Everything downstream of the write — SEO meta, taxonomies, featured
+		// image, ACF fields, field-schema mappings, render test — is delegated
+		// to Arcadia_Post_Builder::finalize_post(), the SAME call the direct PUT
+		// path makes (trait-api-posts.php). See approve_revision()'s docblock for
+		// why hand-rolling that replay here was a data-loss bug (Phase 42.1).
 		$post_data = array( 'ID' => $post_id );
 
-		// Title.
+		// Title — body.title (H1) only. meta.title is the SEO meta-title and
+		// lands in _yoast_wpseo_title via finalize_post(), never in post_title
+		// (Phase 42.3: one incoming field writes exactly one destination).
 		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
 		}
 
 		// Content (stored in the revision CPT's post_content).
@@ -282,11 +287,9 @@ class Arcadia_Revisions {
 			$post_data['post_content'] = $revision->post_content;
 		}
 
-		// Excerpt.
+		// Excerpt — body.excerpt only, same rule as the title.
 		if ( isset( $body['excerpt'] ) ) {
 			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
-		} elseif ( ! empty( $meta['description'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
 		}
 
 		// Slug.
@@ -301,55 +304,36 @@ class Arcadia_Revisions {
 			return $result;
 		}
 
-		// Replay SEO meta.
-		if ( ! empty( $meta['title'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
-		}
-		if ( ! empty( $meta['description'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
-		}
-
-		// Replay featured image (non-fatal failure → warning).
-		if ( ! empty( $meta['featured_image_url'] ) ) {
-			$api = Arcadia_API::get_instance();
-			if ( method_exists( $api, 'sideload_and_set_featured_image' ) ) {
-				$fi_result = $api->sideload_and_set_featured_image(
-					$post_id,
-					$meta['featured_image_url'],
-					$meta['featured_image_alt'] ?? ''
-				);
-				if ( is_wp_error( $fi_result ) ) {
-					$warnings[] = sprintf( 'Featured image sideload failed: %s', $fi_result->get_error_message() );
-				}
-			}
-		}
-
-		// Replay taxonomies (term-creation failures → warnings).
-		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
-			$api = Arcadia_API::get_instance();
-			if ( method_exists( $api, 'get_or_create_terms' ) ) {
-				$cat_result = $api->get_or_create_terms( $meta['categories'], 'category' );
-				wp_set_post_categories( $post_id, $cat_result['ids'], false );
-				$warnings = array_merge( $warnings, $cat_result['errors'] ?? array() );
-			}
-		}
-		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
-			$api = Arcadia_API::get_instance();
-			if ( method_exists( $api, 'get_or_create_terms' ) ) {
-				$tag_result = $api->get_or_create_terms( $meta['tags'], 'post_tag' );
-				wp_set_post_tags( $post_id, $tag_result['ids'], false );
-				$warnings = array_merge( $warnings, $tag_result['errors'] ?? array() );
-			}
+		// Replay every post-write side effect through the shared pipeline.
+		//
+		// $rendered_content is the revision's own post_content: it is what a
+		// `wysiwyg: null` field copies (process_acf_fields), and on this path the
+		// blocks were already rendered at create_revision() time.
+		//
+		// skip_markdown is read back from the stored payload — the flag belonged
+		// to the original request, and there is no request here. Without it, a
+		// round-trip PUT (already-HTML content) would be markdown-parsed a second
+		// time at approval, which is exactly the asymmetry this phase closes.
+		$builder  = new Arcadia_Post_Builder( Arcadia_Blocks::get_instance() );
+		$finalize = $builder->finalize_post(
+			(int) $post_id,
+			$body,
+			$meta,
+			$post->post_type,
+			$revision->post_content,
+			Arcadia_API::get_instance(),
+			array(
+				'is_create'     => false,
+				'skip_markdown' => ! empty( $revision_meta['skip_markdown'] ),
+			)
+		);
+		if ( is_wp_error( $finalize ) ) {
+			return $finalize;
 		}
 
-		// Replay ACF fields.
-		if ( ! empty( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) && function_exists( 'update_field' ) ) {
-			foreach ( $body['acf_fields'] as $field_name => $field_value ) {
-				update_field( $field_name, $field_value, $post_id );
-			}
-			update_post_meta( $post_id, '_acf_changed', 1 );
-			do_action( 'acf/save_post', $post_id );
-		}
+		// Non-fatal replay failures (featured image, term creation) are surfaced
+		// to the approver instead of being silently swallowed.
+		$warnings = $finalize['warnings'];
 
 		// Mark revision as approved.
 		// arcadia:slash-safe — only post ID + status, no slashable content.

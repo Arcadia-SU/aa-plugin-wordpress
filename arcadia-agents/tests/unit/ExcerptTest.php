@@ -158,14 +158,21 @@ class ExcerptTest extends TestCase {
 	}
 
 	/**
-	 * Test backward compat: meta.description sets excerpt when no top-level excerpt.
+	 * Test: meta.description feeds the SEO snippet, never post_excerpt.
+	 *
+	 * Inverted in Phase 42.3. The old behaviour asserted here was the mirror of
+	 * the meta.title crossfeed: a payload carrying only a meta-description also
+	 * rewrote the post's excerpt, which the theme may display on archives.
+	 *
+	 * Contract consequence, deliberate: a PUT without body.excerpt now leaves
+	 * post_excerpt untouched instead of overwriting it. Announced to AA.
 	 */
-	public function test_meta_description_still_works(): void {
-		global $_test_posts;
+	public function test_meta_description_does_not_write_excerpt(): void {
+		global $_test_posts, $_test_post_meta;
 
 		$request = new \WP_REST_Request();
 		$request->set_json_params( array(
-			'title'   => 'Backward compat',
+			'title'   => 'Separate destinations',
 			'content' => 'Body',
 			'meta'    => array(
 				'description' => 'From meta.description',
@@ -173,9 +180,48 @@ class ExcerptTest extends TestCase {
 		) );
 
 		$result = $this->helper->create_post( $request );
+		$data   = $result->get_data();
 
-		$data = $result->get_data();
-		$this->assertEquals( 'From meta.description', $data['post']['excerpt'] );
+		$this->assertNotEquals( 'From meta.description', $data['post']['excerpt'] );
+		$this->assertEquals(
+			'From meta.description',
+			$_test_post_meta[ $data['post_id'] ]['_yoast_wpseo_metadesc']
+		);
+	}
+
+	/**
+	 * Test: an UPDATE carrying only meta.description keeps the existing excerpt.
+	 */
+	public function test_update_only_meta_description_preserves_excerpt(): void {
+		global $_test_posts, $_test_post_meta;
+
+		$post_id                 = 4343;
+		$_test_posts[ $post_id ] = (object) array(
+			'ID'           => $post_id,
+			'post_title'   => 'A page',
+			'post_name'    => 'a-page',
+			'post_type'    => 'post',
+			'post_status'  => 'draft',
+			'post_content' => 'Existing body',
+			'post_excerpt'  => 'The hand-written excerpt',
+			'post_author'   => 1,
+			'post_date'     => '2026-08-01 10:00:00',
+			'post_modified' => '2026-08-01 10:00:00',
+		);
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', $post_id );
+		$request->set_json_params( array(
+			'meta' => array( 'description' => 'A fresh meta description' ),
+		) );
+
+		$this->helper->update_post( $request );
+
+		$this->assertEquals( 'The hand-written excerpt', $_test_posts[ $post_id ]->post_excerpt );
+		$this->assertEquals(
+			'A fresh meta description',
+			$_test_post_meta[ $post_id ]['_yoast_wpseo_metadesc']
+		);
 	}
 
 	/**

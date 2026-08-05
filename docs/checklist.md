@@ -1,17 +1,17 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-05 (**v0.2.1 buildée** ; Phases 34/36/37/38/39 terminées ; **Phase 40** surface `/contents` **terminée** ; **Phase 41** lot P1b (3 défauts `post_type`) **terminée** ; **Phase 42 ouverte** — 4 défauts d'intégrité d'écriture routés le 2026-07-30 et oubliés de la release v0.2.0 ; Phase 29 E2E AA-side pending)
+**Dernière mise à jour :** 2026-08-05 (**v0.3.0 buildée** ; Phases 34/36/37/38/39 terminées ; **Phase 40** surface `/contents` **terminée** ; **Phase 41** lot P1b **terminée** ; **Phase 42** intégrité d'écriture des champs **terminée** — 572 tests, 7 mutants tués ; Phase 29 E2E AA-side pending)
 
-> **Prochain front de travail : Phase 42, avant le déploiement.** Les 4 items ci-dessous ont été routés
-> par AA le **2026-07-30 avec la mention « ⏸ à grouper avec le lot post_type »** — donc dans la même
-> release que les Phases 40/41. Ils n'ont pas été intégrés à la checklist et v0.2.0/v0.2.1 sont parties
-> sans eux. Deux d'entre eux (42.1, 42.2) cassent le **chemin nominal** des 14 pages business cibles :
-> déployer v0.2.1 en l'état donnerait à AA une surface `page` qui répond 200 tout en perdant du contenu.
+> **Prochain front de travail : déploiement de v0.3.0.** Il ne reste que la campagne manuelle sur les
+> 3 sites clients, puis la levée de l'avertissement envoyé à AA et la bascule de leur connector.
 >
-> **Ordre retenu :** finir la Phase 42 → une release → une seule campagne de déploiement sur les
-> 3 sites clients (iSelection preprod + www, trottinette) → bascule du connector AA vers `/contents`.
-> La validation site client des correctifs P1b se fait après déploiement — voir « Vérification sur site
-> client » en bas de la Phase 41.
+> **Pourquoi v0.2.1 ne doit pas rester en prod.** Les 4 items de la Phase 42 avaient été routés par AA le
+> 2026-07-30 avec la mention « ⏸ à grouper avec le lot post_type » — donc dans la même release que les
+> Phases 40/41. Ils n'ont pas été intégrés à la checklist, et v0.2.0 puis v0.2.1 sont parties sans eux.
+> Or la Phase 41 a rendu les pages business **écrivables** (elles répondaient 404 avant) sans que la
+> Phase 42 les rende **sûres** : depuis le 2026-08-02, un `PUT` sur une de ces pages réussit en perdant
+> des champs en silence. v0.3.0 ferme le trou. La leçon est intégrée dans le protocole : intégrer le
+> backlog, c'est l'intégrer **en entier**.
 
 > **Archive :** Phases 0–26 (toutes terminées) → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md)
 
@@ -725,135 +725,130 @@ secondaire qui ne rejoue pas le traitement du chemin principal*. La correction s
 — **un seul pipeline de traitement des champs, appelé depuis tous les points d'écriture** — pas quatre
 rustines. Traiter 42.1 et 42.2 séparément reconstruirait la divergence qu'on est en train de fermer.
 
-### 42.1 — 🔴 Approuver une révision doit produire le même état qu'un `PUT` direct
+### 42.1 — 🔴 Approuver une révision produit le même état qu'un `PUT` direct — ✅ FAIT
 
-*Chemin **nominal**, pas cas limite : les 14 pages business cibles sont toutes `publish`, donc 100 % des
-écritures AA passent par une révision. Et sur ces pages le contenu éditorial vit en champs ACF au niveau
-du post (H1 affiché, chapôs) — précisément ce qui transite par ce chemin.*
+**Tous les pointeurs AA confirmés dans le code.** `approve_revision()` bouclait sur `update_field()` en
+brut sans passer par `process_acf_fields()` — donc markdown jamais converti, URL d'image jamais
+sideloadée, `wysiwyg: null` stocké tel quel, et `apply_field_schema_mappings()` jamais rejoué.
 
-**Défaut à vérifier dans le code de cette session** (pointeurs AA, à confirmer avant de coder) :
-`approve_revision()` boucle sur `update_field()` en brut (`class-revisions.php:348`) sans passer par
-`process_acf_fields()` (`trait-api-acf-fields.php:157-216`), qui n'est appelé que depuis `finalize_post()`
-(`class-post-builder.php:287`) — inatteignable sur le chemin révision (le `return` 201 est à
-`trait-api-posts.php:478`, `finalize_post` à `:507`).
+**La racine était plus large que le rapport.** `class-revisions.php:270-352` ne divergeait pas seulement
+sur les champs ACF : c'était une **réimplémentation complète** du pipeline d'écriture — titre, extrait,
+meta Yoast, image à la une, taxonomies, ACF, chacun recopié à la main. Corriger champ par champ aurait
+laissé la divergence en place et garanti son retour.
 
-Conséquences, toutes silencieuses :
-- champ `wysiwyg` → markdown jamais converti (`parse_rich`, `:179`) → `**gras**` littéral à l'écran ;
-- champ `image` → URL jamais sideloadée (`:189-206`) → string là où un attachment ID est attendu ;
-- `wysiwyg: null` → écrit `null` au lieu de recopier le `post_content` rendu (`:175`).
-- Même écart pour `apply_field_schema_mappings()` (`class-post-builder.php:302`) : jamais rejoué à
-  l'approbation → la calibration field-schema reste sans effet sur tout contenu passé par HITL.
+- [x] `approve_revision()` **délègue à `Arcadia_Post_Builder::finalize_post()`** — exactement l'appel que
+      fait le `PUT` direct (`trait-api-posts.php`). Un seul pipeline, deux appelants. **−114 lignes.**
+- [x] Ce qui suit vient gratuitement avec la délégation : coercions ACF, field-schema, meta SEO,
+      taxonomies, image à la une, `_acf_changed` / `acf/save_post`, render test
+- [x] **Parité complète des modes d'échec** (décision Oscar) : approuver hérite des erreurs du `PUT`.
+      Un render test rouge signale un vrai défaut de template — mieux vu à l'approbation qu'en prod
+- [x] **`skip_markdown` persisté dans le payload de révision** — le flag appartient à la requête
+      d'origine et l'approbation n'a pas de requête. Sans lui, un contenu round-trip (déjà HTML) était
+      re-parsé en markdown à l'approbation : exactement l'asymétrie que la phase ferme
+- [x] Le titre du CPT révision ne retombe plus sur `meta.title` (c'est un libellé wp-admin, pas un H1)
+- [x] Tests — `FieldWriteIntegrityTest.php` : markdown → `<h2>`/`<strong>`, `wysiwyg: null` → recopie du
+      contenu rendu, champ `text` non converti, `skip_markdown` honoré, persistance du flag
 
-- [ ] Confirmer chacun des pointeurs ci-dessus dans le code (ne pas coder sur le rapport seul)
-- [ ] **Un seul chemin de traitement des champs**, appelé depuis le `PUT` direct **et** depuis
-      l'approbation — pas une duplication de `process_acf_fields()` dans `class-revisions.php`
-- [ ] `apply_field_schema_mappings()` rejoué au même endroit, par la même extraction
-- [ ] Invariant à rendre testable : approuver une révision produit le **même état final** que le `PUT`
-      équivalent sur un post non publié — mêmes coercions, mêmes mappings
-- [ ] Tests : `tests/unit/RevisionsTest.php` n'a **aucune assertion ACF** aujourd'hui. Un test de
-      non-régression par type : `wysiwyg` en markdown, `image` en URL, `wysiwyg: null`
-- [ ] Non-vacuité : remettre la boucle `update_field()` brute → les 3 tests doivent rougir
+### 42.2 — 🔴 Un `PUT` sans `acf_fields` ne vide plus les champs — ✅ FAIT
 
-### 42.2 — 🔴 Un `PUT` sans `acf_fields` ne doit pas vider les champs du post
+**Confirmé** : `finalize_post()` appelait `auto_populate_acf_fields()` dès que `acf_fields` était absent,
+et cette fonction écrit `''` dans **tous** les champs `wysiwyg`/`textarea` du post type. Le docblock
+affirmait « Does NOT inject content » — vrai sur l'intention, faux sur l'effet : écrire `''` dans un
+champ peuplé, c'est le détruire.
 
-**Défaut à vérifier** : `finalize_post()` appelle `auto_populate_acf_fields()` dès que `acf_fields` est
-absent ou vide (`class-post-builder.php:295`). Cette fonction écrit `''` dans **tous** les champs
-`wysiwyg` et `textarea` du post type, et le `post_title` dans tout champ text dont le nom matche
-`/title|titre/i` (`trait-api-acf-fields.php:247-258`).
+- [x] `else` → `elseif ( $is_create )` (`class-post-builder.php`). L'auto-remplissage est un filet de
+      **création** (faire que `get_fields()` renvoie un array et non `false`) ; sur un post existant les
+      références existent déjà, le filet n'a plus d'objet et ne fait que détruire
+- [x] Un `PUT` partiel reste partiel : un champ que le body ne mentionne pas n'est jamais écrit
+- [x] `POST` (création) inchangé — vérifié par un test dédié, pour ne pas sur-corriger en supprimant le
+      filet là où il sert
+- [x] Tests — update sans `acf_fields` → **aucun** appel `update_field` sur les champs du post type ;
+      create sans `acf_fields` → auto-remplissage toujours actif
 
-Bénin sur un article dont le contenu vit dans `post_content`. **Destructeur** sur une page business dont
-le contenu éditorial vit précisément dans ces champs. Le chemin révision protège les posts publiés (le
-`return` 201 précède `finalize_post`), mais un **brouillon** ou tout post traité en écriture directe est
-exposé — et AA ne peut pas s'en prémunir côté client, puisque le déclencheur est l'**absence** d'une clé.
+### 42.3 — 🟠 Un champ envoyé atteint une seule destination — ✅ FAIT
 
-- [ ] Confirmer les pointeurs dans le code
-- [ ] **Un `PUT` partiel reste partiel** : ne jamais écrire un champ que le body ne mentionne pas
-- [ ] L'auto-remplissage garde son sens **à la création** ; à la mise à jour d'un post existant, il écrase
-      → discriminer sur create-vs-update, pas sur la présence de la clé
-- [ ] **Hors périmètre** : le comportement du `POST` (création) reste inchangé
-- [ ] Tests : `PUT` sans `acf_fields` sur un brouillon porteur de champs → champs **intacts** ;
-      `POST` sans `acf_fields` → auto-remplissage toujours actif (régression)
-- [ ] Non-vacuité : rétablir l'appel inconditionnel → le test brouillon doit rougir
+**2 sites, pas 3.** Phase 40 avait déjà supprimé le corps de `update_page()`, donc `trait-api-posts.php`
+était propre. Restaient `class-post-builder.php` et `class-revisions.php` — et le second **disparaît de
+lui-même** avec la délégation de 42.1, au lieu d'être corrigé deux fois.
 
-### 42.3 — 🟠 Un champ envoyé doit atteindre un seul champ du CMS
+- [x] `meta.title` → `_yoast_wpseo_title` **uniquement** ; `post_title` ne change que sur `body.title`
+- [x] `meta.description` → `_yoast_wpseo_metadesc` **uniquement** ; `post_excerpt` ne change que sur
+      `body.excerpt` (`isset`, pas `empty` : un `""` explicite reste une valeur fournie qui vide le champ)
+- [x] Tests **inversés** : `TitleSeoSeparationTest` et `ExcerptTest` asserted la retombée. Ils asserted
+      maintenant son absence, avec en plus le cas de production (un `PUT` ne portant que `meta.title`
+      laisse le H1 live intact)
+- [x] ⚠️ **Changement de contrat annoncé à AA** : un `PUT` sans `body.excerpt` laisse désormais
+      `post_excerpt` inchangé au lieu d'y écrire la meta-description — visible sur les thèmes qui
+      affichent l'extrait
 
-*Le contrat l'énonce déjà — `api-contract.md:171-177` : « `body.title` = H1 visible, `body.meta.title` =
-meta-title SEO, les deux sont indépendants » et `:180` : « seuls les champs fournis sont modifiés ».
-L'implémentation les recroise. La Phase 16 (2026-03) avait posé la séparation ; les retombées implicites
-sont restées.*
+### 42.4 — 🟡 `PUT /field-schema` valide les `source` et redevient réversible — ✅ FAIT
 
-**Défaut à vérifier** — une même valeur entrante alimente **deux** destinations :
+- [x] Une `source` inconnue → **400 `invalid_mapping_source`**, avec la liste des valeurs acceptées dans
+      le message **et** dans `data.allowed_sources`
+- [x] **Poka-yoke** : `Arcadia_API::mapping_sources()` est la source unique, lue par la validation **et**
+      par l'écriture. Un test structurel assert que la liste déclarée et la table de valeurs
+      d'`apply_field_schema_mappings()` coïncident — une source ajoutée d'un seul côté serait soit
+      inatteignable, soit acceptée puis ignorée : le défaut même qu'on ferme
+- [x] **Méthode, pas constante** : les constantes de trait exigent PHP 8.2, le plugin cible **8.0**
+- [x] **Dé-calibration par `null`** (décision Oscar) : `{"page": {"champ": null}}` retire la clé. Le
+      chemin de lecture traitait déjà un mapping vide comme « non calibré » — il ne manquait que le
+      verbe d'écriture. Le `PUT` n'est plus purement additif
+- [x] Tests — source inconnue refusée, chaque source déclarée acceptée, accord déclaration/écriture,
+      `null` retire, `null` ne retire **que** le champ nommé
 
-| entrée | destination 1 | destination 2 |
-|---|---|---|
-| `meta.title` | `post_title` si `body.title` absent (`class-post-builder.php:117-119`) | `_yoast_wpseo_title` (`:272-273`) |
-| `meta.description` | `post_excerpt` si `body.excerpt` absent (`:129-130`) | `_yoast_wpseo_metadesc` (`:275-276`) |
+### 42.5 — Vérification & release — ✅ FAIT
 
-Rejoué à l'identique à l'approbation de révision (`class-revisions.php:275-277, 288-289, 305-309`) et sur
-la surface `/pages` (`trait-api-posts.php:778-779, 836-841`) — **trois sites, même règle à corriger**,
-donc même extraction que 42.1.
-
-- [ ] Confirmer les 3 sites dans le code
-- [ ] `meta.title` → snippet SEO **uniquement** ; `post_title` ne change que si `body.title` est fourni
-- [ ] `meta.description` → snippet SEO **uniquement** ; `post_excerpt` ne change que sur `body.excerpt`
-- [ ] **Conséquence à acter, pas un effet de bord oublié** : un `PUT` sans `body.excerpt` laissera
-      `post_excerpt` inchangé au lieu de recevoir la meta-description. C'est le comportement voulu, mais
-      il **change ce que voit le thème** sur les sites qui affichent l'extrait → à annoncer à AA.
-- [ ] AA a déjà corrigé de son côté (le titre voyage désormais toujours explicitement) — mais la garantie
-      ne peut pas vivre uniquement chez l'appelant : le piège reste armé pour tout autre client
-- [ ] Tests : `PUT {meta.title}` seul → `post_title` **inchangé**, `_yoast_wpseo_title` écrit. Idem
-      description/excerpt. Les 3 sites couverts (direct, approbation de révision, `/pages`).
-
-### 42.4 — 🟡 `PUT /field-schema` accepte des `source` inconnues sans le signaler
-
-**Défaut à vérifier** : la validation porte sur `type` (`mapping` | `generation` —
-`trait-api-field-schema.php:126, 142-166`) mais **pas** sur `source`. Les sources réellement supportées
-sont hardcodées plus loin : `excerpt`, `h1`, `meta_title`, `meta_description`, `featured_image_url`
-(`:225-231`). Une source hors liste est acceptée, stockée, puis **ignorée en silence** à l'écriture
-(`:248`). L'agent de calibration croit avoir câblé un champ ; rien ne se produit et rien ne le lui dit.
-
-- [ ] Confirmer les pointeurs dans le code
-- [ ] Refuser une `source` inconnue (422) **en renvoyant la liste des valeurs acceptées** dans l'erreur
-- [ ] Poka-yoke : la liste des sources valides devient **une seule constante**, lue par la validation
-      **et** par l'écriture — sinon la divergence revient à la prochaine source ajoutée
-- [ ] **Défaut adjacent relevé par AA** : le `PUT` est un merge purement additif (`:176-183`) — il
-      n'existe **aucun moyen de dé-calibrer un champ** une fois posé. Décider : suppression explicite
-      (`null` = retirer la clé) ou statu quo assumé. ⬅️ Oscar
-- [ ] Tests : `source` inconnue → 422 + liste des valeurs acceptées ; chaque source valide → acceptée ;
-      non-vacuité par retrait de la validation
-
-### 42.5 — Release & annonce
-
-- [ ] `./build.sh <version>` — 15 gates verts
-- [ ] PHPStan en local **avant** de pousser sur `main` (voir CLAUDE.md — la commande avec `memory_limit=3G`)
-- [ ] Annonce dans `backlog-for-backend.md` : le changement de contrat de 42.3 (`post_excerpt` ne reçoit
-      plus la meta-description) et la décision 42.4 sur la dé-calibration
-- [ ] Puis seulement : campagne de déploiement sur les 3 sites (voir Phase 41.4)
+- [x] **Non-vacuité : 7 mutants, 7 tués.** Filet remis inconditionnel → 1 rouge (et la sortie montre
+      `chapo`/`notes` écrasés par `''`) ; rejeu brut restauré → 4 ; `skip_markdown` ignoré → 1 ;
+      validation de source retirée → 1 ; `null` sans effet → 2 ; source fantôme déclarée → 1 ;
+      retombée `meta.title`/`meta.description` restaurée → 4
+- [x] Suite complète : **572 tests / 1829 assertions**, zéro warning (556 → +16)
+- [x] PHPStan local (`memory_limit=3G`) — **No errors**
+- [x] `./build.sh 0.3.0` — **15 gates verts**, zip 390KB
+- [x] Annonce écrite dans `backlog-for-backend.md`
+- [ ] Déploiement manuel sur les 3 sites, puis levée de l'avertissement à AA
 
 ---
 
-## Contexte de déploiement — relevé live AA du 2026-07-30
+## Contexte de déploiement — relevé de cette session (2026-08-05)
 
-*Ref: [deployed-versions.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/deployed-versions.md)*
+**v0.2.1 est déjà live sur les deux sites de prod.** Relevé nous-mêmes, sans dépendre d'AA :
 
-| Site | Version live relevée | Version enregistrée au handshake AA |
+```bash
+curl -s https://<site>/wp-json/arcadia/v1/health   # public, pas de JWT
+```
+
+| Site | Version live | Note |
 |---|---|---|
-| preprod-iselection.vertuelle.com | **0.1.37** | 0.1.0 (2026-02-23) |
-| www.iselection.com/b2c/ | **0.1.37** | 0.1.34 (2026-06-25) |
-| www.trottinette-tout-terrain.fr | non relevable | 0.1.35 (2026-06-27) |
+| www.iselection.com/b2c | **0.2.1** | à jour |
+| www.trottinette-tout-terrain.fr | **0.2.1** | à jour — le `500` signalé par AA était réel, **réparé par Oscar** |
+| preprod-iselection.vertuelle.com | non relevable | `401` = auth HTTP de staging, ni plugin ni Cloudflare |
 
-**Ce que ça corrige dans notre compréhension.** La Phase 39 concluait qu'aucun zip n'existait entre
-0.1.30 et 0.1.37, donc que les clients tournaient du code pré-Phase-31. **Faux** : les deux sites
-iSelection déclarent 0.1.37. Du code post-Phase-31 tourne bien chez les clients. Par quel chemin il y est
-arrivé reste inexpliqué (aucun zip 0.1.31→0.1.37 n'a pu être produit, cf. réparation de `build.sh` en
-Phase 39) — mais la « campagne de rattrapage » n'a pas la portée qu'on lui donnait.
+**`GET /health` est le moyen canonique de savoir ce qui tourne chez un client** — public, sans auth,
+renvoie `ARCADIA_AGENTS_VERSION` (`arcadia-agents.php`). Ne plus jamais inférer une version déployée ni
+attendre un relevé d'AA : la question se tranche en une commande.
 
-- [ ] **Élucider le chemin de déploiement** — un zip a-t-il été produit hors `build.sh` ? un déploiement
-      par git/rsync ? Tant qu'on ne sait pas, on ne sait pas non plus ce qui tourne réellement.
-- [ ] **trottinette-tout-terrain.fr ne répond pas** : `403 error code: 1010` sur la surface `arcadia/v1`,
-      `500` sur `/wp-json/` en curl nu, avec ou sans User-Agent navigateur. Ni auth ni plugin en cause
-      selon AA — le site répond mal (le `1010` est une signature Cloudflare, piste à creuser).
-      AA investigue ; à recouper avec toute intervention récente de notre côté sur ce site.
+### Deux croyances corrigées
+
+1. **Le chemin de déploiement était une fausse énigme.** Les mises à jour sont faites **manuellement par
+   Oscar**. Il n'y a pas de pipeline mystérieux à élucider : le zip est déposé à la main sur chaque site.
+2. **Le relevé AA du 2026-07-30 (« 0.1.37 ») est périmé**, pas faux — il précède de trois jours le zip
+   0.2.1 (2026-08-02). `deployed-versions.md` côté AA est donc à considérer comme un instantané daté,
+   jamais comme l'état courant.
+
+**Trottinette : le `500` rapporté par AA était réel** (leur diagnostic était bon), **et Oscar a réparé le
+site** depuis. Vérifié le 2026-08-05 : `200` + `0.2.1`. AA peut reprendre ses relevés dessus.
+
+### ⚠️ Ce que ça change pour la Phase 42
+
+La Phase 42 n'est **pas** un travail à finir avant déploiement : c'est un **correctif sur du code déjà en
+production**. Avant la Phase 41, `PUT` sur un `post_type` hiérarchique répondait `404` — les pages
+business étaient inécrivables, donc protégées **par accident**. Depuis v0.2.0 l'appel réussit, et perd
+des champs en silence (42.1 / 42.2). On a rendu ces pages writables et lossy dans la même release.
+
+- [x] Avertissement écrit dans `backlog-for-backend.md` : ne pas pousser sur les pages business avant la
+      release Phase 42, et vérifier les champs ACF de toute page déjà poussée depuis le 2026-08-02
+- [ ] Livrer la Phase 42, builder, déployer (manuellement) sur les 3 sites, puis lever l'avertissement
 
 ---
 

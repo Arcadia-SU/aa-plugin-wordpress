@@ -487,7 +487,15 @@ trait Arcadia_API_Posts_Handler {
 			}
 
 			$revisions  = Arcadia_Revisions::get_instance();
-			$rev_result = $revisions->create_revision( $post_id, $body, $meta, $revision_content );
+			// skip_markdown belongs to THIS request but is consumed at approval
+			// time, where no request exists — so it travels in the stored payload.
+			$rev_result = $revisions->create_revision(
+				$post_id,
+				$body,
+				$meta,
+				$revision_content,
+				$this->is_skip_markdown( $request )
+			);
 			if ( is_wp_error( $rev_result ) ) {
 				return $rev_result;
 			}

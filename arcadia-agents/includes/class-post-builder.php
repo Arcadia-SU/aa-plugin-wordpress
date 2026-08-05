@@ -136,11 +136,15 @@ final class Arcadia_Post_Builder {
 			}
 		}
 
-		// Title — body.title (H1) wins; meta.title is fallback.
+		// Title — body.title (the visible H1) and NOTHING else.
+		//
+		// meta.title is the SEO meta-title: it writes _yoast_wpseo_title in
+		// finalize_post() and must not also land here. The old `elseif` fallback
+		// meant a caller updating only its meta-title silently renamed the post
+		// (Phase 42.3). api-contract.md:171-177 always said the two are
+		// independent; :180 says only supplied fields are modified.
 		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-		} elseif ( ! empty( $meta['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $meta['title'] );
 		}
 
 		// Slug.
@@ -148,11 +152,10 @@ final class Arcadia_Post_Builder {
 			$post_data['post_name'] = sanitize_title( $meta['slug'] );
 		}
 
-		// Excerpt: meta.description, then top-level excerpt overrides
-		// (so an empty body.excerpt clears the field).
-		if ( ! empty( $meta['description'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $meta['description'] );
-		}
+		// Excerpt — body.excerpt and nothing else, same rule as the title.
+		// `isset` (not `empty`) is deliberate: an explicit "" clears the field,
+		// which is a supplied value. meta.description writes the search snippet
+		// (_yoast_wpseo_metadesc) only.
 		if ( isset( $body['excerpt'] ) ) {
 			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
 		}
@@ -362,9 +365,17 @@ final class Arcadia_Post_Builder {
 			if ( is_wp_error( $acf_result ) ) {
 				return $acf_result;
 			}
-		} else {
-			// No explicit acf_fields — create safe references so get_fields() returns
-			// an array (not false), preventing fatal errors in themes that don't guard.
+		} elseif ( $is_create ) {
+			// CREATE ONLY — create safe references so get_fields() returns an array
+			// (not false), preventing fatal errors in themes that don't guard.
+			//
+			// Never on update: auto_populate_acf_fields() writes '' into every
+			// wysiwyg/textarea field of the post type. On a fresh post that is a
+			// no-op on empty fields; on an existing page whose editorial content
+			// lives in exactly those fields, it ERASES them — and the trigger is
+			// the *absence* of an acf_fields key, so no caller can guard against
+			// it client-side (Phase 42.2). A partial PUT stays partial: a field
+			// the body does not mention is never written.
 			$finalizer_context->auto_populate_acf_fields( $post_id, $post_type );
 		}
 
