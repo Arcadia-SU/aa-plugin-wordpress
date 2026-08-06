@@ -688,14 +688,44 @@ existe pour attraper. Il accepte maintenant une version cible explicite (`./buil
 en format et **strictement supérieure** à la courante (re-publier un numéro, c'est comment deux zips
 différents finissent par se déclarer identiques). Un seul écrivain des versions, toujours.
 
-### Vérification sur site client (après déploiement)
+### Vérification sur site client — ✅ FAITE par AA sur préprod (sondes des 2026-08-04 et 08-05)
 
-- [ ] **41.1** — `PUT /contents/{id}` sur une page métier → 200 ; un body avec `post_parent` → 422
-- [ ] **41.2** — preview de révision avec `&aa_debug=1` : `render_context.context_type` doit valoir `page`
-      (pas `aa_revision`), `template_resolution.candidates` basculer sur la liste dérivée du parent,
-      `resolved` pointer le vrai gabarit, `render.output_length` être non nul
-- [ ] **41.3** — `GET /contents?post_type=page` : plus de `word_count: 0` sur les pages à blocs
+Vérifiée **en fait**, pas en lecture de code, sur préprod iSelection en 0.2.1 :
+
+- [x] **41.1** — `GET /contents/{id}/blocks` sur un `page` (hiérarchique) : `404 post_not_found` → **200,
+      14 blocs**. `GET /contents` répond (la route n'existait pas avant)
+- [x] **41.2** — preview de révision rendue **avec le template du parent**. `body_class` relevé :
+      `page-investir-template-default single-page-investir postid-20858`, **aucune occurrence de
+      `aa_revision`**, un seul `<h1>`, titre correct. AA a retiré la mention « à corriger » de son
+      invariant 4 — le défaut qu'ils décrivaient était celui que la Phase 41.2 a fermé
+- [x] **41.3** — `word_count` : `0` sur des pages à 30k caractères → **clé absente**. AA a corrigé son
+      côté (le défaut `0` de leur parseur reconstruisait le faux signal qu'on venait de retirer)
+- [x] **Invariant 4 (révisions tout `post_type`)** — `PUT /articles/20858` (CPT `page-investir`, publié)
+      avec un body ne portant **que** `acf_fields` → `201 revision_created`, révision 92200, post live
+      strictement inchangé (status, slug, url, **et les 12 champs**). Le chemin révision tient sur une
+      page business, pas seulement sur `article`
 - [ ] **40** — `curl -i` sur `/articles` montre `Deprecation` + `Sunset` ; sur `/contents`, aucun des deux
+
+### 🔴 Trou découvert par la sonde AA : la surface REST des révisions est en lecture seule
+
+AA a laissé la révision pending **92200** sur le post 20858 et ne peut pas s'en défaire par l'API.
+Vérifié dans le code : `class-api.php:238-256` n'expose que `GET /{id}/revisions` et
+`GET /{id}/revisions/{revision_id}`. `approve_revision()` et `reject_revision()` existent
+(`class-revisions.php:243` et `:371`) mais ne sont atteignables **que** par AJAX wp-admin
+(`arcadia-agents.php:156-157` → `class-revision-metabox.php`).
+
+Conséquence : chaque sonde d'écriture d'AA sur un post publié laisse un résidu qu'un humain doit
+nettoyer à la main. Ça rend leur répétition e2e coûteuse, et ça s'aggrave à chaque itération.
+
+**Distinction à trancher — les deux verbes ne sont pas symétriques :** ⬅️ Oscar
+- **`reject` par REST** ne casse rien : l'agent retire *sa propre* proposition. Le contenu live n'est
+  jamais touché, la garantie HITL est intacte. C'est du nettoyage, pas de la publication.
+- **`approve` par REST casserait le sens du dispositif** : les révisions en attente existent
+  précisément pour qu'un *humain* valide avant mise en ligne. Un agent qui approuve ses propres
+  révisions contourne la seule protection que le client a demandée.
+
+- [ ] Décider : exposer `DELETE`/`POST /contents/{id}/revisions/{revision_id}/reject` seul, ou rien
+- [ ] En attendant : la révision 92200 sur le post 20858 (préprod) reste à rejeter à la main
 
 ### Anomalie non élucidée (à surveiller)
 
