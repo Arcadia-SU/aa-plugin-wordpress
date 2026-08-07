@@ -698,6 +698,10 @@ Vérifiée **en fait**, pas en lecture de code, sur préprod iSelection en 0.2.1
       `page-investir-template-default single-page-investir postid-20858`, **aucune occurrence de
       `aa_revision`**, un seul `<h1>`, titre correct. AA a retiré la mention « à corriger » de son
       invariant 4 — le défaut qu'ils décrivaient était celui que la Phase 41.2 a fermé
+      ⚠️ **Portée exacte de ce ✅ (précisé le 2026-08-07) : le template, pas le contenu.** La sonde
+      mesurait la résolution de gabarit. Une seconde sonde AA (08-06) montre que la preview rend
+      **vide** — 0 `<p>`, 0 `<h2>`, pas de header/footer : les champs ACF ne sont pas résolus. Le
+      routage reste correct. Voir **Phase 43**, qui ne remet pas 41.2 en cause mais en borne la portée
 - [x] **41.3** — `word_count` : `0` sur des pages à 30k caractères → **clé absente**. AA a corrigé son
       côté (le défaut `0` de leur parseur reconstruisait le faux signal qu'on venait de retirer)
 - [x] **Invariant 4 (révisions tout `post_type`)** — `PUT /articles/20858` (CPT `page-investir`, publié)
@@ -728,7 +732,14 @@ nettoyer à la main. Ça rend leur répétition e2e coûteuse, et ça s'aggrave 
   révisions contourne la seule protection que le client a demandée.
 
 - [ ] Décider : exposer `DELETE`/`POST /contents/{id}/revisions/{revision_id}/reject` seul, ou rien
-- [ ] En attendant : la révision 92200 sur le post 20858 (préprod) reste à rejeter à la main
+- [ ] En attendant, deux résidus à traiter à la main dans l'admin préprod :
+      - `92200` sur le post `20858` → **à rejeter**
+      - `92277` sur le post `21495` → **à approuver** : elle restaure la valeur d'origine de la page
+        de test d'AA, l'approuver remet la page dans son état initial
+
+**Le coût s'accumule comme prévu.** Un résidu au 08-05, deux au 08-07. Chaque sonde d'écriture d'AA en
+ajoute un, et aucun ne part sans un humain dans wp-admin. C'est l'argument principal pour trancher la
+décision `reject` par REST ci-dessus, et AA a confirmé que `reject` seul les débloquerait.
 
 ### Anomalie non élucidée (à surveiller)
 
@@ -887,9 +898,105 @@ des champs en silence (42.1 / 42.2). On a rendu ces pages writables et lossy dan
 - [x] Avertissement écrit dans `backlog-for-backend.md` : ne pas pousser sur les pages business avant la
       release Phase 42, et vérifier les champs ACF de toute page déjà poussée depuis le 2026-08-02
 - [x] Livrer la Phase 42, builder, déployer (manuellement) sur les 3 sites, puis lever l'avertissement —
-      **bouclé le 2026-08-07**, avertissement levé dans `backlog-for-backend.md`. La question « une page
-      business a-t-elle été poussée entre le 08-02 et le 08-07 ? » reste posée à AA : la perte était
-      silencieuse, seul AA sait s'il y a eu des écritures à réparer
+      **bouclé le 2026-08-07**, avertissement levé dans `backlog-for-backend.md`
+- [x] **Fenêtre 08-02 → 08-07 : rien à réparer, tranché par AA.** Leurs seules écritures sous 0.2.1
+      sont les sondes du 08-05 sur le post `20858`, non destructives par construction (valeur relue puis
+      réinjectée telle quelle) et vérifiées après coup : `status`/`slug`/`url` identiques, **0 champ
+      modifié**. Aucune écriture de contenu réel n'est partie pendant la fenêtre
+- [x] **Le rejeu à l'approbation (42.1) est vérifié en live par AA**, pas seulement en test unitaire :
+      post `21495` (`page`, publié, 19 blocs), `PUT` → révision `92276` → approbation depuis le metabox
+      → relecture. La valeur proposée est rendue, **rayon d'impact nul par ailleurs** — 19 blocs
+      identiques, 9 champs post-level intacts **y compris l'objet `image`** (tableau ACF de 1 322
+      caractères), soit exactement ce que la boucle `update_field()` brute abîmait. Le live est resté
+      strictement inchangé entre le `PUT` et l'approbation
+
+---
+
+## Phase 43 : Une révision en attente ne dit pas ce qu'elle propose
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-08-07*
+*Item neuf, mesuré par AA le 2026-08-06 sur préprod en **0.3.0**. Il avait été rédigé le 06 sur une
+branche AA qui n'a pas atteint `main` — d'où le fait qu'on ait vidé le backlog sans l'avoir vu.*
+
+### Pourquoi ça compte
+
+Le HITL est le **chemin nominal** du chantier pages business : les pages cibles sont toutes publiées,
+donc 100 % des écritures AA deviennent des révisions à approuver. Aujourd'hui, ni le validateur humain
+ni l'agent qui a proposé ne peuvent lire la proposition avant de décider. On demande à un client de
+valider à l'aveugle.
+
+### Ce qu'AA a mesuré (post `20858`, `page-investir`, 12 blocs, révision `92200`)
+
+| | live | preview |
+|---|---|---|
+| octets | 72 432 | 10 963 |
+| `<p>` | 27 | **0** |
+| `<h2>`/`<h3>` | 8 | **0** |
+| `<header>` / `<footer>` | oui | **non** |
+| `<h1>` | « Dispositif fiscal LMNP (géré) » | « Dispositif fiscal LMNP » |
+| `body_class` | `single-page-investir postid-20858` | identique |
+
+### Diagnostic — vérifié dans le code, les trois pointeurs AA sont exacts
+
+Le routage est bon (Phase 41.2 tient : bon gabarit, bonnes classes). **C'est le contenu qui manque.**
+
+1. `create_revision()` insère le CPT `aa_revision` avec `post_title` + `post_content` seulement
+   (`class-revisions.php:122-133`) et range le body complet en JSON dans `_aa_revision_meta`
+   (`:158-170`). **Aucun `acf_fields` n'est écrit en meta sur la révision** — ils n'existent que dans
+   le JSON, rejoué à l'approbation.
+2. `setup_preview_state()` fait boucler `wp_query` sur la révision (`class-preview.php:263-268`) —
+   choix délibéré et commenté (« the loop yields the revision — that's the content under review »).
+   Tout `get_field()` du thème résout donc sur la révision, qui n'a aucun champ, et rend vide. Le
+   `<h1>` le confirme indépendamment : il retombe sur `post_title` faute de `title_overrided`.
+3. `format_revision()` (`class-revisions.php:489-517`) ne renvoie que de la métadonnée — pas un octet
+   de contenu proposé.
+
+**La formule d'AA est la bonne :** la preview tente de rendre un **delta** comme si c'était une page
+complète.
+
+### 43.1 — 🔴 Exposer la proposition dans `GET /contents/{id}/revisions/{rid}`
+
+Le socle : la donnée est **déjà là en entier** dans `_aa_revision_meta`. C'est du décodage et de la
+projection, aucune écriture nouvelle, aucun risque sur le live.
+
+- [ ] Pour chaque champ que la révision touche : nom, **valeur courante du parent**, valeur proposée
+- [ ] ⚠️ **Ne pas l'ajouter à `format_revision()` tel quel** — la méthode sert aussi `get_revisions()`
+      (le listing, `:432`). Un diff complet par entrée ferait exploser la réponse du listing. Le diff
+      appartient au **détail** ; le listing reste à la métadonnée
+- [ ] Décider la profondeur : champs post-level (`acf_fields`, `title`, `excerpt`, meta SEO) certainement ;
+      diff bloc-à-bloc de `post_content` — probablement hors périmètre (le markup Gutenberg ACF est
+      illisible en diff, c'est déjà l'argument qui a fait choisir la preview visuelle en 2026-04-05)
+
+### 43.2 — 🟠 Afficher le diff dans le metabox wp-admin
+
+- [ ] Déplier la ligne `v1 — <date> PENDING` en avant/après par champ. Se construit sur 43.1 —
+      même projection, deux surfaces
+- [ ] C'est **43.1 + 43.2 qui ferment le flux** : avec 1 l'agent sait ce qu'il a proposé, avec 2 le
+      client voit ce qu'il approuve
+
+### 43.3 — 🟡 La preview résout les champs (repli sur le parent)
+
+Le plus long et le moins pressé — **ne doit pas bloquer 43.1/43.2** (arbitrage AA, que je partage :
+c'est le seul des trois qui touche au rendu, donc le seul qui peut casser une page).
+
+- [ ] Une seule règle : pendant une preview de révision, une lecture de champ **absent** de la
+      proposition retombe sur le parent ; la proposition gagne quand elle est présente
+- [ ] ⚠️ **ACF stocke chaque champ en paire** (`<nom>` + clé `_<nom>`) : le repli doit ramener **les
+      deux**, sinon le type est mal résolu et le champ rend faux
+- [ ] ⚠️ **Ne jamais faire retomber les meta internes** du plugin (`_aa_revision_*`, `_aa_preview_*`)
+      sur le parent — le token de preview et le JSON de révision n'ont rien à faire résolus au parent
+
+### Vérifiable par
+
+Sur une page dont l'éditorial vit en ACF, une preview de révision ne modifiant qu'un champ rend la
+**page complète**, avec ce seul champ à sa valeur proposée et tous les autres à leur valeur publiée.
+
+### Correction à acter dans nos propres notes
+
+AA nous avait écrit le 2026-08-05 « la preview est bonne, rien ne vous attend là-dessus », et on l'a
+recopié tel quel dans la vérification 41.2. C'était trop large **des deux côtés** : la sonde mesurait
+la **résolution du template**, jamais le **contenu** rendu. Le template est bon, le contenu est vide.
+Voir la note ajoutée en 41.2.
 
 ---
 
