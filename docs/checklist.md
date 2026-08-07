@@ -704,7 +704,10 @@ Vérifiée **en fait**, pas en lecture de code, sur préprod iSelection en 0.2.1
       avec un body ne portant **que** `acf_fields` → `201 revision_created`, révision 92200, post live
       strictement inchangé (status, slug, url, **et les 12 champs**). Le chemin révision tient sur une
       page business, pas seulement sur `article`
-- [ ] **40** — `curl -i` sur `/articles` montre `Deprecation` + `Sunset` ; sur `/contents`, aucun des deux
+- [x] **40** — `curl -i` sur `/articles` montre `Deprecation` + `Sunset` ; sur `/contents`, aucun des deux.
+      Vérifié le 2026-08-07 sur trottinette (0.3.0) : `/articles` renvoie `deprecation:` et `sunset:` =
+      `Mon, 01 Feb 2027 00:00:00 GMT` + `link: <…/contents>; rel="successor-version"` ; `/contents` ne
+      porte que le `link` WP standard. Les en-têtes sont émis avant l'auth (relevé sur un `401`)
 
 ### 🔴 Trou découvert par la sonde AA : la surface REST des révisions est en lecture seule
 
@@ -836,23 +839,28 @@ lui-même** avec la délégation de 42.1, au lieu d'être corrigé deux fois.
 - [x] PHPStan local (`memory_limit=3G`) — **No errors**
 - [x] `./build.sh 0.3.0` — **15 gates verts**, zip 390KB
 - [x] Annonce écrite dans `backlog-for-backend.md`
-- [ ] Déploiement manuel sur les 3 sites, puis levée de l'avertissement à AA
+- [x] **Déploiement manuel sur les 3 sites — FAIT**, vérifié par `GET /health` le 2026-08-07 :
+      trottinette **0.3.0**, iselection/b2c **0.3.0** (il était encore en 0.2.1 au relevé du 08-06),
+      préprod **0.3.0** (non sondable de l'extérieur, `401` d'auth staging — relevé AA du 08-06)
+- [x] Avertissement « ne pas pousser sur les pages business » **levé** dans `backlog-for-backend.md`
 
 ---
 
-## Contexte de déploiement — relevé de cette session (2026-08-05)
+## Contexte de déploiement — relevé du 2026-08-07
 
-**v0.2.1 est déjà live sur les deux sites de prod.** Relevé nous-mêmes, sans dépendre d'AA :
+**v0.3.0 est live partout.** Relevé nous-mêmes, sans dépendre d'AA :
 
 ```bash
 curl -s https://<site>/wp-json/arcadia/v1/health   # public, pas de JWT
 ```
 
-| Site | Version live | Note |
+| Site | Version live (2026-08-07) | Note |
 |---|---|---|
-| www.iselection.com/b2c | **0.2.1** | à jour |
-| www.trottinette-tout-terrain.fr | **0.2.1** | à jour — le `500` signalé par AA était réel, **réparé par Oscar** |
-| preprod-iselection.vertuelle.com | non relevable | `401` = auth HTTP de staging, ni plugin ni Cloudflare |
+| www.iselection.com/b2c | **0.3.0** | déployé entre le 08-06 (0.2.1) et le 08-07 |
+| www.trottinette-tout-terrain.fr | **0.3.0** | le `500` signalé par AA était réel, **réparé par Oscar** |
+| preprod-iselection.vertuelle.com | **0.3.0** (relevé AA du 08-06) | non sondable : `401` = auth HTTP de staging, ni plugin ni Cloudflare |
+
+*Historique : au 2026-08-05, les trois étaient en 0.2.1 — la version incomplète que la Phase 42 corrige.*
 
 **`GET /health` est le moyen canonique de savoir ce qui tourne chez un client** — public, sans auth,
 renvoie `ARCADIA_AGENTS_VERSION` (`arcadia-agents.php`). Ne plus jamais inférer une version déployée ni
@@ -878,7 +886,10 @@ des champs en silence (42.1 / 42.2). On a rendu ces pages writables et lossy dan
 
 - [x] Avertissement écrit dans `backlog-for-backend.md` : ne pas pousser sur les pages business avant la
       release Phase 42, et vérifier les champs ACF de toute page déjà poussée depuis le 2026-08-02
-- [ ] Livrer la Phase 42, builder, déployer (manuellement) sur les 3 sites, puis lever l'avertissement
+- [x] Livrer la Phase 42, builder, déployer (manuellement) sur les 3 sites, puis lever l'avertissement —
+      **bouclé le 2026-08-07**, avertissement levé dans `backlog-for-backend.md`. La question « une page
+      business a-t-elle été poussée entre le 08-02 et le 08-07 ? » reste posée à AA : la perte était
+      silencieuse, seul AA sait s'il y a eu des écritures à réparer
 
 ---
 
