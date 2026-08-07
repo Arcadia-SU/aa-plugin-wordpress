@@ -168,51 +168,115 @@ trait Arcadia_API_ACF_Fields_Handler {
 		foreach ( $acf_fields as $field_name => $value ) {
 			$field_type = $type_map[ $field_name ] ?? 'text';
 
-			switch ( $field_type ) {
-				case 'wysiwyg':
-					if ( null === $value ) {
-						// Copy rendered post_content (already HTML) into this field.
-						$value = $post_content;
-					} else {
-						// Parse structural markdown → HTML (ADR-013), unless the agent
-						// flagged this as already-HTML round-trip content (skip_markdown).
-						$value = \Arcadia_Markdown_Parser::parse_rich( $value, $skip_markdown );
-					}
-					break;
-
-				case 'image':
-					// Empty values → no image. Normalize to 0.
-					if ( empty( $value ) || 0 === $value || '0' === $value ) {
-						$value = 0;
-						break;
-					}
-					if ( is_string( $value ) && ! empty( $value ) ) {
-						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
-						if ( is_wp_error( $sideloaded ) ) {
-							return $sideloaded;
-						}
-						$value = $sideloaded;
-					} elseif ( is_array( $value ) && ! empty( $value['url'] ) ) {
-						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field(
-							$value['url'],
-							$post_id,
-							$value['title'] ?? null,
-							$value['alt'] ?? ''
-						);
-						if ( is_wp_error( $sideloaded ) ) {
-							return $sideloaded;
-						}
-						$value = $sideloaded;
-					}
-					break;
-
-				// Repeater, text, textarea, url, select, radio, etc.: passthrough.
+			$coerced = $this->coerce_field_value( $value, $field_type, $post_content, $skip_markdown, $post_id );
+			if ( is_wp_error( $coerced ) ) {
+				return $coerced;
 			}
 
-			update_field( $field_name, $value, $post_id );
+			update_field( $field_name, $coerced, $post_id );
 		}
 
 		return true;
+	}
+
+	/**
+	 * Coerce one incoming field value into what ACF must actually store.
+	 *
+	 * Extracted from process_acf_fields() so the write path is not the only
+	 * place that knows these rules. The revision preview needs the same
+	 * coercions to render a proposed value (Phase 43.3), and duplicating them
+	 * there would rebuild exactly the divergence Phase 42.1 closed — a
+	 * secondary path that replays the primary one by hand and drifts from it.
+	 * One implementation, two callers.
+	 *
+	 * @param mixed  $value          The incoming value from the payload.
+	 * @param string $field_type     The ACF field type (see build_acf_field_type_map()).
+	 * @param string $post_content   Rendered post_content, used for the wysiwyg-null case.
+	 * @param bool   $skip_markdown  True when the value is already-rendered HTML (round-trip).
+	 * @param int    $post_id        Post the value belongs to — the sideload target.
+	 * @param bool   $allow_sideload When false, an image URL is returned untouched instead of
+	 *                               being imported. Read-only callers (preview rendering) MUST
+	 *                               pass false: importing a media file is a write, and no render
+	 *                               path is allowed to create attachments as a side effect.
+	 * @return mixed|WP_Error The value to store, or WP_Error if a sideload failed.
+	 */
+	public function coerce_field_value( $value, $field_type, $post_content, $skip_markdown = false, $post_id = 0, $allow_sideload = true ) {
+		switch ( $field_type ) {
+			case 'wysiwyg':
+				if ( null === $value ) {
+					// Copy rendered post_content (already HTML) into this field.
+					return $post_content;
+				}
+				// Parse structural markdown → HTML (ADR-013), unless the agent
+				// flagged this as already-HTML round-trip content (skip_markdown).
+				return \Arcadia_Markdown_Parser::parse_rich( $value, $skip_markdown );
+
+			case 'image':
+				// Empty values → no image. Normalize to 0.
+				// empty() already covers 0 and '0'; the explicit comparisons that
+				// used to follow were unreachable.
+				if ( empty( $value ) ) {
+					return 0;
+				}
+				if ( ! $allow_sideload ) {
+					// Caller is read-only: hand back the raw value. It is NOT a valid
+					// attachment ID, so callers must treat 'sideload_image' from
+					// describe_field_transform() as "cannot resolve here".
+					return $value;
+				}
+				if ( is_string( $value ) ) {
+					return Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
+				}
+				if ( is_array( $value ) && ! empty( $value['url'] ) ) {
+					return Arcadia_ACF_Adapter::sideload_image_field(
+						$value['url'],
+						$post_id,
+						$value['title'] ?? null,
+						$value['alt'] ?? ''
+					);
+				}
+				return $value;
+		}
+
+		// Repeater, text, textarea, url, select, radio, etc.: passthrough.
+		return $value;
+	}
+
+	/**
+	 * Name the coercion coerce_field_value() will apply, without applying it.
+	 *
+	 * Lets a read-only caller tell the user what will happen to a proposed value
+	 * ("the markdown will be converted", "the image will be imported") and lets
+	 * the preview know which values it cannot resolve without writing.
+	 *
+	 * Keep the branches in lockstep with coerce_field_value() above — a describer
+	 * that disagrees with the doer is a lie told confidently. RevisionDiffTest
+	 * asserts the two agree on every case.
+	 *
+	 * @param mixed  $value         The incoming value from the payload.
+	 * @param string $field_type    The ACF field type.
+	 * @param bool   $skip_markdown True when the value is already-rendered HTML.
+	 * @return string|null 'markdown_to_html' | 'copy_rendered_content' | 'sideload_image', or
+	 *                     null when the value is stored verbatim.
+	 */
+	public function describe_field_transform( $value, $field_type, $skip_markdown = false ) {
+		if ( 'wysiwyg' === $field_type ) {
+			if ( null === $value ) {
+				return 'copy_rendered_content';
+			}
+			return $skip_markdown ? null : 'markdown_to_html';
+		}
+
+		if ( 'image' === $field_type ) {
+			if ( empty( $value ) ) {
+				return null;
+			}
+			if ( is_string( $value ) || ( is_array( $value ) && ! empty( $value['url'] ) ) ) {
+				return 'sideload_image';
+			}
+		}
+
+		return null;
 	}
 
 	/**
@@ -279,10 +343,14 @@ trait Arcadia_API_ACF_Fields_Handler {
 	 * Queries ACF for all field groups assigned to the post type,
 	 * then collects each field's name and type.
 	 *
+	 * Public because Arcadia_Revision_Diff reads it to label a proposed value
+	 * with the coercion it will undergo (Phase 43.1). It only reads the ACF
+	 * schema — no post is touched — so exposing it adds no write surface.
+	 *
 	 * @param string $post_type The post type slug.
 	 * @return array Associative array of field_name => field_type.
 	 */
-	private function build_acf_field_type_map( $post_type ) {
+	public function build_acf_field_type_map( $post_type ) {
 		$map = array();
 
 		if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {

@@ -693,6 +693,52 @@ class RevisionsTest extends TestCase {
 		$this->assertEquals( 'arcadia_agent', $data['created_by'] );
 		$this->assertEquals( 'Test notes', $data['revision_notes'] );
 		$this->assertStringContainsString( 'tok123', $data['preview_url'] );
+
+		// Phase 43.1: the detail endpoint carries what the revision proposes.
+		$this->assertArrayHasKey( 'changes', $data );
+		$this->assertArrayHasKey( 'content_changed', $data );
+	}
+
+	/**
+	 * The listing must stay metadata-only.
+	 *
+	 * format_revision() feeds both the listing and the detail view. Building the
+	 * proposal projection reads the payload, the parent post, its ACF values and
+	 * the field-schema option — per revision. Doing that for 20 listed revisions
+	 * turns a cheap index call into 20 diffs nobody asked for, so the projection
+	 * is opt-in and only the detail endpoint opts in.
+	 */
+	public function test_revisions_listing_carries_no_diff(): void {
+		global $_test_posts, $_test_post_meta;
+
+		$this->create_test_post( 42 );
+
+		$_test_posts[1001] = (object) array(
+			'ID'          => 1001,
+			'post_type'   => 'aa_revision',
+			'post_parent' => 42,
+			'post_title'  => 'Rev 1',
+			'post_status' => 'pending',
+			'post_date'   => '2026-04-05 14:00:00',
+		);
+		$_test_post_meta[1001] = array(
+			'_aa_revision_version' => 1,
+			'_aa_revision_meta'    => wp_json_encode(
+				array(
+					'body' => array( 'title' => 'Proposed' ),
+					'meta' => array(),
+				)
+			),
+		);
+
+		\WP_Query::set_next_result( array( $_test_posts[1001] ) );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+
+		$data = $this->helper->get_article_revisions( $request )->get_data();
+
+		$this->assertArrayNotHasKey( 'changes', $data['revisions'][0] );
 	}
 
 	public function test_get_article_revision_wrong_parent_returns_404(): void {

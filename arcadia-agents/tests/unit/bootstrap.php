@@ -572,13 +572,97 @@ if ( ! function_exists( 'get_post_meta' ) ) {
 
     function get_post_meta( $post_id, $key = '', $single = false ) {
         global $_test_post_meta;
+
+        // Mirror core's short-circuit filter. Without it the revision preview
+        // overlay (Arcadia_Preview::install_field_overlay) is untestable here:
+        // it works entirely by answering this filter, so a stub that skips it
+        // would report a passing test for code that never runs.
+        $check = apply_filters( 'get_post_metadata', null, $post_id, $key, $single, 'post' );
+        if ( null !== $check ) {
+            if ( $single && is_array( $check ) ) {
+                return $check[0];
+            }
+            return $check;
+        }
+
         if ( '' === $key ) {
-            return isset( $_test_post_meta[ $post_id ] ) ? $_test_post_meta[ $post_id ] : array();
+            // Core returns key => list-of-raw-values for a bulk read, not
+            // key => value. Mirror that shape or callers merging bulk results
+            // pass here and break against real WordPress.
+            $all = isset( $_test_post_meta[ $post_id ] ) ? $_test_post_meta[ $post_id ] : array();
+            $out = array();
+            foreach ( $all as $meta_key => $meta_value ) {
+                $out[ $meta_key ] = array( maybe_serialize( $meta_value ) );
+            }
+            return $out;
         }
         if ( ! isset( $_test_post_meta[ $post_id ][ $key ] ) ) {
             return $single ? '' : array();
         }
         return $single ? $_test_post_meta[ $post_id ][ $key ] : array( $_test_post_meta[ $post_id ][ $key ] );
+    }
+}
+
+// maybe_serialize() stub.
+if ( ! function_exists( 'maybe_serialize' ) ) {
+    function maybe_serialize( $data ) {
+        if ( is_array( $data ) || is_object( $data ) ) {
+            return serialize( $data );
+        }
+        return $data;
+    }
+}
+
+// Filter registry stubs. Deliberately ordered by priority and honouring
+// accepted_args, because production code registers a 4-arg closure at 10 and
+// relies on both.
+if ( ! function_exists( 'add_filter' ) ) {
+    global $_test_filters;
+    $_test_filters = array();
+
+    function add_filter( $hook, $callback, $priority = 10, $accepted_args = 1 ) {
+        global $_test_filters;
+        $_test_filters[ $hook ][] = array(
+            'callback'      => $callback,
+            'priority'      => $priority,
+            'accepted_args' => $accepted_args,
+        );
+        usort(
+            $_test_filters[ $hook ],
+            static function ( $a, $b ) {
+                return $a['priority'] <=> $b['priority'];
+            }
+        );
+        return true;
+    }
+
+    function apply_filters( $hook, $value ) {
+        global $_test_filters;
+        $extra = array_slice( func_get_args(), 2 );
+        if ( empty( $_test_filters[ $hook ] ) ) {
+            return $value;
+        }
+        foreach ( $_test_filters[ $hook ] as $filter ) {
+            $args  = array_merge( array( $value ), $extra );
+            $args  = array_slice( $args, 0, max( 1, (int) $filter['accepted_args'] ) );
+            $value = call_user_func_array( $filter['callback'], $args );
+        }
+        return $value;
+    }
+
+    function remove_all_filters( $hook = '' ) {
+        global $_test_filters;
+        if ( '' === $hook ) {
+            $_test_filters = array();
+            return true;
+        }
+        unset( $_test_filters[ $hook ] );
+        return true;
+    }
+
+    function has_filter( $hook, $callback = false ) {
+        global $_test_filters;
+        return ! empty( $_test_filters[ $hook ] );
     }
 }
 
@@ -1468,6 +1552,9 @@ require_once dirname( __DIR__, 2 ) . '/includes/class-preview.php';
 
 // Load revisions class for testing.
 require_once dirname( __DIR__, 2 ) . '/includes/class-revisions.php';
+
+// Load the revision diff builder (format_revision() instantiates it on the detail path).
+require_once dirname( __DIR__, 2 ) . '/includes/class-revision-diff.php';
 
 // Load post builder (used by trait-api-posts).
 require_once dirname( __DIR__, 2 ) . '/includes/class-post-builder.php';

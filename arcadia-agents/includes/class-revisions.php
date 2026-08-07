@@ -477,16 +477,24 @@ class Arcadia_Revisions {
 			return new WP_Error( 'revision_not_found', 'Revision not found.', array( 'status' => 404 ) );
 		}
 
-		return $this->format_revision( $revision );
+		// Detail view: carry the proposal, same as the REST detail handler.
+		return $this->format_revision( $revision, true );
 	}
 
 	/**
 	 * Format a revision post for API response.
 	 *
-	 * @param WP_Post $revision The revision post object.
+	 * @param WP_Post $revision        The revision post object.
+	 * @param bool    $include_changes When true, attach the before/after projection of
+	 *                                 what this revision proposes (Phase 43.1).
+	 *                                 Defaults to FALSE on purpose: this formatter also
+	 *                                 feeds the listing (get_revisions()) and the admin
+	 *                                 history box, and listing 20 revisions must not mean
+	 *                                 building and shipping 20 full diffs. The detail
+	 *                                 endpoint is the one caller that opts in.
 	 * @return array Formatted revision data.
 	 */
-	public function format_revision( $revision ) {
+	public function format_revision( $revision, $include_changes = false ) {
 		$version = (int) get_post_meta( $revision->ID, '_aa_revision_version', true );
 
 		// Get or create preview URL.
@@ -512,6 +520,14 @@ class Arcadia_Revisions {
 			'revision_notes'   => get_post_meta( $revision->ID, '_aa_revision_notes', true ) ?: null,
 			'preview_url'      => $preview_url,
 		);
+
+		if ( $include_changes ) {
+			$diff                    = new Arcadia_Revision_Diff();
+			$projection              = $diff->build( $revision );
+			$data['changes']         = $projection['changes'];
+			$data['content_changed'] = $projection['content_changed'];
+			$data['skip_markdown']   = $projection['skip_markdown'];
+		}
 
 		return $data;
 	}

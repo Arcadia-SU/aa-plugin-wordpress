@@ -954,42 +954,94 @@ Le routage est bon (Phase 41.2 tient : bon gabarit, bonnes classes). **C'est le 
 **La formule d'AA est la bonne :** la preview tente de rendre un **delta** comme si c'était une page
 complète.
 
-### 43.1 — 🔴 Exposer la proposition dans `GET /contents/{id}/revisions/{rid}`
+### Décision de conception commune — un seul constructeur, trois consommateurs
 
-Le socle : la donnée est **déjà là en entier** dans `_aa_revision_meta`. C'est du décodage et de la
-projection, aucune écriture nouvelle, aucun risque sur le live.
+**Nouveau fichier `includes/class-revision-diff.php`.** C'est le même geste que 42.1 (`approve_revision()`
+délègue à `finalize_post()`) : REST, bannière classique et panneau Gutenberg lisent **la même
+projection**. Trois formatages indépendants auraient dérivé, et un diff qui contredit l'écriture est
+pire que pas de diff.
 
-- [ ] Pour chaque champ que la révision touche : nom, **valeur courante du parent**, valeur proposée
-- [ ] ⚠️ **Ne pas l'ajouter à `format_revision()` tel quel** — la méthode sert aussi `get_revisions()`
-      (le listing, `:432`). Un diff complet par entrée ferait exploser la réponse du listing. Le diff
-      appartient au **détail** ; le listing reste à la métadonnée
-- [ ] Décider la profondeur : champs post-level (`acf_fields`, `title`, `excerpt`, meta SEO) certainement ;
-      diff bloc-à-bloc de `post_content` — probablement hors périmètre (le markup Gutenberg ACF est
-      illisible en diff, c'est déjà l'argument qui a fait choisir la preview visuelle en 2026-04-05)
+**Invariant dur tenu : construire un diff n'a aucun effet de bord.** Les trois consommateurs sont un
+`GET` ou un rendu d'écran. Les coercions sont **nommées**, jamais appliquées — appeler
+`process_acf_fields()` sideloaderait une image, et un `GET` qui crée des médias serait un défaut plus
+grave que celui qu'on ferme. Un test le garde (`test_building_a_diff_writes_nothing`).
 
-### 43.2 — 🟠 Afficher le diff dans le metabox wp-admin
+### 43.1 — 🔴 Exposer la proposition dans `GET /contents/{id}/revisions/{rid}` — ✅ FAIT
 
-- [ ] Déplier la ligne `v1 — <date> PENDING` en avant/après par champ. Se construit sur 43.1 —
-      même projection, deux surfaces
-- [ ] C'est **43.1 + 43.2 qui ferment le flux** : avec 1 l'agent sait ce qu'il a proposé, avec 2 le
-      client voit ce qu'il approuve
+- [x] Une entrée par champ touché : `field`, `label`, `kind`, `current` (valeur live), `proposed`
+      (brute, telle qu'envoyée), `transform`, `origin`, `source`
+- [x] **Le listing reste à la métadonnée** : `format_revision( $rev, $include_changes = false )`.
+      Le défaut `false` est le poka-yoke — seul le handler de détail bascule à `true`. Test dédié
+      (`test_revisions_listing_carries_no_diff`) : lister 20 révisions ne doit pas construire 20 diffs
+- [x] **`transform` dit ce qui sera réellement stocké** — `markdown_to_html`, `copy_rendered_content`,
+      `sideload_image`. Un écho brut de `acf_fields` mentirait : le markdown est converti, l'URL d'image
+      devient un attachment ID. Un test structurel vérifie que le descripteur et la coercion sont
+      d'accord cas par cas
+- [x] **Les écritures implicites du field-schema sont surfacées** (`origin: field_schema`, avec la
+      `source` dont la valeur dérive). Ces champs calibrés changent du contenu sans que le payload les
+      nomme — c'était invisible à 100 %
+- [x] **`body.status` volontairement absent** : `approve_revision()` ne l'applique jamais. L'annoncer
+      comme « proposé » serait faux sur le seul écran dont le métier est d'être fiable. Signalé à AA
+- [x] Contenu de blocs → booléen `content_changed`, pas un diff (markup Gutenberg illisible ;
+      c'est l'argument de la décision 2026-04-05). Question de périmètre posée à AA
 
-### 43.3 — 🟡 La preview résout les champs (repli sur le parent)
+### 43.2 — 🟠 Le diff dans les deux surfaces admin — ✅ FAIT
 
-Le plus long et le moins pressé — **ne doit pas bloquer 43.1/43.2** (arbitrage AA, que je partage :
-c'est le seul des trois qui touche au rendu, donc le seul qui peut casser une page).
+- [x] **Bannière éditeur classique** : `<details>` natif + tableau avant/après, ouvert d'office
+      jusqu'à 5 champs. Styles inline — le plugin n'a aucun fichier CSS ni précédent d'accordéon
+- [x] **Panneau Gutenberg** à parité stricte : même liste, transportée par `wp_localize_script`.
+      Les deux surfaces rendent `to_display_rows()` — la parité est **structurelle**, pas une
+      coïncidence entre deux implémentations
+- [x] Valeurs aplaties et tronquées à 300 caractères ; `—` distingue « aucune valeur stockée » de
+      « stockée, et vide » (la nuance qui dit si un changement est destructeur)
+- [x] Chaque coercion affiche sa phrase (« le markdown sera converti », « l'image sera importée »)
 
-- [ ] Une seule règle : pendant une preview de révision, une lecture de champ **absent** de la
-      proposition retombe sur le parent ; la proposition gagne quand elle est présente
-- [ ] ⚠️ **ACF stocke chaque champ en paire** (`<nom>` + clé `_<nom>`) : le repli doit ramener **les
-      deux**, sinon le type est mal résolu et le champ rend faux
-- [ ] ⚠️ **Ne jamais faire retomber les meta internes** du plugin (`_aa_revision_*`, `_aa_preview_*`)
-      sur le parent — le token de preview et le JSON de révision n'ont rien à faire résolus au parent
+### 43.3 — 🟡 La preview résout les champs (repli sur le parent) — ✅ FAIT
 
-### Vérifiable par
+- [x] **Superposition en lecture seule** via un filtre `get_post_metadata`, armé uniquement pendant
+      le rendu d'une preview de révision. Une seule règle : la proposition gagne quand elle est
+      présente, sinon le parent. Rien n'est écrit, la superposition meurt avec la requête
+- [x] **Les paires ACF suivent** (`<nom>` + `_<nom>`) — c'est précisément parce que la règle est
+      générique, et pas une liste de champs, qu'elles sont couvertes
+- [x] **Les meta internes ne retombent jamais** (`_aa_revision_*`, `_aa_preview_*`, `_edit_*`) :
+      le token de preview du parent résolu sur la révision serait un défaut de sécurité
+- [x] **Lecture en bloc fusionnée** (`$meta_key === ''`) — ACF amorce son cache par là ; ne répondre
+      qu'aux lectures unitaires aurait laissé la moitié des champs vides
+- [x] **Coercion réutilisée, pas dupliquée** : extraction de `coerce_field_value()` sur le chemin
+      d'écriture, appelée par `process_acf_fields()` et par la preview. Dupliquer les trois règles
+      aurait reconstruit la divergence que la Phase 42 vient de fermer
+- [x] ⚠️ **Limite documentée** : un champ `image` proposé en URL n'a pas encore d'attachment ID, et
+      en fabriquer un veut dire importer le fichier. La preview affiche donc **l'image du parent**,
+      et c'est le diff qui annonce le changement. Un rendu de page ne crée pas de média
 
-Sur une page dont l'éditorial vit en ACF, une preview de révision ne modifiant qu'un champ rend la
-**page complète**, avec ce seul champ à sa valeur proposée et tous les autres à leur valeur publiée.
+### 43.4 — Vérification & release — ✅ FAIT
+
+- [x] **Non-vacuité : 9 mutants, 9 tués.** Garde meta interne retirée → rouge ; diff activé par défaut
+      sur le listing → rouge ; image URL non déclinée → rouge ; `status` reporté → rouge ;
+      `skip_markdown` ignoré → rouge ; la proposition ne gagne plus → rouge ; champs calibrés non
+      surfacés → rouge ; `null` indistinguable de `""` → rouge ; lecture en bloc non fusionnée → rouge
+- [x] Suite complète : **605 tests / 1904 assertions** (572 → +33), zéro warning
+- [x] **Bootstrap de test rapproché du vrai WordPress** : `get_post_meta()` applique désormais le
+      filtre `get_post_metadata` et renvoie la forme brute de core sur une lecture en bloc. Sans ça,
+      la superposition était **intestable** — elle ne fonctionne qu'en répondant à ce filtre, donc un
+      stub qui l'ignore aurait affiché un test vert sur du code jamais exécuté
+- [x] PHPStan local (`memory_limit=3G`) — **No errors**. Deux entrées de baseline devenues orphelines
+      supprimées, et le code mort qu'elles couvraient (`0 === $value` après `empty()`) retiré
+- [x] `./build.sh 0.4.0` — **15 gates verts**, dont le check de fidélité sur vrai WordPress. Zip 401KB
+- [ ] Déploiement manuel sur les 3 sites
+- [ ] Vérification sur préprod (voir ci-dessous)
+
+### Vérification de sortie — séparer les deux natures de changement
+
+On a empilé un changement d'API et un changement de rendu dans le même zip (réserve exprimée, levée
+par Oscar). La vérification les sépare donc explicitement :
+
+- [ ] **API seule** : `GET /contents/20858/revisions/92200` renvoie `changes` avec les champs touchés
+      et leur valeur courante. Ne touche à aucun rendu — vérifiable sans regarder une page
+- [ ] **Rendu** : ouvrir la preview de `92200`. Attendu — page **complète** (proche des 72 432 octets
+      du live, header/footer présents, `<p>` et `<h2>` non nuls), avec le seul champ proposé à sa
+      nouvelle valeur. C'est le critère de sortie qu'AA a écrit
+- [ ] **Admin** : la bannière déplie l'avant/après ; le panneau Gutenberg montre la même chose
 
 ### Correction à acter dans nos propres notes
 

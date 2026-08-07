@@ -60,6 +60,10 @@
 		var msgState        = useState( '' );
 		var message         = msgState[0];
 		var setMessage      = msgState[1];
+		var changes         = data.changes || [];
+		var showDiffState   = useState( changes.length > 0 && changes.length <= 5 );
+		var showDiff        = showDiffState[0];
+		var setShowDiff     = showDiffState[1];
 
 		var processing = status === 'approving' || status === 'rejecting' || status === 'done';
 
@@ -138,6 +142,74 @@
 					: null
 			)
 		);
+
+		// ---------- What the revision proposes ----------
+		// Mirrors the classic-editor banner. Both render the same server-built
+		// rows, so a reviewer sees identical information whichever editor they use.
+		if ( changes.length === 0 ) {
+			children.push(
+				el( 'p', {
+					key: 'no-changes',
+					style: { margin: '0 0 12px', fontSize: '12px', color: '#664d03' },
+				}, data.i18n.changes_none )
+			);
+		} else {
+			children.push(
+				el( Button, {
+					key: 'diff-toggle',
+					variant: 'link',
+					onClick: function() { setShowDiff( ! showDiff ); },
+					style: { marginBottom: '8px' },
+				}, showDiff
+					? data.i18n.changes_hide
+					: data.i18n.changes_count.replace( '%d', changes.length ) )
+			);
+		}
+
+		if ( showDiff && changes.length > 0 ) {
+			children.push(
+				el( 'div', {
+					key: 'diff',
+					style: {
+						marginBottom: '12px',
+						border: '1px solid #ffe08a',
+						borderRadius: '4px',
+						overflow: 'hidden',
+					},
+				}, changes.map( function( row, i ) {
+					return el( 'div', {
+						key: 'row-' + i,
+						style: {
+							padding: '8px',
+							borderTop: i === 0 ? 'none' : '1px solid #f0f0f1',
+							fontSize: '12px',
+						},
+					},
+						el( 'code', {
+							style: { fontSize: '11px', display: 'block', marginBottom: '4px' },
+						}, row.label ),
+						row.note
+							? el( 'div', {
+								style: {
+									color: '#856404',
+									fontStyle: 'italic',
+									fontSize: '11px',
+									marginBottom: '4px',
+								},
+							}, row.note )
+							: null,
+						el( 'div', { style: { color: '#666', marginBottom: '2px' } },
+							el( 'strong', null, data.i18n.changes_current + ': ' ),
+							row.current
+						),
+						el( 'div', { style: { color: '#0a5c36' } },
+							el( 'strong', null, data.i18n.changes_proposed + ': ' ),
+							row.proposed
+						)
+					);
+				} ) )
+			);
+		}
 
 		// ---------- IDLE: show action buttons ----------
 		if ( status === 'idle' || status === 'error' ) {

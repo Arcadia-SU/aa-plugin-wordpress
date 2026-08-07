@@ -185,6 +185,10 @@ class Arcadia_Preview {
 		// A revision renders in its parent's clothes, not its own (Phase 41.2).
 		$context = $this->resolve_render_context( $post );
 
+		// ...and in its parent's field values, not its own emptiness (Phase 43.3).
+		// Must be installed before any template code runs.
+		$this->install_field_overlay( $post, $context );
+
 		// Set up rendering state (headers, post data, wp_query).
 		$this->setup_preview_state( $post, $context );
 
@@ -221,6 +225,248 @@ class Arcadia_Preview {
 		// No template found at all — render fallback.
 		$this->render_fallback( $post );
 		exit;
+	}
+
+	/**
+	 * Guard against re-entering the meta overlay filter.
+	 *
+	 * The filter needs to ask "does the revision itself carry this key?", which
+	 * is another read of the very object it is filtering. Without this flag that
+	 * question would call the filter again, forever.
+	 *
+	 * @var bool
+	 */
+	private $overlay_active = false;
+
+	/**
+	 * Make a revision preview read the parent's fields where it has none.
+	 *
+	 * A revision post carries only post_title and post_content; its proposal
+	 * lives as JSON in _aa_revision_meta and is replayed onto the parent only at
+	 * approval. But the preview loop yields the revision, so every get_field()
+	 * in the theme resolved against a post with no fields and rendered nothing —
+	 * a page that was 72KB live came back as 11KB with zero paragraphs. The
+	 * preview was trying to render a delta as if it were a whole page.
+	 *
+	 * One rule, applied per meta key: the proposal wins when it has an opinion,
+	 * otherwise the parent's stored value shows through.
+	 *
+	 * Read-only by construction. Nothing is written to the revision, so the
+	 * overlay dies with the request. Writing the proposed fields onto the CPT at
+	 * PUT time would have been the alternative — it would mean running coercions
+	 * (importing images) during a write that is supposed to touch nothing, and
+	 * then writing them a second time on approval.
+	 *
+	 * @param WP_Post     $revision      The revision being previewed.
+	 * @param WP_Post     $parent        The post it proposes to modify.
+	 * @param object|null $field_context Holder of the coercion pipeline. Defaults to the
+	 *                                   API singleton; injectable so the overlay can be
+	 *                                   tested without booting the whole API.
+	 */
+	public function install_field_overlay( $revision, $parent, $field_context = null ) {
+		if ( ! $revision || 'aa_revision' !== $revision->post_type ) {
+			return;
+		}
+		if ( ! $parent || (int) $parent->ID === (int) $revision->ID ) {
+			return;
+		}
+
+		$revision_id = (int) $revision->ID;
+		$parent_id   = (int) $parent->ID;
+
+		// Resolved before the filter is installed — this reads the revision's own
+		// meta, which the filter would otherwise intercept.
+		$proposed = $this->build_proposed_meta( $revision, $parent, $field_context );
+
+		add_filter(
+			'get_post_metadata',
+			function ( $value, $object_id, $meta_key, $single ) use ( $revision_id, $parent_id, $proposed ) {
+				unset( $single ); // Core takes [0] of whatever array we return.
+
+				if ( (int) $object_id !== $revision_id || $this->overlay_active ) {
+					return $value;
+				}
+
+				// Plugin bookkeeping must never inherit. A parent's preview token
+				// resolving on the revision would be a security defect, not a
+				// convenience; the same goes for the revision payload itself.
+				if ( '' !== $meta_key && $this->is_internal_meta_key( $meta_key ) ) {
+					return $value;
+				}
+
+				if ( '' === $meta_key ) {
+					return $this->merged_meta( $revision_id, $parent_id, $proposed );
+				}
+
+				if ( array_key_exists( $meta_key, $proposed ) ) {
+					return array( $proposed[ $meta_key ] );
+				}
+
+				// The revision may legitimately carry this key itself — let core serve it.
+				if ( array() !== $this->own_meta( $revision_id, $meta_key ) ) {
+					return $value;
+				}
+
+				// ACF stores every field as a pair: `name` and `_name` (the field key).
+				// A generic key-by-key rule carries both automatically — which is
+				// exactly why the rule is generic and not a list of field names.
+				$inherited = get_post_meta( $parent_id, $meta_key, false );
+
+				return empty( $inherited ) ? $value : $inherited;
+			},
+			10,
+			4
+		);
+	}
+
+	/**
+	 * Resolve the field values this revision proposes, without writing anything.
+	 *
+	 * @param WP_Post     $revision      The revision being previewed.
+	 * @param WP_Post     $parent        The post it proposes to modify.
+	 * @param object|null $field_context Holder of the coercion pipeline.
+	 * @return array meta_key => coerced value.
+	 */
+	private function build_proposed_meta( $revision, $parent, $field_context = null ) {
+		if ( null === $field_context ) {
+			if ( ! class_exists( 'Arcadia_API' ) ) {
+				return array();
+			}
+			$field_context = Arcadia_API::get_instance();
+		}
+
+		$payload = json_decode( (string) get_post_meta( $revision->ID, '_aa_revision_meta', true ), true );
+		if ( ! is_array( $payload ) ) {
+			return array();
+		}
+
+		$body          = isset( $payload['body'] ) && is_array( $payload['body'] ) ? $payload['body'] : array();
+		$meta          = isset( $payload['meta'] ) && is_array( $payload['meta'] ) ? $payload['meta'] : array();
+		$skip_markdown = ! empty( $payload['skip_markdown'] );
+
+		$api      = $field_context;
+		$type_map = $api->build_acf_field_type_map( $parent->post_type );
+		$proposed = array();
+
+		$explicit = isset( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ? $body['acf_fields'] : array();
+		foreach ( $explicit as $field_name => $raw ) {
+			$field_type = $type_map[ $field_name ] ?? 'text';
+			$resolved   = $this->resolve_for_render( $api, $raw, $field_type, $revision->post_content, $skip_markdown );
+			if ( null !== $resolved ) {
+				$proposed[ $field_name ] = $resolved;
+			}
+		}
+
+		// Calibrated fields the payload never names, but approval will write.
+		foreach ( $api->resolve_field_schema_mappings( $parent->post_type, $body, $meta ) as $field_name => $entry ) {
+			$field_type = $type_map[ $field_name ] ?? 'text';
+			$resolved   = $this->resolve_for_render( $api, $entry['value'], $field_type, $revision->post_content, $skip_markdown );
+			if ( null !== $resolved ) {
+				$proposed[ $field_name ] = $resolved;
+			}
+		}
+
+		return $proposed;
+	}
+
+	/**
+	 * Coerce one proposed value for display, or decline to.
+	 *
+	 * Delegates to the write path's own coercion so markdown renders as markup
+	 * here exactly as it will once approved — duplicating those rules would
+	 * rebuild the divergence Phase 42.1 closed.
+	 *
+	 * Declines (returns null) for an image proposed as a URL: turning it into an
+	 * attachment ID means importing the file, and a page render is not allowed
+	 * to create media. Such a field shows the parent's current image, and the
+	 * before/after diff is what announces the change.
+	 *
+	 * @param Arcadia_API $api           API instance holding the coercion pipeline.
+	 * @param mixed       $raw           Proposed value as the agent sent it.
+	 * @param string      $field_type    ACF field type.
+	 * @param string      $post_content  Revision's rendered content (wysiwyg-null case).
+	 * @param bool        $skip_markdown Round-trip flag stored with the revision.
+	 * @return mixed|null Coerced value, or null to leave the field to the parent.
+	 */
+	private function resolve_for_render( $api, $raw, $field_type, $post_content, $skip_markdown ) {
+		if ( 'sideload_image' === $api->describe_field_transform( $raw, $field_type, $skip_markdown ) ) {
+			return null;
+		}
+
+		$coerced = $api->coerce_field_value( $raw, $field_type, $post_content, $skip_markdown, 0, false );
+
+		return is_wp_error( $coerced ) ? null : $coerced;
+	}
+
+	/**
+	 * Read a key straight off the revision, with the overlay stood down.
+	 *
+	 * @param int    $revision_id The revision post ID.
+	 * @param string $meta_key    Key to read.
+	 * @return array Raw values (empty when the revision has none).
+	 */
+	private function own_meta( $revision_id, $meta_key ) {
+		$this->overlay_active = true;
+		$own                  = get_post_meta( $revision_id, $meta_key, false );
+		$this->overlay_active = false;
+
+		return is_array( $own ) ? $own : array();
+	}
+
+	/**
+	 * Full meta set for a bulk read ($meta_key === '').
+	 *
+	 * ACF primes its cache with one bulk read, so the overlay has to answer this
+	 * shape too — otherwise the fallback is invisible on that path and half the
+	 * fields render empty anyway. Returns core's raw shape: key => list of
+	 * serialized values.
+	 *
+	 * @param int   $revision_id The revision post ID.
+	 * @param int   $parent_id   The parent post ID.
+	 * @param array $proposed    Resolved proposed values.
+	 * @return array
+	 */
+	private function merged_meta( $revision_id, $parent_id, $proposed ) {
+		$this->overlay_active = true;
+		$own                  = get_post_meta( $revision_id );
+		$this->overlay_active = false;
+
+		$inherited = get_post_meta( $parent_id );
+
+		$own       = is_array( $own ) ? $own : array();
+		$inherited = is_array( $inherited ) ? $inherited : array();
+
+		foreach ( array_keys( $inherited ) as $key ) {
+			if ( $this->is_internal_meta_key( $key ) ) {
+				unset( $inherited[ $key ] );
+			}
+		}
+
+		// Parent is the floor, the revision's own meta overrides it, the
+		// proposal wins outright.
+		$merged = array_merge( $inherited, $own );
+
+		foreach ( $proposed as $key => $value ) {
+			$merged[ $key ] = array( maybe_serialize( $value ) );
+		}
+
+		return $merged;
+	}
+
+	/**
+	 * Keys that belong to the plugin's own bookkeeping and never inherit.
+	 *
+	 * @param string $meta_key Key to test.
+	 * @return bool
+	 */
+	private function is_internal_meta_key( $meta_key ) {
+		foreach ( array( '_aa_revision', '_aa_preview', '_edit_lock', '_edit_last' ) as $prefix ) {
+			if ( 0 === strpos( $meta_key, $prefix ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

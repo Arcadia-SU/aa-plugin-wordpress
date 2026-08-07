@@ -95,6 +95,11 @@ class Arcadia_Revision_Metabox {
 		);
 
 		$nonce = wp_create_nonce( 'aa_revision_action' );
+
+		// What this revision actually proposes (Phase 43.2). Until this existed,
+		// the reviewer approved on the strength of a version number and a date.
+		$diff = new Arcadia_Revision_Diff();
+		$rows = $diff->to_display_rows( $diff->build( $pending )['changes'] );
 		?>
 		<div id="aa-revision-banner-content" style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 16px; margin: -6px -12px;">
 			<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
@@ -114,6 +119,59 @@ class Arcadia_Revision_Metabox {
 				<p style="margin: 0 0 12px; color: #664d03; font-style: italic;">
 					&ldquo;<?php echo esc_html( $notes ); ?>&rdquo;
 				</p>
+			<?php endif; ?>
+
+			<?php if ( empty( $rows ) ) : ?>
+				<p style="margin: 0 0 12px; color: #664d03;">
+					<?php esc_html_e( 'This revision proposes new page content only — no individual field is modified. Use Preview to review it.', 'arcadia-agents' ); ?>
+				</p>
+			<?php else : ?>
+				<details style="margin: 0 0 12px;" <?php echo count( $rows ) <= 5 ? 'open' : ''; ?>>
+					<summary style="cursor: pointer; font-weight: 600; color: #664d03; margin-bottom: 8px;">
+						<?php
+						printf(
+							/* translators: %d: number of modified fields */
+							esc_html( _n( '%d field modified', '%d fields modified', count( $rows ), 'arcadia-agents' ) ),
+							count( $rows )
+						);
+						?>
+					</summary>
+					<table style="width: 100%; border-collapse: collapse; font-size: 12px; background: #fff; border: 1px solid #ffe08a;">
+						<thead>
+							<tr style="background: #fff8e1;">
+								<th style="text-align: left; padding: 6px 8px; border-bottom: 1px solid #ffe08a; width: 20%;">
+									<?php esc_html_e( 'Field', 'arcadia-agents' ); ?>
+								</th>
+								<th style="text-align: left; padding: 6px 8px; border-bottom: 1px solid #ffe08a; width: 40%;">
+									<?php esc_html_e( 'Current', 'arcadia-agents' ); ?>
+								</th>
+								<th style="text-align: left; padding: 6px 8px; border-bottom: 1px solid #ffe08a; width: 40%;">
+									<?php esc_html_e( 'Proposed', 'arcadia-agents' ); ?>
+								</th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $rows as $row ) : ?>
+								<tr style="vertical-align: top;">
+									<td style="padding: 6px 8px; border-bottom: 1px solid #f0f0f1;">
+										<code style="font-size: 11px;"><?php echo esc_html( $row['label'] ); ?></code>
+										<?php if ( '' !== $row['note'] ) : ?>
+											<div style="margin-top: 4px; color: #856404; font-size: 11px; font-style: italic;">
+												<?php echo esc_html( $row['note'] ); ?>
+											</div>
+										<?php endif; ?>
+									</td>
+									<td style="padding: 6px 8px; border-bottom: 1px solid #f0f0f1; color: #666;">
+										<?php echo esc_html( $row['current'] ); ?>
+									</td>
+									<td style="padding: 6px 8px; border-bottom: 1px solid #f0f0f1; color: #0a5c36;">
+										<?php echo esc_html( $row['proposed'] ); ?>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				</details>
 			<?php endif; ?>
 
 			<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
@@ -409,6 +467,11 @@ class Arcadia_Revision_Metabox {
 			true
 		);
 
+		// Same rows the classic banner renders — the two surfaces must show the
+		// same thing, so they read the same list rather than each building one.
+		$diff = new Arcadia_Revision_Diff();
+		$rows = $diff->to_display_rows( $diff->build( $pending )['changes'] );
+
 		wp_localize_script(
 			'aa-revision-sidebar',
 			'aaRevisionData',
@@ -419,9 +482,16 @@ class Arcadia_Revision_Metabox {
 				'date'         => $date ?: '',
 				'notes'        => $notes ?: '',
 				'preview_url'  => $preview_url,
+				'changes'      => $rows,
 				'nonce'        => wp_create_nonce( 'aa_revision_action' ),
 				'ajax_url'     => admin_url( 'admin-ajax.php' ),
 				'i18n'         => array(
+					'changes_none'    => __( 'This revision proposes new page content only — no individual field is modified.', 'arcadia-agents' ),
+					/* translators: %d: number of modified fields */
+					'changes_count'   => __( '%d field(s) modified', 'arcadia-agents' ),
+					'changes_hide'    => __( 'Hide details', 'arcadia-agents' ),
+					'changes_current' => __( 'Current', 'arcadia-agents' ),
+					'changes_proposed' => __( 'Proposed', 'arcadia-agents' ),
 					'title'           => __( 'Pending Revision', 'arcadia-agents' ),
 					'approve_confirm' => __( 'Apply this revision to the live article?', 'arcadia-agents' ),
 					'approving'       => __( 'Approving...', 'arcadia-agents' ),

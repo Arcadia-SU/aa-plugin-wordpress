@@ -95,7 +95,10 @@ trait Arcadia_API_Revisions_Handler {
 		}
 
 		$revisions = Arcadia_Revisions::get_instance();
-		$result    = $revisions->format_revision( $revision );
+
+		// true = attach the before/after projection. This is the detail endpoint;
+		// the listing above deliberately stays metadata-only (Phase 43.1).
+		$result = $revisions->format_revision( $revision, true );
 
 		return new WP_REST_Response( $result, 200 );
 	}

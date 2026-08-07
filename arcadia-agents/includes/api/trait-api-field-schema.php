@@ -271,9 +271,62 @@ trait Arcadia_API_Field_Schema_Handler {
 			return;
 		}
 
+		$resolved = $this->resolve_field_schema_mappings( $post_type, $body, $meta );
+		if ( empty( $resolved ) ) {
+			return;
+		}
+
+		// ACF field type map — needed to handle type-specific values (e.g. image sideload).
+		$acf_type_map = $this->build_acf_field_type_map( $post_type );
+
+		foreach ( $resolved as $field_name => $entry ) {
+			$value = $entry['value'];
+
+			// Type-aware: ACF image fields expect an attachment ID, not a URL.
+			// Sideload the URL first, same as process_acf_fields() does.
+			$acf_field_type = $acf_type_map[ $field_name ] ?? 'text';
+			if ( 'image' === $acf_field_type && is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
+				$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
+				if ( is_wp_error( $sideloaded ) ) {
+					// Log warning but don't fail the whole request. Sanitize the
+					// agent-supplied field name first so it can't inject forged
+					// log lines (CR/LF / control chars) into the PHP error log.
+					error_log( sprintf(
+						'[ArcadiaAgents] field_schema sideload failed for %s: %s',
+						sanitize_key( $field_name ),
+						$sideloaded->get_error_message()
+					) );
+					continue;
+				}
+				$value = $sideloaded;
+			}
+
+			update_field( $field_name, $value, $post_id );
+		}
+	}
+
+	/**
+	 * Work out which calibrated fields a payload would write, and from which source.
+	 *
+	 * Read-only twin of the selection half of apply_field_schema_mappings(): it
+	 * reads the stored schema and resolves source values, but writes nothing and
+	 * imports nothing. Extracted so Arcadia_Revision_Diff can tell a reviewer that
+	 * approving a revision will ALSO touch these fields (Phase 43.1) — today those
+	 * writes are completely invisible, since the payload never names them.
+	 *
+	 * Selection lives here and only here: a second copy inside the diff would be
+	 * free to drift, and a diff that disagrees with the writer is worse than no
+	 * diff at all.
+	 *
+	 * @param string $post_type The post type slug.
+	 * @param array  $body      The request body.
+	 * @param array  $meta      The meta array from the request.
+	 * @return array field_name => array{source: string, value: mixed}
+	 */
+	public function resolve_field_schema_mappings( $post_type, $body, $meta ) {
 		$stored = get_option( self::$field_schema_option, array() );
 		if ( empty( $stored[ $post_type ] ) || ! is_array( $stored[ $post_type ] ) ) {
-			return;
+			return array();
 		}
 
 		// Fields already handled by process_acf_fields() — don't overwrite.
@@ -281,21 +334,8 @@ trait Arcadia_API_Field_Schema_Handler {
 		// wysiwyg markdown parse, etc.) that we must not clobber with raw values.
 		$explicit_acf = ! empty( $body['acf_fields'] ) ? array_keys( $body['acf_fields'] ) : array();
 
-		// ACF field type map — needed to handle type-specific values (e.g. image sideload).
-		$acf_type_map = $this->build_acf_field_type_map( $post_type );
-
-		// Build source values map. Its keys MUST be exactly self::mapping_sources() —
-		// asserted by a test, because a source added here without being declared
-		// there would be rejected at PUT time and unreachable, while one declared
-		// there without a value here would be accepted and then silently ignored:
-		// the very defect Phase 42.4 closes.
-		$sources = array(
-			'excerpt'            => isset( $body['excerpt'] ) ? $body['excerpt'] : ( isset( $meta['description'] ) ? $meta['description'] : '' ),
-			'h1'                 => isset( $body['title'] ) ? $body['title'] : '',
-			'meta_title'         => isset( $meta['title'] ) ? $meta['title'] : '',
-			'meta_description'   => isset( $meta['description'] ) ? $meta['description'] : '',
-			'featured_image_url' => isset( $meta['featured_image_url'] ) ? $meta['featured_image_url'] : '',
-		);
+		$sources  = $this->build_field_schema_sources( $body, $meta );
+		$resolved = array();
 
 		foreach ( $stored[ $post_type ] as $field_name => $mapping ) {
 			// Skip fields explicitly set via acf_fields — already processed
@@ -310,35 +350,45 @@ trait Arcadia_API_Field_Schema_Handler {
 
 			$type = isset( $mapping['type'] ) ? $mapping['type'] : '';
 
-			if ( 'mapping' === $type && ! empty( $mapping['source'] ) ) {
-				$source_key = $mapping['source'];
-				if ( isset( $sources[ $source_key ] ) && '' !== $sources[ $source_key ] ) {
-					$value = $sources[ $source_key ];
-
-					// Type-aware: ACF image fields expect an attachment ID, not a URL.
-					// Sideload the URL first, same as process_acf_fields() does.
-					$acf_field_type = $acf_type_map[ $field_name ] ?? 'text';
-					if ( 'image' === $acf_field_type && is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
-						$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
-						if ( is_wp_error( $sideloaded ) ) {
-							// Log warning but don't fail the whole request. Sanitize the
-							// agent-supplied field name first so it can't inject forged
-							// log lines (CR/LF / control chars) into the PHP error log.
-							error_log( sprintf(
-								'[ArcadiaAgents] field_schema sideload failed for %s: %s',
-								sanitize_key( $field_name ),
-								$sideloaded->get_error_message()
-							) );
-							continue;
-						}
-						$value = $sideloaded;
-					}
-
-					update_field( $field_name, $value, $post_id );
-				}
-			}
 			// 'generation' type: the agent passes the value in acf_fields directly.
 			// No action needed here — handled by process_acf_fields().
+			if ( 'mapping' !== $type || empty( $mapping['source'] ) ) {
+				continue;
+			}
+
+			$source_key = $mapping['source'];
+			if ( ! isset( $sources[ $source_key ] ) || '' === $sources[ $source_key ] ) {
+				continue;
+			}
+
+			$resolved[ $field_name ] = array(
+				'source' => $source_key,
+				'value'  => $sources[ $source_key ],
+			);
 		}
+
+		return $resolved;
+	}
+
+	/**
+	 * Map each declared mapping source to the value this payload supplies for it.
+	 *
+	 * Its keys MUST be exactly self::mapping_sources() — asserted by a test,
+	 * because a source added here without being declared there would be rejected
+	 * at PUT time and unreachable, while one declared there without a value here
+	 * would be accepted and then silently ignored: the very defect Phase 42.4 closes.
+	 *
+	 * @param array $body The request body.
+	 * @param array $meta The meta array from the request.
+	 * @return array source_key => value.
+	 */
+	public function build_field_schema_sources( $body, $meta ) {
+		return array(
+			'excerpt'            => isset( $body['excerpt'] ) ? $body['excerpt'] : ( isset( $meta['description'] ) ? $meta['description'] : '' ),
+			'h1'                 => isset( $body['title'] ) ? $body['title'] : '',
+			'meta_title'         => isset( $meta['title'] ) ? $meta['title'] : '',
+			'meta_description'   => isset( $meta['description'] ) ? $meta['description'] : '',
+			'featured_image_url' => isset( $meta['featured_image_url'] ) ? $meta['featured_image_url'] : '',
+		);
 	}
 }
