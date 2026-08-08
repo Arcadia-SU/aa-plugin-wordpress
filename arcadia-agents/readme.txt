@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.4.1
+Stable tag: 0.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -20,7 +20,7 @@ Arcadia Agents is a WordPress plugin that enables seamless integration between y
 * **JWT Authentication** - Asymmetric RS256 authentication for maximum security
 * **Gutenberg Support** - Native WordPress block generation
 * **ACF Blocks Support** - Compatible with Advanced Custom Fields Pro blocks
-* **Granular Permissions** - 8 configurable scopes for fine-grained access control
+* **Granular Permissions** - 14 configurable scopes for fine-grained access control
 
 **How it works:**
 
@@ -50,11 +50,19 @@ Yes. The plugin uses asymmetric JWT authentication (RS256) which means only Arca
 * articles:read - Read articles
 * articles:write - Create/edit articles
 * articles:delete - Delete articles
+* revisions:write - Withdraw its own pending revisions (never approve them)
 * media:read - Read media library
-* media:write - Upload media
+* media:write - Upload/edit media
+* media:delete - Delete media
 * taxonomies:read - Read categories/tags
-* taxonomies:write - Create categories/tags
+* taxonomies:write - Create/edit categories/tags
+* taxonomies:delete - Delete categories/tags
 * site:read - Read site info and pages
+* redirects:read - Read redirects
+* redirects:write - Create/delete redirects
+* settings:write - Update plugin settings
+
+Each one is a checkbox in Settings → Arcadia Agents, off unless you tick it. A permission added by a plugin update always arrives disabled.
 
 = Does it work with page builders? =
 
@@ -65,6 +73,24 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.5.1 =
+Covers everything since 0.3.0. Versions 0.4.0, 0.4.1 and 0.5.0 were built but never released.
+
+* A pending revision now says what it proposes: field-by-field before/after in the API, in the classic editor banner and in the block editor panel
+* Revision previews resolve custom fields against the page they modify instead of rendering an empty shell
+* Pending revisions can be withdrawn through the API — new `revisions:write` permission, disabled by default, and there is deliberately no matching "approve" (approval stays a human decision)
+* An edit held for approval now refuses a `status` change with a clear error instead of accepting it and doing nothing at approval time
+* SEO meta is written to whichever SEO plugin is active — on a Rank Math or AIOSEO site, meta titles and descriptions previously went to Yoast's fields and never appeared
+* Revision previews fixed: a rich-text field no longer renders blank when the edit proposes no page content, repeater/group/flexible fields no longer render a mix of old and new, and themes reading fields off the queried page now see the proposal
+* The before/after list now matches what approval actually writes, and warns when disallowed HTML (iframes, scripts) will be stripped
+* Revision details over the API no longer expose related posts or users in full, and long values are capped and flagged
+
+= 0.3.0 =
+* Write integrity: approving a revision replays the same pipeline as a direct write, so custom fields, taxonomies, featured image and SEO meta are no longer lost
+* A partial update stays partial — an update that does not mention custom fields no longer erases them
+* `meta.title` writes the SEO title only; it no longer renames the post
+* Field calibration can be removed, and an unknown mapping source is rejected instead of stored and ignored
 
 = 0.2.1 =
 * No functional change — static-analysis and CI hygiene only (accurate type annotations in the preview renderer, stale analysis baseline entry removed, coding-standards job repaired)

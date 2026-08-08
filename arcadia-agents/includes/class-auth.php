@@ -316,14 +316,22 @@ class Arcadia_Auth {
 	}
 
 	/**
-	 * All scopes supported by the plugin.
+	 * All scopes supported by the plugin, in the order the settings page shows them.
 	 *
-	 * @var array
+	 * Source of truth for three consumers: route registration, the admin
+	 * checkboxes, and the POST validation that filters what those checkboxes
+	 * submit. The list used to be copied into admin/settings.php twice over (once
+	 * as $all_scopes, once as the $scope_labels map that actually drives the
+	 * render), so a scope added here and nowhere else was enforced by the API and
+	 * ungrantable in the UI — permanently 403, with no clue why.
+	 *
+	 * @var string[]
 	 */
 	private static $all_scopes = array(
 		'articles:read',
 		'articles:write',
 		'articles:delete',
+		'revisions:write',
 		'media:read',
 		'media:write',
 		'media:delete',
@@ -335,6 +343,47 @@ class Arcadia_Auth {
 		'redirects:write',
 		'settings:write',
 	);
+
+	/**
+	 * Every scope the plugin understands.
+	 *
+	 * @return string[]
+	 */
+	public static function all_scopes() {
+		return self::$all_scopes;
+	}
+
+	/**
+	 * Human labels for the admin checkboxes.
+	 *
+	 * Keys MUST be exactly all_scopes(), in the same order — asserted by a test,
+	 * because a scope present here but not there would be rendered and then
+	 * stripped on save, and one present there but not here would never get a
+	 * checkbox at all.
+	 *
+	 * A method, not a property: the strings go through __() and translations are
+	 * not loaded when class properties initialise.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function scope_labels() {
+		return array(
+			'articles:read'     => __( 'Read articles', 'arcadia-agents' ),
+			'articles:write'    => __( 'Create/edit articles', 'arcadia-agents' ),
+			'articles:delete'   => __( 'Delete articles', 'arcadia-agents' ),
+			'revisions:write'   => __( 'Withdraw its own pending revisions', 'arcadia-agents' ),
+			'media:read'        => __( 'Read media library', 'arcadia-agents' ),
+			'media:write'       => __( 'Upload/edit media', 'arcadia-agents' ),
+			'media:delete'      => __( 'Delete media', 'arcadia-agents' ),
+			'taxonomies:read'   => __( 'Read categories/tags', 'arcadia-agents' ),
+			'taxonomies:write'  => __( 'Create/edit categories/tags', 'arcadia-agents' ),
+			'taxonomies:delete' => __( 'Delete categories/tags', 'arcadia-agents' ),
+			'site:read'         => __( 'Read site info & pages', 'arcadia-agents' ),
+			'redirects:read'    => __( 'Read redirects', 'arcadia-agents' ),
+			'redirects:write'   => __( 'Create/delete redirects', 'arcadia-agents' ),
+			'settings:write'    => __( 'Update plugin settings', 'arcadia-agents' ),
+		);
+	}
 
 	/**
 	 * Check if a required scope is enabled in WP admin settings.

@@ -1104,8 +1104,8 @@ Phase 42 avait fermée sur le chemin d'écriture, rouverte sur le chemin de lect
       les champs que le résolveur résout, ce qui est ce sur quoi la correction repose
 - [x] Suite complète : **630 tests / 1961 assertions** (605 → +25). PHPStan local — **No errors**
 - [x] `./build.sh 0.4.1` — **15 gates verts**, zip 406KB
-- [ ] Déploiement manuel sur les 3 sites
-- [ ] Vérification sur préprod (voir ci-dessous)
+- [ ] ~~Déploiement de 0.4.1~~ — **jamais déployée** non plus, remplacée par 0.5.1 (voir 44.3)
+- [ ] Vérification sur préprod (voir ci-dessous) — sur **0.5.1**
 
 ### Vérification de sortie — séparer les deux natures de changement
 
@@ -1118,9 +1118,15 @@ par Oscar). La vérification les sépare donc explicitement :
       du live, header/footer présents, `<p>` et `<h2>` non nuls), avec le seul champ proposé à sa
       nouvelle valeur. C'est le critère de sortie qu'AA a écrit
 - [ ] **Admin** : la bannière déplie l'avant/après ; le panneau Gutenberg montre la même chose
-- [ ] **SEO (nouveau en 0.4.1)** : vérifier quel plugin SEO tourne sur chaque site
-      (`GET /site-info`, ou l'admin). Sur un site Yoast la cible d'écriture est inchangée ; sur un
-      site Rank Math elle change, et c'est le seul endroit où 0.4.1 modifie ce que l'approbation écrit
+- [ ] **SEO** : relevé fait le 2026-08-08 depuis le HTML public — **iselection.com/b2c = Yoast**
+      (cible d'écriture inchangée), **trottinette-tout-terrain.fr = Rank Math** (la cible change).
+      Sur trottinette, toute meta SEO écrite par le plugin avant 0.4.1 est partie dans
+      `_yoast_wpseo_title` / `_yoast_wpseo_metadesc` et n'a jamais été affichée. **À décider :
+      recopier ces valeurs vers les clés `rank_math_*`**, ou les laisser (les meta actuelles du site
+      sont celles saisies à la main, elles sont correctes). Préprod iSelection : non sondé, à
+      vérifier — présumé Yoast comme la prod
+- [ ] Le plugin n'expose nulle part quel plugin SEO tourne sur un site. `get_active_plugin()` existe
+      et n'est branché sur aucun endpoint — à ajouter à `/site-info` quand on y touchera
 
 ### Correction à acter dans nos propres notes
 
@@ -1128,6 +1134,80 @@ AA nous avait écrit le 2026-08-05 « la preview est bonne, rien ne vous attend 
 recopié tel quel dans la vérification 41.2. C'était trop large **des deux côtés** : la sonde mesurait
 la **résolution du template**, jamais le **contenu** rendu. Le template est bon, le contenu est vide.
 Voir la note ajoutée en 41.2.
+
+---
+
+## Phase 44 : Les deux décisions ouvertes, tranchées
+
+*Arbitrage Oscar, 2026-08-08. Les deux dormaient dans `backlog-for-backend.md` depuis le 08-07.*
+
+### 44.1 — `reject` par REST — ✅ FAIT
+
+`POST /contents/{id}/revisions/{revision_id}/reject`, corps optionnel `{ "decision_notes": "…" }`.
+
+- [x] **Pas de jumeau `approve`, et c'est le cœur du design.** Retirer une proposition ne touche
+      jamais le contenu publié ; approuver si. C'est la seule protection que le client a demandée en
+      activant le dispositif — un agent qui approuve ses propres révisions la contournerait
+- [x] **Scope dédié `revisions:write`**, pas `articles:write` : écrire du contenu et détruire une
+      décision qu'un humain s'apprêtait à prendre sont deux pouvoirs différents. Deuxième ligne du
+      tableau de routes à rompre le motif `articles:*`, après `featured-image` — donc épinglée par
+      `ContentRouteParityTest`
+- [x] ⚠️ **Le scope arrive désactivé sur les 3 sites.** `arcadia_agents_scopes` n'utilise la liste
+      complète que si l'option n'a jamais été enregistrée ; sur un site où la page Réglages a déjà
+      été validée, un scope neuf est absent donc refusé. **Il faudra cocher la case sur chaque site**
+      — c'est le bon défaut : une capacité nouvelle se donne, elle ne s'attrape pas en mettant à jour
+- [x] **`decided_by` = `arcadia-agents-api`.** Le `sub` du JWT identifie le *site*, pas une personne :
+      inscrire un login humain dans la piste d'audit serait faux. Une identité machine garde les
+      retraits par API distinguables d'un clic dans wp-admin
+- [x] La vérification d'appartenance (`revision->post_parent === id`) est **partagée** avec le
+      handler de détail — sinon elle est présente sur l'un et oubliée sur l'autre, et n'importe
+      quelle révision serait adressable via n'importe quelle URL de post
+
+**Au passage — la liste des scopes existait en trois exemplaires.** `Arcadia_Auth::$all_scopes`, plus
+deux copies dans `admin/settings.php` (dont la map de libellés, qui est ce qui **pilote réellement le
+rendu**). Un scope ajouté au seul enforcement aurait été refusé par l'API et **incochable dans l'UI** :
+403 permanent, sans indice. `Arcadia_Auth` possède maintenant `all_scopes()` et `scope_labels()`, un
+test épingle que les clés coïncident dans le même ordre.
+
+### 44.2 — `body.status` : 422 sur le chemin révision — ✅ FAIT
+
+Ni « laisser tel quel » ni « appliquer à l'approbation » : **refuser explicitement**.
+
+- [x] **Le fait qui tranche la question :** en mode HITL (`aa_force_draft`), `body.status` n'a *déjà*
+      aucun effet nulle part — sur un post publié l'écriture devient une révision et le statut est
+      perdu, sur un post non publié `build_post_data()` force `draft` de toute façon. Le défaut
+      n'était pas l'absence d'effet, c'était le **silence** sur cette absence
+- [x] Un `PUT` avec `status` sur le chemin révision renvoie **422 `status_not_supported_for_revision`**.
+      Même précédent que `FORBIDDEN_STRUCTURAL_FIELDS` : un champ qui ne peut pas prendre effet se
+      refuse, il ne se laisse pas tomber en silence
+- [x] **Périmètre serré** : sans Force Draft, ou sur un post non publié, l'écriture s'applique
+      directement et `body.status` est honoré comme avant. Test de non-vacuité dédié
+- [x] **Ce qu'on n'a pas fait, et pourquoi.** Faire appliquer le statut à l'approbation ferait passer
+      l'écran HITL de « ceci change du texte » à « ceci peut mettre une page business hors ligne ».
+      Autre rayon d'action : il faudrait une ligne d'avertissement distincte dans le diff et une
+      décision sur l'interaction avec `aa_force_draft`, sous peine de refaire diverger les deux
+      chemins d'écriture (le défaut que 42.1 a fermé). À rouvrir **seulement** si AA répond qu'elle
+      s'appuie sur `status`
+
+### 44.3 — Vérification & release
+
+- [x] **Non-vacuité : 7 mutants, 7 tués** (appartenance contournée, identité humaine dans l'audit,
+      notes ignorées, 422 désarmé, 422 élargi à tous les chemins, scope élargi à `articles:write`,
+      libellé de scope désynchronisé)
+- [x] Suite complète : **638 tests / 2005 assertions**. PHPStan local — **No errors**
+- [x] Changelog `readme.txt` rattrapé — il s'était arrêté à 0.2.1, trois versions en arrière
+- [x] `./build.sh 0.5.1` — **16 gates verts**, zip 409KB. Bump mineur : nouvel endpoint, nouveau
+      scope, et un `PUT` jusqu'ici accepté renvoie désormais 422
+- [x] **Nouveau gate de build #12 : l'entrée de changelog doit exister avant le bump.** Le changelog
+      a été écrit *après* `./build.sh 0.5.0`, donc l'entrée décrivait une autre version que le zip.
+      Impossible à réparer sur place — les trois sources de version ne s'écrivent que par le script,
+      qui refuse de re-couper un numéro. **0.4.0, 0.4.1 et 0.5.0 ont été brûlées comme ça** ; 0.5.1
+      est la première dont le changelog soit exact. Le gate rend l'erreur impossible plutôt que
+      rattrapable, et le changelog `readme.txt` — arrêté à 0.2.1 — est rattrapé en une entrée
+      honnête qui dit que les trois versions intermédiaires n'ont jamais été publiées
+- [ ] Déploiement manuel sur les 3 sites (**0.5.1**, pas 0.4.1 ni 0.5.0)
+- [ ] **Cocher `revisions:write`** dans Réglages sur chacun des 3 sites (sinon 403)
+- [ ] Annoncer à AA : chemin, scope, corps, codes de retour
 
 ---
 

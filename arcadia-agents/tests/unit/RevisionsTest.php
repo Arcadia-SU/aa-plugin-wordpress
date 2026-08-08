@@ -769,6 +769,172 @@ class RevisionsTest extends TestCase {
 	}
 
 	// =========================================================================
+	// POST /contents/{id}/revisions/{rid}/reject
+	// =========================================================================
+
+	/**
+	 * Seed a pending revision on post 42.
+	 *
+	 * @param string $status Revision post status.
+	 * @param int    $parent Parent post ID.
+	 */
+	private function seed_pending_revision( $status = 'pending', $parent = 42 ) {
+		global $_test_posts, $_test_post_meta;
+
+		$_test_posts[1001] = (object) array(
+			'ID'          => 1001,
+			'post_type'   => 'aa_revision',
+			'post_parent' => $parent,
+			'post_title'  => 'Rev 1',
+			'post_status' => $status,
+			'post_date'   => '2026-04-05 14:00:00',
+		);
+		$_test_post_meta[1001] = array( '_aa_revision_version' => 1 );
+	}
+
+	/**
+	 * The residual every e2e rehearsal left behind is now clearable by the caller
+	 * that created it, without a human opening wp-admin.
+	 */
+	public function test_reject_withdraws_a_pending_revision(): void {
+		global $_test_posts, $_test_post_meta;
+
+		$this->create_test_post( 42 );
+		$this->seed_pending_revision();
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_param( 'revision_id', 1001 );
+		$request->set_json_params( array( 'decision_notes' => 'Répétition e2e' ) );
+
+		$result = $this->helper->reject_article_revision( $request );
+
+		$this->assertInstanceOf( \WP_REST_Response::class, $result );
+		$this->assertSame( 200, $result->get_status() );
+		$this->assertTrue( $result->get_data()['rejected'] );
+		$this->assertSame( 'rejected', $_test_posts[1001]->post_status );
+		$this->assertSame( 'Répétition e2e', $_test_post_meta[1001]['_aa_revision_decision_notes'] );
+
+		// The live post is the whole reason reject is exposed and approve is not.
+		$this->assertSame( 'Original Title', $_test_posts[42]->post_title );
+		$this->assertSame( 'publish', $_test_posts[42]->post_status );
+	}
+
+	/**
+	 * The audit trail must not imply a person decided this. The JWT's `sub` names
+	 * the site, not a human, so a fixed machine identity is the honest record —
+	 * and it keeps API withdrawals distinguishable from a click in wp-admin.
+	 */
+	public function test_reject_records_a_machine_identity(): void {
+		global $_test_post_meta;
+
+		$this->create_test_post( 42 );
+		$this->seed_pending_revision();
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_param( 'revision_id', 1001 );
+
+		$this->helper->reject_article_revision( $request );
+
+		$this->assertSame( 'arcadia-agents-api', $_test_post_meta[1001]['_aa_revision_decided_by'] );
+		$this->assertNotEmpty( $_test_post_meta[1001]['_aa_revision_decided_at'] );
+	}
+
+	/**
+	 * Ownership is checked on reject exactly as on the detail read — otherwise any
+	 * revision ID could be withdrawn through any post's URL.
+	 */
+	public function test_reject_refuses_a_revision_of_another_post(): void {
+		global $_test_posts;
+
+		$this->create_test_post( 42 );
+		$this->create_test_post( 99 );
+		$this->seed_pending_revision( 'pending', 99 );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_param( 'revision_id', 1001 );
+
+		$result = $this->helper->reject_article_revision( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'revision_not_found', $result->get_error_code() );
+		$this->assertSame( 'pending', $_test_posts[1001]->post_status, 'Nothing was decided.' );
+	}
+
+	/**
+	 * An already-decided revision cannot be re-decided.
+	 */
+	public function test_reject_refuses_an_already_approved_revision(): void {
+		$this->create_test_post( 42 );
+		$this->seed_pending_revision( 'approved' );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_param( 'revision_id', 1001 );
+
+		$result = $this->helper->reject_article_revision( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'revision_not_pending', $result->get_error_code() );
+	}
+
+	// =========================================================================
+	// body.status on the revision path
+	// =========================================================================
+
+	/**
+	 * An approval cannot change the post status, so proposing one is refused
+	 * rather than accepted and dropped.
+	 *
+	 * approve_revision() builds its $post_data without post_status. Before 0.4.1 a
+	 * PUT proposing `status: draft` on a published post returned 201 with a
+	 * revision, and approving it unpublished nothing — invisible from the caller's
+	 * side, which is what makes it worse than an error.
+	 */
+	public function test_status_on_the_revision_path_is_refused(): void {
+		global $_test_options, $_test_posts;
+
+		$_test_options['aa_force_draft'] = true;
+		$this->create_test_post( 42, 'publish' );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_json_params( array( 'status' => 'draft', 'title' => 'Proposé' ) );
+
+		$result = $this->helper->update_post( $request );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'status_not_supported_for_revision', $result->get_error_code() );
+		$this->assertSame( 422, $result->get_error_data()['status'] );
+
+		// No revision was created for a request that could not be honoured.
+		$this->assertSame( 'publish', $_test_posts[42]->post_status );
+	}
+
+	/**
+	 * Non-vacuity, and the boundary of the refusal: without Force Draft the write
+	 * applies directly and body.status is honoured as it always was. The 422 is
+	 * about the revision path, not about the field.
+	 */
+	public function test_status_still_applies_on_a_direct_write(): void {
+		global $_test_options, $_test_posts;
+
+		$_test_options['aa_force_draft'] = false;
+		$this->create_test_post( 42, 'publish' );
+
+		$request = new \WP_REST_Request();
+		$request->set_param( 'id', 42 );
+		$request->set_json_params( array( 'status' => 'draft' ) );
+
+		$result = $this->helper->update_post( $request );
+
+		$this->assertNotInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'draft', $_test_posts[42]->post_status );
+	}
+
+	// =========================================================================
 	// site-info setting
 	// =========================================================================
 

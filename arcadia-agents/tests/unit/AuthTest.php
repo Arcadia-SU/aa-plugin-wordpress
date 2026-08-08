@@ -357,9 +357,35 @@ class AuthTest extends TestCase {
         $auth   = \Arcadia_Auth::get_instance();
         $result = $auth->get_enabled_scopes();
 
-        $this->assertCount( 13, $result );
+        $this->assertSame( \Arcadia_Auth::all_scopes(), $result );
         $this->assertContains( 'articles:read', $result );
         $this->assertContains( 'settings:write', $result );
+    }
+
+    /**
+     * The settings page renders one checkbox per label and saves only what
+     * all_scopes() allows. A scope in one list and not the other is either
+     * enforced-but-ungrantable (permanent 403 with no clue why) or
+     * displayed-but-stripped-on-save. Both lists live in Arcadia_Auth for that
+     * reason; this pins that they stay in step.
+     */
+    public function test_scope_labels_cover_every_scope_in_order(): void {
+        $this->assertSame(
+            \Arcadia_Auth::all_scopes(),
+            array_keys( \Arcadia_Auth::scope_labels() )
+        );
+
+        foreach ( \Arcadia_Auth::scope_labels() as $scope => $label ) {
+            $this->assertNotSame( '', trim( $label ), sprintf( 'Scope %s has no label.', $scope ) );
+        }
+    }
+
+    /**
+     * Non-vacuity for the check above, and a guard on the decision itself:
+     * withdrawing a pending revision is behind its own scope, not articles:write.
+     */
+    public function test_revision_withdrawal_has_its_own_scope(): void {
+        $this->assertContains( 'revisions:write', \Arcadia_Auth::all_scopes() );
     }
 
     // -------------------------------------------------------

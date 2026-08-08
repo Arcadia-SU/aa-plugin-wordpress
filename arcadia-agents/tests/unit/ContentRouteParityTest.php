@@ -212,6 +212,11 @@ class ContentRouteParityTest extends TestCase {
 			'/(?P<id>\d+)/featured-image'                 => array( 'PUT' => 'media:write' ),
 			'/(?P<id>\d+)/revisions'                      => array( 'GET' => 'articles:read' ),
 			'/(?P<id>\d+)/revisions/(?P<revision_id>\d+)' => array( 'GET' => 'articles:read' ),
+			// The second deliberate break in the articles:* pattern. Withdrawing a
+			// pending revision destroys a decision a human was about to make; that
+			// is not the same power as writing content, so it gets its own scope
+			// and arrives disabled on any site that has saved its settings.
+			'/(?P<id>\d+)/revisions/(?P<revision_id>\d+)/reject' => array( 'POST' => 'revisions:write' ),
 		);
 	}
 

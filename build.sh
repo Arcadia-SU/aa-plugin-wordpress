@@ -263,6 +263,18 @@ else
 	NEW_VERSION="${MAJOR_MINOR}.${NEW_PATCH}"
 fi
 
+# The changelog must already name the version being cut.
+#
+# It cannot be written afterwards: the version sources are only writable through
+# this script, and it refuses to re-cut a number — so a changelog fixed after the
+# fact costs another bump, and the zip that ships carries an entry describing a
+# different release. That is not hypothetical; it is how 0.4.0, 0.4.1 and 0.5.0
+# were burned. Checking here is the only point where the mistake is still free.
+README_FILE="${PLUGIN_DIR}/readme.txt"
+if ! grep -qF "= ${NEW_VERSION} =" "$README_FILE"; then
+	fail "readme.txt has no changelog entry for ${NEW_VERSION}. Add '= ${NEW_VERSION} =' under == Changelog == before building."
+fi
+
 # Arm the rollback before touching any file (see cleanup()).
 PREV_VERSION="$CURRENT_VERSION"
 VERSION_BUMPED=1
@@ -272,7 +284,6 @@ sed -i '' "s/define( 'ARCADIA_AGENTS_VERSION', '${CURRENT_VERSION}' )/define( 'A
 # Update plugin header
 sed -i '' "s/ \* Version: ${CURRENT_VERSION}/ * Version: ${NEW_VERSION}/" "$MAIN_FILE"
 # Keep readme.txt "Stable tag" in lockstep so the WP.org header never drifts.
-README_FILE="${PLUGIN_DIR}/readme.txt"
 sed -i '' "s/^Stable tag: .*/Stable tag: ${NEW_VERSION}/" "$README_FILE"
 
 # Assert the three version sources now agree (poka-yoke against future drift).

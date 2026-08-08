@@ -25,22 +25,16 @@ function arcadia_agents_settings_page() {
 	$connected_at   = get_option( 'arcadia_agents_connected_at', '' );
 	$last_activity  = get_option( 'arcadia_agents_last_activity', '' );
 
-	// Default scopes (all enabled).
-	$all_scopes = array(
-		'articles:read',
-		'articles:write',
-		'articles:delete',
-		'media:read',
-		'media:write',
-		'media:delete',
-		'taxonomies:read',
-		'taxonomies:write',
-		'taxonomies:delete',
-		'site:read',
-		'redirects:read',
-		'redirects:write',
-		'settings:write',
-	);
+	// Scopes come from Arcadia_Auth, which is also what enforces them at request
+	// time. Two copies of this list is how a scope ends up enforced by the API and
+	// ungrantable in the UI.
+	//
+	// Note the consequence for upgrades: `arcadia_agents_scopes` is only used as a
+	// default when the option has never been saved, so a scope added in a new
+	// version arrives DISABLED on any site that has visited this page. That is the
+	// right default for a new capability — it is granted deliberately, never by
+	// installing an update.
+	$all_scopes = Arcadia_Auth::all_scopes();
 
 	$notice        = '';
 	$notice_type   = '';
@@ -102,22 +96,9 @@ function arcadia_agents_settings_page() {
 	// Get current scopes.
 	$enabled_scopes = get_option( 'arcadia_agents_scopes', $all_scopes );
 
-	// Scope labels.
-	$scope_labels = array(
-		'articles:read'    => __( 'Read articles', 'arcadia-agents' ),
-		'articles:write'   => __( 'Create/edit articles', 'arcadia-agents' ),
-		'articles:delete'  => __( 'Delete articles', 'arcadia-agents' ),
-		'media:read'       => __( 'Read media library', 'arcadia-agents' ),
-		'media:write'      => __( 'Upload/edit media', 'arcadia-agents' ),
-		'media:delete'     => __( 'Delete media', 'arcadia-agents' ),
-		'taxonomies:read'  => __( 'Read categories/tags', 'arcadia-agents' ),
-		'taxonomies:write'  => __( 'Create/edit categories/tags', 'arcadia-agents' ),
-		'taxonomies:delete' => __( 'Delete categories/tags', 'arcadia-agents' ),
-		'site:read'         => __( 'Read site info & pages', 'arcadia-agents' ),
-		'redirects:read'    => __( 'Read redirects', 'arcadia-agents' ),
-		'redirects:write'   => __( 'Create/delete redirects', 'arcadia-agents' ),
-		'settings:write'    => __( 'Update plugin settings', 'arcadia-agents' ),
-	);
+	// Scope labels — same source as the list above, so a scope can never be
+	// enforced without being displayable, or displayed without being enforceable.
+	$scope_labels = Arcadia_Auth::scope_labels();
 
 	?>
 	<div class="wrap">

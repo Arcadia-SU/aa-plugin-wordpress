@@ -255,6 +255,22 @@ class Arcadia_API {
 					),
 				),
 			),
+			array(
+				'path'      => '/(?P<id>\d+)/revisions/(?P<revision_id>\d+)/reject',
+				'endpoints' => array(
+					array(
+						'methods'  => 'POST',
+						'callback' => 'reject_article_revision',
+						// The second line in this table that breaks the
+						// articles:* pattern, and for the same kind of reason as
+						// featured-image above: withdrawing a human's pending
+						// decision is not the same power as writing content.
+						// There is deliberately no `approve` twin — see
+						// reject_article_revision().
+						'scope'    => 'revisions:write',
+					),
+				),
+			),
 		);
 	}
 

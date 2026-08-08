@@ -138,8 +138,8 @@ final class Arcadia_Post_Builder {
 
 		// Title — body.title (the visible H1) and NOTHING else.
 		//
-		// meta.title is the SEO meta-title: it writes _yoast_wpseo_title in
-		// finalize_post() and must not also land here. The old `elseif` fallback
+		// meta.title is the SEO meta-title: it writes the active SEO plugin's title
+		// key in finalize_post() and must not also land here. The old `elseif` fallback
 		// meant a caller updating only its meta-title silently renamed the post
 		// (Phase 42.3). api-contract.md:171-177 always said the two are
 		// independent; :180 says only supplied fields are modified.
@@ -155,7 +155,7 @@ final class Arcadia_Post_Builder {
 		// Excerpt — body.excerpt and nothing else, same rule as the title.
 		// `isset` (not `empty`) is deliberate: an explicit "" clears the field,
 		// which is a supplied value. meta.description writes the search snippet
-		// (_yoast_wpseo_metadesc) only.
+		// (the active SEO plugin's description key) only.
 		if ( isset( $body['excerpt'] ) ) {
 			$post_data['post_excerpt'] = sanitize_textarea_field( $body['excerpt'] );
 		}

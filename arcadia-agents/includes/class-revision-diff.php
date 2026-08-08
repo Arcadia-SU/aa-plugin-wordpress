@@ -129,9 +129,11 @@ class Arcadia_Revision_Diff {
 	 * Changes to columns of the post row itself.
 	 *
 	 * Deliberately absent: body.status. approve_revision() builds its $post_data
-	 * without it (class-revisions.php), so a proposed status is never applied.
-	 * Listing it as "proposed" would state something untrue — the gap is real and
-	 * tracked separately, but this class must not paper over it.
+	 * without it (class-revisions.php), so a proposed status is never applied, and
+	 * listing it as "proposed" would state something untrue. Since 0.4.1 the write
+	 * path refuses body.status with a 422 on the revision branch, so no new
+	 * revision can carry one — but revisions stored before that still can, and
+	 * those must stay unlisted for exactly the original reason.
 	 *
 	 * Every gate below mirrors the writer's, key by key, and the mirror is the
 	 * whole point: this class first shipped gating everything on isset(), while

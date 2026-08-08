@@ -475,6 +475,37 @@ trait Arcadia_API_Posts_Handler {
 		if ( get_option( 'aa_force_draft', false )
 			&& 'publish' === $post->post_status
 		) {
+			// body.status cannot travel through a revision, so say so instead of
+			// accepting it.
+			//
+			// approve_revision() builds its $post_data without post_status: a PUT
+			// proposing `status: draft` on a published post created a revision, the
+			// caller got a 200, and approving it unpublished nothing. Silent, and
+			// therefore unfindable from the caller's side.
+			//
+			// The fix is a 422, not "apply it at approval". Making approval able to
+			// unpublish would turn the HITL screen from "this changes some text"
+			// into "this can take a business page offline" — a different blast
+			// radius, needing its own warning row in the diff and its own decision
+			// about how aa_force_draft interacts. Refusing here states the truth
+			// that already holds: with Force Draft on, the agent does not control
+			// status. Same reasoning as FORBIDDEN_STRUCTURAL_FIELDS — a field that
+			// cannot take effect must be rejected, never quietly dropped.
+			//
+			// Scoped to this branch on purpose: without Force Draft, or on a post
+			// that is not published, the write goes straight through and
+			// build_post_data() honours body.status normally.
+			if ( isset( $body['status'] ) ) {
+				return new WP_Error(
+					'status_not_supported_for_revision',
+					__( "This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly.", 'arcadia-agents' ),
+					array(
+						'status' => 422,
+						'field'  => 'status',
+					)
+				);
+			}
+
 			// Render content for revision storage.
 			$revision_content = null;
 			if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {

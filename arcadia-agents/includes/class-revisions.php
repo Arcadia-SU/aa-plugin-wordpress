@@ -276,7 +276,7 @@ class Arcadia_Revisions {
 		$post_data = array( 'ID' => $post_id );
 
 		// Title — body.title (H1) only. meta.title is the SEO meta-title and
-		// lands in _yoast_wpseo_title via finalize_post(), never in post_title
+		// lands in the active SEO plugin's title key via finalize_post(), never in post_title
 		// (Phase 42.3: one incoming field writes exactly one destination).
 		if ( ! empty( $body['title'] ) ) {
 			$post_data['post_title'] = sanitize_text_field( $body['title'] );

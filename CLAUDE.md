@@ -116,13 +116,18 @@ Le script exécute ces checks avant de créer le zip :
 | 9 | Autoloader audit (pas de dev deps) | Oui |
 | 10 | Vendor completeness (firebase/php-jwt) | Oui |
 | 11 | Boot test (autoloader charge) | Oui |
-| 12 | Version bump + sync readme `Stable tag` | Oui |
+| 12 | **Entrée de changelog présente** pour la version cible + version bump + sync readme `Stable tag` | Oui |
 | 13 | Création du zip | Oui |
 | 14 | Zip content audit (pas de tests/dev deps) | Oui |
 | 15 | Zip size en octets (warning si > 500KB) | Warning |
 | – | Restauration dev deps + rollback version (trap EXIT) | - |
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`, et le bump de version est annulé — un build avorté ne doit pas laisser l'arbre sur une version jamais packagée (c'est exactement ce qui s'est produit des Phases 31 à 38 : 0.1.30 → 0.1.37 sans aucun zip).
+
+**Écrire l'entrée de changelog AVANT de builder.** Le check #12 la réclame, parce qu'après coup il est
+trop tard : les trois sources de version ne s'écrivent que par ce script, et il refuse de re-couper un
+numéro déjà pris. Un changelog corrigé après le build coûte donc un bump de plus, et le zip livré
+décrit une autre release. C'est exactement comme ça que 0.4.0, 0.4.1 et 0.5.0 ont été brûlées.
 
 **Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
 
