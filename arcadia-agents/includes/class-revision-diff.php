@@ -133,6 +133,15 @@ class Arcadia_Revision_Diff {
 	 * Listing it as "proposed" would state something untrue — the gap is real and
 	 * tracked separately, but this class must not paper over it.
 	 *
+	 * Every gate below mirrors the writer's, key by key, and the mirror is the
+	 * whole point: this class first shipped gating everything on isset(), while
+	 * approve_revision()/build_post_data() gate most fields on ! empty(). A payload
+	 * carrying `title: ""` was therefore listed as a proposed change that approval
+	 * then silently skipped — the reviewer approves an edit, nothing moves, and no
+	 * message says why. `excerpt` really is isset(): an explicit "" clears it
+	 * (build_post_data(), Phase 42.3), and that asymmetry is the reason the gates
+	 * are spelled out one by one instead of shared behind a single rule.
+	 *
 	 * @param WP_Post $parent Live post.
 	 * @param array   $body   Proposed body.
 	 * @param array   $meta   Proposed meta.
@@ -141,13 +150,16 @@ class Arcadia_Revision_Diff {
 	private function post_changes( $parent, $body, $meta ) {
 		$changes = array();
 
-		if ( isset( $body['title'] ) ) {
+		// Writer: build_post_data() / approve_revision(), `! empty( $body['title'] )`.
+		if ( ! empty( $body['title'] ) ) {
 			$changes[] = $this->entry( 'title', 'post', $parent->post_title, $body['title'] );
 		}
+		// Writer: build_post_data(), `isset( $body['excerpt'] )` — "" is a value.
 		if ( isset( $body['excerpt'] ) ) {
 			$changes[] = $this->entry( 'excerpt', 'post', $parent->post_excerpt, $body['excerpt'] );
 		}
-		if ( isset( $meta['slug'] ) ) {
+		// Writer: build_post_data() / approve_revision(), `! empty( $meta['slug'] )`.
+		if ( ! empty( $meta['slug'] ) ) {
 			$changes[] = $this->entry( 'meta.slug', 'post', $parent->post_name, $meta['slug'] );
 		}
 
@@ -157,26 +169,30 @@ class Arcadia_Revision_Diff {
 	/**
 	 * Changes to the search-snippet fields.
 	 *
-	 * Read through Arcadia_SEO_Meta so the "before" comes from whichever SEO
-	 * plugin the site actually runs, not from a hardcoded Yoast meta key.
+	 * Reads the exact cell approval will overwrite (Arcadia_SEO_Meta::storage_keys()),
+	 * not get_seo_meta()'s display view. On a site with no SEO plugin those differ:
+	 * the display view falls back to post_title/post_excerpt, so the row would have
+	 * read "current: <the H1>" and looked like the H1 was about to be replaced —
+	 * while approval writes an SEO meta key and leaves the H1 alone.
 	 *
 	 * @param WP_Post $parent Live post.
 	 * @param array   $meta   Proposed meta.
 	 * @return array
 	 */
 	private function seo_changes( $parent, $meta ) {
-		if ( ! isset( $meta['title'] ) && ! isset( $meta['description'] ) ) {
+		// Writer: finalize_post(), `! empty( $meta['title'] )` / `! empty( $meta['description'] )`.
+		if ( empty( $meta['title'] ) && empty( $meta['description'] ) ) {
 			return array();
 		}
 
-		$seo     = Arcadia_SEO_Meta::get_seo_meta( $parent->ID );
+		$seo     = Arcadia_SEO_Meta::get_stored_seo_meta( $parent->ID );
 		$changes = array();
 
-		if ( isset( $meta['title'] ) ) {
-			$changes[] = $this->entry( 'meta.title', 'seo', $seo['meta_title'] ?? '', $meta['title'] );
+		if ( ! empty( $meta['title'] ) ) {
+			$changes[] = $this->entry( 'meta.title', 'seo', $seo['meta_title'], $meta['title'] );
 		}
-		if ( isset( $meta['description'] ) ) {
-			$changes[] = $this->entry( 'meta.description', 'seo', $seo['meta_description'] ?? '', $meta['description'] );
+		if ( ! empty( $meta['description'] ) ) {
+			$changes[] = $this->entry( 'meta.description', 'seo', $seo['meta_description'], $meta['description'] );
 		}
 
 		return $changes;
@@ -192,7 +208,11 @@ class Arcadia_Revision_Diff {
 	private function taxonomy_changes( $parent, $meta ) {
 		$changes = array();
 
-		if ( isset( $meta['categories'] ) ) {
+		// Writer: finalize_post(), `! empty( … ) && is_array( … )`. An empty array
+		// does NOT clear the terms — wp_set_post_categories() is never reached — so
+		// listing `categories: []` as a proposed change would promise a wipe that
+		// approval does not perform.
+		if ( ! empty( $meta['categories'] ) && is_array( $meta['categories'] ) ) {
 			$current   = wp_get_post_categories( $parent->ID, array( 'fields' => 'names' ) );
 			$changes[] = $this->entry(
 				'meta.categories',
@@ -201,7 +221,7 @@ class Arcadia_Revision_Diff {
 				$meta['categories']
 			);
 		}
-		if ( isset( $meta['tags'] ) ) {
+		if ( ! empty( $meta['tags'] ) && is_array( $meta['tags'] ) ) {
 			$current   = wp_get_post_tags( $parent->ID, array( 'fields' => 'names' ) );
 			$changes[] = $this->entry(
 				'meta.tags',
@@ -217,28 +237,37 @@ class Arcadia_Revision_Diff {
 	/**
 	 * Featured image changes, compared as URLs.
 	 *
+	 * Both rows hang off `featured_image_url`, because that is how the writer works:
+	 * finalize_post() only enters this branch when the URL is non-empty, and the alt
+	 * text is passed as an argument to that one sideload call. An alt sent on its own
+	 * is never written, so it is never listed.
+	 *
 	 * @param WP_Post $parent Live post.
 	 * @param array   $meta   Proposed meta.
 	 * @return array
 	 */
 	private function media_changes( $parent, $meta ) {
-		$changes = array();
+		// Writer: finalize_post(), `! empty( $meta['featured_image_url'] )`.
+		if ( empty( $meta['featured_image_url'] ) ) {
+			return array();
+		}
 
-		if ( isset( $meta['featured_image_url'] ) ) {
-			$thumb_id  = get_post_thumbnail_id( $parent->ID );
-			$current   = $thumb_id ? wp_get_attachment_url( $thumb_id ) : '';
-			$changes[] = $this->entry(
+		$thumb_id = get_post_thumbnail_id( $parent->ID );
+		$current  = $thumb_id ? wp_get_attachment_url( $thumb_id ) : '';
+
+		$changes = array(
+			$this->entry(
 				'meta.featured_image_url',
 				'media',
 				$current ? $current : '',
 				$meta['featured_image_url'],
 				'sideload_image'
-			);
-		}
+			),
+		);
+
 		if ( isset( $meta['featured_image_alt'] ) ) {
-			$thumb_id  = get_post_thumbnail_id( $parent->ID );
-			$current   = $thumb_id ? (string) get_post_meta( $thumb_id, '_wp_attachment_image_alt', true ) : '';
-			$changes[] = $this->entry( 'meta.featured_image_alt', 'media', $current, $meta['featured_image_alt'] );
+			$current_alt = $thumb_id ? (string) get_post_meta( $thumb_id, '_wp_attachment_image_alt', true ) : '';
+			$changes[]   = $this->entry( 'meta.featured_image_alt', 'media', $current_alt, $meta['featured_image_alt'] );
 		}
 
 		return $changes;
@@ -320,12 +349,18 @@ class Arcadia_Revision_Diff {
 		foreach ( $resolved as $field_name => $entry ) {
 			$field_type = $type_map[ $field_name ] ?? 'text';
 
-			// Mirrors the one type-aware branch of apply_field_schema_mappings():
-			// an image field fed a URL is sideloaded. Everything else is verbatim.
-			$transform = null;
-			if ( 'image' === $field_type && is_string( $entry['value'] ) && filter_var( $entry['value'], FILTER_VALIDATE_URL ) ) {
-				$transform = 'sideload_image';
-			}
+			// The one type-aware branch of apply_field_schema_mappings() is the image
+			// sideload, and it now delegates to coerce_field_value() — so this asks
+			// coerce_field_value()'s own describer instead of re-encoding the rule.
+			// Three spellings of "is this a sideload?" (filter_var here, filter_var
+			// in the writer, any-non-empty-string in describe_field_transform) is how
+			// a protocol-relative URL got three different answers (Phase 43.5).
+			//
+			// Restricted to `image`: calibration writes every other type verbatim, it
+			// does not run the wysiwyg branch the acf_fields path does.
+			$transform = 'image' === $field_type
+				? $api->describe_field_transform( $entry['value'], 'image' )
+				: null;
 
 			$changes[] = $this->entry(
 				'acf_fields.' . $field_name,
@@ -345,6 +380,119 @@ class Arcadia_Revision_Diff {
 	 * How many characters of a value the admin surfaces show before truncating.
 	 */
 	const DISPLAY_LIMIT = 300;
+
+	/**
+	 * How many characters of a *current* value the REST detail ships per field.
+	 *
+	 * Far more generous than DISPLAY_LIMIT — a caller comparing values needs more
+	 * than a preview — but still a ceiling. Unbounded, a page whose editorial lives
+	 * in a dozen wysiwyg fields turned one revision detail into hundreds of KB.
+	 * Only `current` is clipped: `proposed` is the caller's own payload echoed back,
+	 * and api-contract promises it verbatim.
+	 */
+	const API_VALUE_LIMIT = 5000;
+
+	/**
+	 * Structure ceilings for an API-facing value: nesting depth and items per level.
+	 */
+	const API_MAX_DEPTH = 8;
+	const API_MAX_ITEMS = 200;
+
+	/**
+	 * Make the changes list safe to put on the wire.
+	 *
+	 * Two jobs, both about `current`, which is the only side read off the site:
+	 *
+	 * 1. Objects never travel whole. An ACF post_object / relationship / user field
+	 *    set to "return object" makes get_fields() hand back WP_Post or WP_User
+	 *    instances, and json-encoding those ships post_password, the entire
+	 *    post_content, user_email and user_login to whoever holds a read scope.
+	 *    They collapse to {object, id}, which is all a diff needs.
+	 * 2. Size is bounded, so a revision detail cannot become a multi-hundred-KB
+	 *    response. Anything clipped is flagged rather than quietly shortened —
+	 *    a consumer that diffs values must be able to tell it got a prefix.
+	 *
+	 * @param array $changes The 'changes' list from build().
+	 * @return array Same list, each entry gaining 'current_truncated'.
+	 */
+	public function to_api_changes( $changes ) {
+		$out = array();
+
+		foreach ( $changes as $change ) {
+			$truncated                   = false;
+			$change['current']           = self::api_safe( $change['current'], $truncated, 0 );
+			$change['current_truncated'] = $truncated;
+			$out[]                       = $change;
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Recursively bound and de-objectify one value.
+	 *
+	 * @param mixed $value     Value to sanitise.
+	 * @param bool  $truncated Set to true if anything was clipped (by reference).
+	 * @param int   $depth     Current recursion depth.
+	 * @return mixed
+	 */
+	private static function api_safe( $value, &$truncated, $depth ) {
+		if ( $depth > self::API_MAX_DEPTH ) {
+			$truncated = true;
+			return null;
+		}
+
+		if ( is_object( $value ) ) {
+			return self::identify_object( $value );
+		}
+
+		if ( is_array( $value ) ) {
+			$out   = array();
+			$count = 0;
+			foreach ( $value as $key => $item ) {
+				++$count;
+				if ( $count > self::API_MAX_ITEMS ) {
+					$truncated = true;
+					break;
+				}
+				$out[ $key ] = self::api_safe( $item, $truncated, $depth + 1 );
+			}
+			return $out;
+		}
+
+		if ( is_string( $value ) && strlen( $value ) > self::API_VALUE_LIMIT ) {
+			$truncated = true;
+			// mb_strcut cuts on a byte budget without splitting a character;
+			// mb_substr would count characters and blow the budget on accents.
+			return function_exists( 'mb_strcut' )
+				? mb_strcut( $value, 0, self::API_VALUE_LIMIT )
+				: substr( $value, 0, self::API_VALUE_LIMIT );
+		}
+
+		return $value;
+	}
+
+	/**
+	 * Reduce any object to a reference. See to_api_changes() for why.
+	 *
+	 * @param object $value The object.
+	 * @return array{object:string, id:int|null}
+	 */
+	private static function identify_object( $value ) {
+		$id = null;
+
+		foreach ( array( 'ID', 'id', 'term_id' ) as $property ) {
+			if ( isset( $value->$property ) ) {
+				$id = (int) $value->$property;
+				break;
+			}
+		}
+
+		return array(
+			'object' => get_class( $value ),
+			'id'     => $id,
+		);
+	}
 
 	/**
 	 * Flatten changes into display-ready rows.
@@ -384,7 +532,10 @@ class Arcadia_Revision_Diff {
 
 		switch ( $change['transform'] ) {
 			case 'markdown_to_html':
-				$notes[] = __( 'Markdown will be converted to HTML on approval.', 'arcadia-agents' );
+				$notes[] = __( 'Markdown will be converted to HTML and sanitised on approval; disallowed tags such as iframe or script are removed.', 'arcadia-agents' );
+				break;
+			case 'sanitize_html':
+				$notes[] = __( 'The HTML will be sanitised on approval; disallowed tags such as iframe or script are removed.', 'arcadia-agents' );
 				break;
 			case 'copy_rendered_content':
 				$notes[] = __( 'This field will receive the proposed page content.', 'arcadia-agents' );
@@ -417,6 +568,12 @@ class Arcadia_Revision_Diff {
 			// the other means "stored, and empty".
 			return '—';
 		}
+
+		// Same de-objectifying pass the REST detail gets: an admin screen has no
+		// more business rendering a serialized WP_User than a JSON response does.
+		$discard = false;
+		$value   = self::api_safe( $value, $discard, 0 );
+
 		if ( is_bool( $value ) ) {
 			return $value ? 'true' : 'false';
 		}
@@ -432,7 +589,7 @@ class Arcadia_Revision_Diff {
 			$value = (string) wp_json_encode( $value );
 		}
 
-		$value = trim( preg_replace( '/\s+/u', ' ', (string) $value ) );
+		$value = self::collapse_whitespace( (string) $value );
 
 		if ( function_exists( 'mb_strimwidth' ) ) {
 			return mb_strimwidth( $value, 0, self::DISPLAY_LIMIT, '…' );
@@ -441,6 +598,30 @@ class Arcadia_Revision_Diff {
 		return strlen( $value ) > self::DISPLAY_LIMIT
 			? substr( $value, 0, self::DISPLAY_LIMIT - 1 ) . '…'
 			: $value;
+	}
+
+	/**
+	 * Squash runs of whitespace to single spaces, safely on any byte sequence.
+	 *
+	 * The /u modifier makes preg_replace() return NULL — not the subject — when the
+	 * input is not valid UTF-8, and legacy pages migrated from a latin1 database
+	 * routinely are. Unguarded, that null flowed into trim() and the Current cell
+	 * rendered blank: the reviewer reads "this field is empty", approves, and
+	 * overwrites content that was there all along. Same trap the markdown parser
+	 * documents at Arcadia_Markdown_Parser::parse_block_markdown().
+	 *
+	 * @param string $value Raw string.
+	 * @return string Never null.
+	 */
+	private static function collapse_whitespace( $value ) {
+		$collapsed = preg_replace( '/\s+/u', ' ', $value );
+
+		if ( null === $collapsed ) {
+			// Byte-wise fallback: no /u, so no UTF-8 precondition to violate.
+			$collapsed = preg_replace( '/\s+/', ' ', $value );
+		}
+
+		return trim( null === $collapsed ? $value : $collapsed );
 	}
 
 	/**

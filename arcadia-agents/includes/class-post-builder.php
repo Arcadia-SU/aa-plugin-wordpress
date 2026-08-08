@@ -345,11 +345,19 @@ final class Arcadia_Post_Builder {
 		}
 
 		// SEO meta — meta.title is the SEO meta-title, distinct from post_title (H1).
+		//
+		// Keys come from Arcadia_SEO_Meta, the same class the read path uses. They
+		// used to be the Yoast keys spelled out here, which meant that on a Rank
+		// Math site the API read `rank_math_title` and wrote `_yoast_wpseo_title`:
+		// the write went to a key nothing displays, and the revision diff announced
+		// a change approval never delivered (Phase 43.5).
+		$seo_keys = Arcadia_SEO_Meta::storage_keys();
+
 		if ( ! empty( $meta['title'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_title', sanitize_text_field( $meta['title'] ) );
+			update_post_meta( $post_id, $seo_keys['meta_title'], sanitize_text_field( $meta['title'] ) );
 		}
 		if ( ! empty( $meta['description'] ) ) {
-			update_post_meta( $post_id, '_yoast_wpseo_metadesc', sanitize_textarea_field( $meta['description'] ) );
+			update_post_meta( $post_id, $seo_keys['meta_description'], sanitize_textarea_field( $meta['description'] ) );
 		}
 
 		// ACF fields. UPDATE falls back to existing post_content if rendered is empty

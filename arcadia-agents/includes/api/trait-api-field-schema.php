@@ -267,12 +267,17 @@ trait Arcadia_API_Field_Schema_Handler {
 	 * @param array  $meta      The meta array from the request.
 	 */
 	public function apply_field_schema_mappings( $post_id, $post_type, $body, $meta ) {
-		if ( ! function_exists( 'update_field' ) ) {
-			return;
-		}
-
+		// The ACF gate that MATTERS now lives in resolve_field_schema_mappings():
+		// read-only callers (the revision diff, the preview overlay) call it too, so
+		// they reach the same verdict instead of announcing writes that could not
+		// happen. One gate, one place.
+		//
+		// The function_exists() below is therefore unreachable by construction — it
+		// stays because it is what makes the update_field() call at the bottom of
+		// this method statically provable, and a precondition a reader can check
+		// locally is worth one redundant boolean.
 		$resolved = $this->resolve_field_schema_mappings( $post_type, $body, $meta );
-		if ( empty( $resolved ) ) {
+		if ( empty( $resolved ) || ! function_exists( 'update_field' ) ) {
 			return;
 		}
 
@@ -282,23 +287,28 @@ trait Arcadia_API_Field_Schema_Handler {
 		foreach ( $resolved as $field_name => $entry ) {
 			$value = $entry['value'];
 
-			// Type-aware: ACF image fields expect an attachment ID, not a URL.
-			// Sideload the URL first, same as process_acf_fields() does.
+			// Type-aware: ACF image fields expect an attachment ID, never a string.
+			// Delegated to coerce_field_value() — the acf_fields path's own rule —
+			// so there is exactly one answer to "is this image value sideloaded?".
+			// This branch used to gate on filter_var(FILTER_VALIDATE_URL), which
+			// let a protocol-relative URL through as a raw string and wrote it into
+			// an image field, producing a broken field and a diff that disagreed
+			// with both the writer and the preview (Phase 43.5).
 			$acf_field_type = $acf_type_map[ $field_name ] ?? 'text';
-			if ( 'image' === $acf_field_type && is_string( $value ) && filter_var( $value, FILTER_VALIDATE_URL ) ) {
-				$sideloaded = Arcadia_ACF_Adapter::sideload_image_field( $value, $post_id );
-				if ( is_wp_error( $sideloaded ) ) {
+			if ( 'image' === $acf_field_type ) {
+				$coerced = $this->coerce_field_value( $value, 'image', '', false, $post_id );
+				if ( is_wp_error( $coerced ) ) {
 					// Log warning but don't fail the whole request. Sanitize the
 					// agent-supplied field name first so it can't inject forged
 					// log lines (CR/LF / control chars) into the PHP error log.
 					error_log( sprintf(
 						'[ArcadiaAgents] field_schema sideload failed for %s: %s',
 						sanitize_key( $field_name ),
-						$sideloaded->get_error_message()
+						$coerced->get_error_message()
 					) );
 					continue;
 				}
-				$value = $sideloaded;
+				$value = $coerced;
 			}
 
 			update_field( $field_name, $value, $post_id );
@@ -324,6 +334,13 @@ trait Arcadia_API_Field_Schema_Handler {
 	 * @return array field_name => array{source: string, value: mixed}
 	 */
 	public function resolve_field_schema_mappings( $post_type, $body, $meta ) {
+		// Without ACF there is no update_field() and therefore no calibrated write.
+		// The gate lives here rather than in apply_field_schema_mappings() so that
+		// what a reader is told and what a writer does cannot disagree.
+		if ( ! function_exists( 'update_field' ) ) {
+			return array();
+		}
+
 		$stored = get_option( self::$field_schema_option, array() );
 		if ( empty( $stored[ $post_type ] ) || ! is_array( $stored[ $post_type ] ) ) {
 			return array();

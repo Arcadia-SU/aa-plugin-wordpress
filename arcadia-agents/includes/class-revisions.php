@@ -524,7 +524,9 @@ class Arcadia_Revisions {
 		if ( $include_changes ) {
 			$diff                    = new Arcadia_Revision_Diff();
 			$projection              = $diff->build( $revision );
-			$data['changes']         = $projection['changes'];
+			// to_api_changes(), not the raw list: it bounds value size and refuses
+			// to serialize WP objects an ACF relationship field may hand back.
+			$data['changes']         = $diff->to_api_changes( $projection['changes'] );
 			$data['content_changed'] = $projection['content_changed'];
 			$data['skip_markdown']   = $projection['skip_markdown'];
 		}

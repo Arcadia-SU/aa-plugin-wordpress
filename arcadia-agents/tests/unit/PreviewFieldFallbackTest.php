@@ -104,11 +104,13 @@ class PreviewFieldFallbackTest extends TestCase {
 	/**
 	 * Seed parent + revision, then arm the overlay.
 	 *
-	 * @param array $payload     Stored _aa_revision_meta payload.
-	 * @param array $parent_meta Meta stored on the live post.
-	 * @param array $rev_meta    Extra meta stored on the revision itself.
+	 * @param array  $payload      Stored _aa_revision_meta payload.
+	 * @param array  $parent_meta  Meta stored on the live post.
+	 * @param array  $rev_meta     Extra meta stored on the revision itself.
+	 * @param string $rev_content  The revision's own post_content. '' models a PUT
+	 *                             that proposed fields but no page content.
 	 */
-	private function arm( array $payload, array $parent_meta = array(), array $rev_meta = array() ) {
+	private function arm( array $payload, array $parent_meta = array(), array $rev_meta = array(), $rev_content = '<p>proposed content</p>' ) {
 		global $_test_posts, $_test_post_meta;
 
 		$_test_posts[10] = (object) array(
@@ -133,7 +135,7 @@ class PreviewFieldFallbackTest extends TestCase {
 			'post_title'     => 'Proposed',
 			'post_name'      => '',
 			'post_status'    => 'pending',
-			'post_content'   => '<p>proposed content</p>',
+			'post_content'   => $rev_content,
 			'post_excerpt'   => '',
 			'post_author'    => 1,
 			'post_date'      => '2026-08-02 10:00:00',
@@ -371,14 +373,164 @@ class PreviewFieldFallbackTest extends TestCase {
 	}
 
 	// =========================================================================
+	// The preview must show what approval would produce, not something else
+	// =========================================================================
+
+	/**
+	 * `wysiwyg: null` means "copy the page content into this field". When the
+	 * revision proposes no content of its own, approval copies the LIVE post's
+	 * content (finalize_post falls back to it) — so the preview must too.
+	 *
+	 * Reading only the revision's post_content copied '' into the field: the
+	 * preview blanked a field that approval would have preserved, and a reviewer
+	 * looking at an empty block rejects a revision that was correct. That is the
+	 * exact failure Phase 43.3 set out to end, reintroduced one level down.
+	 */
+	public function test_wysiwyg_null_copies_live_content_when_the_revision_proposes_none(): void {
+		$this->register_acf_group( 'page', array( array( 'corps', 'wysiwyg' ) ) );
+
+		$this->arm(
+			array(
+				'body' => array( 'acf_fields' => array( 'corps' => null ) ),
+				'meta' => array(),
+			),
+			array( 'corps' => '<p>Ancien corps</p>' ),
+			array(),
+			'' // The PUT touched fields only; no content was proposed.
+		);
+
+		$this->assertSame(
+			'<p>live content</p>',
+			get_post_meta( 11, 'corps', true ),
+			'Mirror finalize_post(): no proposed content means the live content is copied.'
+		);
+	}
+
+	/**
+	 * The revision's own content still wins when it has some.
+	 */
+	public function test_wysiwyg_null_copies_the_proposed_content_when_there_is_some(): void {
+		$this->register_acf_group( 'page', array( array( 'corps', 'wysiwyg' ) ) );
+
+		$this->arm(
+			array(
+				'body' => array( 'acf_fields' => array( 'corps' => null ) ),
+				'meta' => array(),
+			),
+			array( 'corps' => '<p>Ancien corps</p>' )
+		);
+
+		$this->assertSame( '<p>proposed content</p>', get_post_meta( 11, 'corps', true ) );
+	}
+
+	/**
+	 * A repeater is not stored under its own name — ACF keeps a row count there and
+	 * one meta key per sub-field per row. Handing back the payload array made ACF
+	 * read intval(array) = 1 and render a single row filled from the PARENT's
+	 * sub-field keys: neither the current page nor the proposal, but a chimera of
+	 * both. Showing the parent's real rows is the honest fallback; the diff is what
+	 * announces the change.
+	 */
+	public function test_structured_fields_fall_back_to_the_parent(): void {
+		$this->register_acf_group(
+			'page',
+			array(
+				array( 'blocs', 'repeater' ),
+				array( 'groupe', 'group' ),
+				array( 'flex', 'flexible_content' ),
+				array( 'chapo_1', 'wysiwyg' ),
+			)
+		);
+
+		$this->arm(
+			array(
+				'body' => array(
+					'acf_fields' => array(
+						'blocs'   => array( array( 'titre' => 'A' ), array( 'titre' => 'B' ) ),
+						'groupe'  => array( 'titre' => 'G' ),
+						'flex'    => array( array( 'acf_fc_layout' => 'x' ) ),
+						'chapo_1' => 'Nouveau',
+					),
+				),
+				'meta' => array(),
+			),
+			array(
+				'blocs'         => 3,
+				'blocs_0_titre' => 'Rangée live',
+				'groupe_titre'  => 'Groupe live',
+				'flex'          => 2,
+				'chapo_1'       => '<p>Ancien</p>',
+			)
+		);
+
+		$this->assertSame( 3, get_post_meta( 11, 'blocs', true ), 'Row count stays the parent\'s.' );
+		$this->assertSame( 'Rangée live', get_post_meta( 11, 'blocs_0_titre', true ) );
+		$this->assertSame( 'Groupe live', get_post_meta( 11, 'groupe_titre', true ) );
+		$this->assertSame( 2, get_post_meta( 11, 'flex', true ) );
+
+		// Non-vacuity: a scalar field in the same payload still gets overlaid, so
+		// the assertions above are about the field type and not a dead overlay.
+		$this->assertSame( '<p>Nouveau</p>', get_post_meta( 11, 'chapo_1', true ) );
+	}
+
+	// =========================================================================
 	// Scope
 	// =========================================================================
 
 	/**
-	 * The overlay is scoped to the revision. Reading the parent must be untouched,
-	 * or a preview would start rewriting the live page's own field reads.
+	 * A read addressed to the parent still belongs to the preview — but only for
+	 * the fields the revision actually proposes.
+	 *
+	 * The overlay was first keyed to the revision ID alone. That looked right and
+	 * was the most dangerous shape available: setup_preview_state() points
+	 * queried_object/queried_object_id at the PARENT, so every theme calling
+	 * get_field( 'x', get_queried_object_id() ) addressed the live post and got
+	 * live values. The page rendered full, well-formed and stale, with nothing on
+	 * screen to suggest the proposal had been ignored.
+	 *
+	 * Everything the revision does NOT propose must still read through untouched:
+	 * the parent remains the source of truth, and its own bookkeeping is never
+	 * rewritten.
 	 */
-	public function test_parent_reads_are_untouched(): void {
+	public function test_parent_reads_carry_the_proposal_and_nothing_else(): void {
+		$this->register_acf_group(
+			'page',
+			array( array( 'chapo_1', 'wysiwyg' ), array( 'chapo_2', 'wysiwyg' ) )
+		);
+
+		$this->arm(
+			array(
+				'body' => array( 'acf_fields' => array( 'chapo_1' => 'Nouveau' ) ),
+				'meta' => array(),
+			),
+			array(
+				'chapo_1' => '<p>Ancien</p>',
+				'chapo_2' => '<p>Intouché</p>',
+			)
+		);
+
+		$this->assertSame(
+			'<p>Nouveau</p>',
+			get_post_meta( 10, 'chapo_1', true ),
+			'A theme reading off the queried object must see the proposal, not the live value.'
+		);
+		$this->assertSame(
+			'<p>Intouché</p>',
+			get_post_meta( 10, 'chapo_2', true ),
+			'A field the revision does not propose is the parent\'s, unchanged.'
+		);
+		$this->assertSame(
+			'parent-secret-token',
+			get_post_meta( 10, '_aa_preview_token', true ),
+			'The parent\'s own bookkeeping is never rewritten.'
+		);
+	}
+
+	/**
+	 * Non-vacuity for the rule above: the parent branch answers proposed keys only,
+	 * so a bulk read of the parent is not turned into the revision's merged view.
+	 */
+	public function test_parent_bulk_read_is_not_hijacked(): void {
 		$this->register_acf_group( 'page', array( array( 'chapo_1', 'wysiwyg' ) ) );
 
 		$this->arm(
@@ -389,8 +541,10 @@ class PreviewFieldFallbackTest extends TestCase {
 			array( 'chapo_1' => '<p>Ancien</p>' )
 		);
 
-		$this->assertSame( '<p>Ancien</p>', get_post_meta( 10, 'chapo_1', true ) );
-		$this->assertSame( 'parent-secret-token', get_post_meta( 10, '_aa_preview_token', true ) );
+		$all = get_post_meta( 10 );
+
+		$this->assertArrayHasKey( '_aa_preview_token', $all );
+		$this->assertSame( array( 'parent-secret-token' ), $all['_aa_preview_token'] );
 	}
 
 	/**

@@ -256,15 +256,20 @@ trait Arcadia_API_ACF_Fields_Handler {
 	 * @param mixed  $value         The incoming value from the payload.
 	 * @param string $field_type    The ACF field type.
 	 * @param bool   $skip_markdown True when the value is already-rendered HTML.
-	 * @return string|null 'markdown_to_html' | 'copy_rendered_content' | 'sideload_image', or
-	 *                     null when the value is stored verbatim.
+	 * @return string|null 'markdown_to_html' | 'sanitize_html' | 'copy_rendered_content' |
+	 *                     'sideload_image', or null when the value is stored verbatim.
 	 */
 	public function describe_field_transform( $value, $field_type, $skip_markdown = false ) {
 		if ( 'wysiwyg' === $field_type ) {
 			if ( null === $value ) {
 				return 'copy_rendered_content';
 			}
-			return $skip_markdown ? null : 'markdown_to_html';
+			// skip_markdown is NOT "stored verbatim": parse_rich() still runs the
+			// value through wp_kses_post(), which drops <iframe>, <script>, <form>
+			// and any attribute outside the allowed list. Reporting null here told
+			// the reviewer nothing would happen while an embed was being silently
+			// removed — the one screen whose job is to be trustworthy, lying.
+			return $skip_markdown ? 'sanitize_html' : 'markdown_to_html';
 		}
 
 		if ( 'image' === $field_type ) {

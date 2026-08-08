@@ -1028,6 +1028,82 @@ grave que celui qu'on ferme. Un test le garde (`test_building_a_diff_writes_noth
 - [x] PHPStan local (`memory_limit=3G`) — **No errors**. Deux entrées de baseline devenues orphelines
       supprimées, et le code mort qu'elles couvraient (`0 === $value` après `empty()`) retiré
 - [x] `./build.sh 0.4.0` — **15 gates verts**, dont le check de fidélité sur vrai WordPress. Zip 401KB
+- [ ] ~~Déploiement de 0.4.0~~ — **jamais déployée**, remplacée par 0.4.1 (voir 43.5)
+
+### 43.5 — Code review : le descripteur avait dérivé du scripteur — ✅ FAIT
+
+*Revue multi-agents lancée le 2026-08-07 après le build 0.4.0, avant tout déploiement.
+10 findings vérifiés (9 CONFIRMED, 1 PLAUSIBLE), tous corrigés ici.*
+
+**Le thème est une correction à ce qu'on avait écrit en 43.2.** La parité entre les deux surfaces
+admin était bien structurelle. Mais le principe « un seul pipeline, plusieurs appelants » n'a pas tenu
+là où il comptait le plus : **entre ce qui décrit et ce qui écrit**. C'est la classe de défaut que la
+Phase 42 avait fermée sur le chemin d'écriture, rouverte sur le chemin de lecture.
+
+**La preview montrait un écran qui n'était ni l'avant ni l'après — le contraire de son objet :**
+
+- [x] **`wysiwyg: null` vidait le champ.** `finalize_post()` retombe sur le contenu **du parent** quand
+      la révision ne propose pas de contenu ; la preview ne lisait que celui de la révision, souvent
+      vide. Le relecteur voyait un bloc blanc et rejetait une révision correcte. Miroir du writer,
+      fallback compris
+- [x] **Les champs structurés affichaient une chimère.** ACF ne range pas un repeater sous son propre
+      nom (compteur de lignes + une clé par sous-champ et par ligne). Injecter le tableau brut faisait
+      lire `intval(array) = 1` : **une** ligne, remplie depuis les sous-clés **du parent**. Repeater,
+      group, flexible_content et clone retombent maintenant sur le parent — comme les images en URL,
+      et pour la même raison : réimplémenter le stockage d'ACF sur un chemin de lecture se casserait
+      chez le client
+- [x] **La superposition ratait les lectures adressées au parent.** `setup_preview_state()` pointe
+      `queried_object` sur le parent : tout thème lisant `get_field( 'x', get_queried_object_id() )`
+      obtenait les valeurs live. Le mode de défaillance le plus dangereux du lot — la page rendait
+      pleine, bien formée et périmée, sans rien à l'écran pour le laisser deviner
+
+**Le diff annonçait des changements que l'approbation ne fait pas :**
+
+- [x] **`isset()` contre `!empty()`.** Le diff ouvrait sur `isset`, les scripteurs ferment sur
+      `!empty` pour le titre, le slug, les meta SEO, les taxonomies et l'image à la une. Un
+      `title: ""` était listé puis silencieusement ignoré. Chaque garde cite désormais la ligne du
+      scripteur qu'elle reflète — `excerpt` reste en `isset` (un `""` explicite efface, Phase 42.3),
+      et c'est cette asymétrie qui interdit de factoriser en une règle unique
+- [x] **L'alt de l'image à la une** n'est écrit qu'à l'intérieur de la branche `featured_image_url` :
+      envoyé seul, il n'est plus listé
+- [x] **SEO : lecture multi-plugin, écriture Yoast en dur.** `Arcadia_SEO_Meta::storage_keys()` est
+      désormais la source unique des deux sens. Sur un site Rank Math, l'écriture partait dans une clé
+      que rien n'affiche ; sur un site nu, le diff montrait le H1 en « valeur courante » alors que
+      l'approbation ne touche pas au H1. **C'est un changement de ce que l'approbation écrit** — hors
+      du périmètre initial « montrer sans rien changer », intégré ici parce que corriger le seul
+      descripteur aurait maquillé le défaut
+- [x] **Trois orthographes de « est-ce un sideload ? »** — `filter_var(VALIDATE_URL)` chez le writer
+      field-schema, la même recopiée dans le diff, « toute chaîne non vide » dans
+      `describe_field_transform()`. Une URL protocole-relative recevait trois réponses contradictoires
+      et finissait écrite brute dans un champ image. Le writer field-schema délègue maintenant à
+      `coerce_field_value()` : une règle, une implémentation, trois consommateurs
+- [x] **La garde ACF était restée du mauvais côté de l'extraction.** Déplacée dans
+      `resolve_field_schema_mappings()`, que lisent aussi le diff et la preview
+
+**Deux défauts de sûreté :**
+
+- [x] **`transform: null` sur `skip_markdown` était un mensonge.** `parse_rich( $v, true )` est
+      `wp_kses_post()` : un `<iframe>` disparaît. Nouvelle valeur `sanitize_html`, annoncée sur les
+      trois surfaces. **Le test de lockstep ne l'attrapait pas** : son unique cas `skip_markdown`
+      (`<h2>T</h2>`) traverse kses intact, donc il ne prouvait rien. Toutes les sondes sont maintenant
+      choisies pour être visiblement transformées
+- [x] **Le détail REST expédiait les valeurs brutes.** Un champ ACF `post_object`/`relationship`/`user`
+      en « retour objet » fait renvoyer des `WP_Post`/`WP_User` par `get_fields()` — sérialisés, ils
+      emportent `post_password`, le `post_content` entier, `user_email`. `to_api_changes()` réduit tout
+      objet à `{object, id}` et borne `current` à 5 000 caractères avec un `current_truncated` explicite.
+      `proposed` reste verbatim : c'est le payload de l'appelant, et l'`api-contract` le promet tel quel
+- [x] **`preg_replace('/\s+/u')` renvoie `null`** sur du contenu non-UTF-8 (pages migrées depuis
+      latin1). La cellule « valeur courante » s'affichait vide : le relecteur lit « champ vide »,
+      approuve, et écrase un texte qui était là. Repli octet par octet
+
+**Vérification :**
+
+- [x] **Non-vacuité : 12 mutants, 11 tués.** Le survivant est la garde `function_exists('update_field')` —
+      inexerçable en processus (le bootstrap définit le stub inconditionnellement, et PHP ne sait pas
+      dé-définir une fonction). Couvert autrement : un test prouve que le writer écrit **exactement**
+      les champs que le résolveur résout, ce qui est ce sur quoi la correction repose
+- [x] Suite complète : **630 tests / 1961 assertions** (605 → +25). PHPStan local — **No errors**
+- [x] `./build.sh 0.4.1` — **15 gates verts**, zip 406KB
 - [ ] Déploiement manuel sur les 3 sites
 - [ ] Vérification sur préprod (voir ci-dessous)
 
@@ -1042,6 +1118,9 @@ par Oscar). La vérification les sépare donc explicitement :
       du live, header/footer présents, `<p>` et `<h2>` non nuls), avec le seul champ proposé à sa
       nouvelle valeur. C'est le critère de sortie qu'AA a écrit
 - [ ] **Admin** : la bannière déplie l'avant/après ; le panneau Gutenberg montre la même chose
+- [ ] **SEO (nouveau en 0.4.1)** : vérifier quel plugin SEO tourne sur chaque site
+      (`GET /site-info`, ou l'admin). Sur un site Yoast la cible d'écriture est inchangée ; sur un
+      site Rank Math elle change, et c'est le seul endroit où 0.4.1 modifie ce que l'approbation écrit
 
 ### Correction à acter dans nos propres notes
 

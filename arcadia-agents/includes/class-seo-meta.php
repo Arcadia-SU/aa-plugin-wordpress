@@ -46,6 +46,70 @@ class Arcadia_SEO_Meta {
 	}
 
 	/**
+	 * The two meta keys this plugin reads AND writes for the search snippet.
+	 *
+	 * Single source of truth for both directions. Until Phase 43.5 the write path
+	 * hardcoded the Yoast keys (Arcadia_Post_Builder::finalize_post) while the read
+	 * path went through get_seo_meta() above — so on a Rank Math site the API
+	 * reported `rank_math_title` as the current value and then wrote
+	 * `_yoast_wpseo_title`, a key Rank Math never reads. The write landed nowhere
+	 * visible and the revision diff promised a change that approval never made.
+	 *
+	 * 'none' maps to the Yoast keys on purpose: that is what every site written by
+	 * this plugin already carries, and it means the values survive installing Yoast
+	 * later. It also keeps meta.title/meta.description out of post_title/post_excerpt,
+	 * which are the H1 and the excerpt and belong to body.* alone (Phase 42.3).
+	 *
+	 * Caveat, deliberately not papered over: AIOSEO keeps its authoritative copy in
+	 * its own table, so writing `_aioseo_title` post meta may not reach its UI. That
+	 * mirrors what the reader already assumes; making the two agree is the point here,
+	 * and a real AIOSEO integration is a separate piece of work.
+	 *
+	 * @return array{meta_title:string, meta_description:string}
+	 */
+	public static function storage_keys() {
+		switch ( self::get_active_plugin() ) {
+			case 'rankmath':
+				return array(
+					'meta_title'       => 'rank_math_title',
+					'meta_description' => 'rank_math_description',
+				);
+			case 'aioseo':
+				return array(
+					'meta_title'       => '_aioseo_title',
+					'meta_description' => '_aioseo_description',
+				);
+			case 'yoast':
+			default:
+				return array(
+					'meta_title'       => '_yoast_wpseo_title',
+					'meta_description' => '_yoast_wpseo_metadesc',
+				);
+		}
+	}
+
+	/**
+	 * Read back exactly what this plugin would overwrite.
+	 *
+	 * get_seo_meta() answers "what does the site say today", which on a bare site
+	 * means post_title/post_excerpt. That is the right answer for the API's read
+	 * endpoints and the WRONG one for a before/after diff: approval will not touch
+	 * post_title, it will write the key storage_keys() names. A diff must compare
+	 * against the cell it is about to overwrite, not against a display fallback.
+	 *
+	 * @param int $post_id The post ID.
+	 * @return array{meta_title:string, meta_description:string}
+	 */
+	public static function get_stored_seo_meta( $post_id ) {
+		$keys = self::storage_keys();
+
+		return array(
+			'meta_title'       => (string) get_post_meta( $post_id, $keys['meta_title'], true ),
+			'meta_description' => (string) get_post_meta( $post_id, $keys['meta_description'], true ),
+		);
+	}
+
+	/**
 	 * Detect which SEO plugin is active (if any).
 	 *
 	 * @return string Plugin identifier: 'yoast', 'rankmath', 'aioseo', or 'none'.

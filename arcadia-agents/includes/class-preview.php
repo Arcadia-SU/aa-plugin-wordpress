@@ -283,7 +283,29 @@ class Arcadia_Preview {
 			function ( $value, $object_id, $meta_key, $single ) use ( $revision_id, $parent_id, $proposed ) {
 				unset( $single ); // Core takes [0] of whatever array we return.
 
-				if ( (int) $object_id !== $revision_id || $this->overlay_active ) {
+				if ( $this->overlay_active ) {
+					return $value;
+				}
+
+				$object_id = (int) $object_id;
+
+				// A read aimed at the PARENT still belongs to this preview. The loop
+				// yields the revision, but setup_preview_state() points
+				// queried_object/queried_object_id at the parent — so a theme calling
+				// get_field('x', get_queried_object_id()), or any of the many plugins
+				// that read off the queried object, addressed the live post and got
+				// live values. The page rendered full and well-formed with none of the
+				// proposal in it: the most dangerous failure mode this feature has,
+				// because nothing looks wrong. Only proposed keys are answered here —
+				// the parent is the source of truth for everything else.
+				if ( $object_id === $parent_id && $parent_id !== $revision_id ) {
+					if ( '' !== $meta_key && array_key_exists( $meta_key, $proposed ) ) {
+						return array( $proposed[ $meta_key ] );
+					}
+					return $value;
+				}
+
+				if ( $object_id !== $revision_id ) {
 					return $value;
 				}
 
@@ -310,13 +332,33 @@ class Arcadia_Preview {
 				// ACF stores every field as a pair: `name` and `_name` (the field key).
 				// A generic key-by-key rule carries both automatically — which is
 				// exactly why the rule is generic and not a list of field names.
-				$inherited = get_post_meta( $parent_id, $meta_key, false );
+				$inherited = $this->parent_meta( $parent_id, $meta_key );
 
 				return empty( $inherited ) ? $value : $inherited;
 			},
 			10,
 			4
 		);
+	}
+
+	/**
+	 * Read a key off the parent with the overlay stood down.
+	 *
+	 * The parent branch of the filter answers proposed keys, so an unguarded read
+	 * here would bounce back through it. Nothing would break today — the caller
+	 * already returned for proposed keys — but the re-entrancy is the kind that
+	 * stops being harmless the moment either branch grows a case.
+	 *
+	 * @param int    $parent_id The parent post ID.
+	 * @param string $meta_key  Key to read.
+	 * @return array Raw values.
+	 */
+	private function parent_meta( $parent_id, $meta_key ) {
+		$this->overlay_active = true;
+		$inherited            = get_post_meta( $parent_id, $meta_key, false );
+		$this->overlay_active = false;
+
+		return is_array( $inherited ) ? $inherited : array();
 	}
 
 	/**
@@ -348,10 +390,22 @@ class Arcadia_Preview {
 		$type_map = $api->build_acf_field_type_map( $parent->post_type );
 		$proposed = array();
 
+		// What a `wysiwyg: null` field copies. finalize_post() uses the revision's
+		// rendered content, and falls back to the LIVE post's content when the
+		// revision proposes none — so a PUT that only touches ACF fields keeps the
+		// page body it already had. Reading only $revision->post_content here meant
+		// copying '' into the field: the preview blanked a field that approval would
+		// have preserved, and the reviewer rejected a correct revision on the
+		// strength of it. Mirror the writer, including its fallback.
+		$content_for_acf = (string) $revision->post_content;
+		if ( '' === $content_for_acf ) {
+			$content_for_acf = (string) $parent->post_content;
+		}
+
 		$explicit = isset( $body['acf_fields'] ) && is_array( $body['acf_fields'] ) ? $body['acf_fields'] : array();
 		foreach ( $explicit as $field_name => $raw ) {
 			$field_type = $type_map[ $field_name ] ?? 'text';
-			$resolved   = $this->resolve_for_render( $api, $raw, $field_type, $revision->post_content, $skip_markdown );
+			$resolved   = $this->resolve_for_render( $api, $raw, $field_type, $content_for_acf, $skip_markdown );
 			if ( null !== $resolved ) {
 				$proposed[ $field_name ] = $resolved;
 			}
@@ -360,7 +414,7 @@ class Arcadia_Preview {
 		// Calibrated fields the payload never names, but approval will write.
 		foreach ( $api->resolve_field_schema_mappings( $parent->post_type, $body, $meta ) as $field_name => $entry ) {
 			$field_type = $type_map[ $field_name ] ?? 'text';
-			$resolved   = $this->resolve_for_render( $api, $entry['value'], $field_type, $revision->post_content, $skip_markdown );
+			$resolved   = $this->resolve_for_render( $api, $entry['value'], $field_type, $content_for_acf, $skip_markdown );
 			if ( null !== $resolved ) {
 				$proposed[ $field_name ] = $resolved;
 			}
@@ -370,16 +424,42 @@ class Arcadia_Preview {
 	}
 
 	/**
+	 * ACF field types the overlay cannot stand in for, and must not try to.
+	 *
+	 * ACF does not store these under their own name. A repeater is a row count in
+	 * `field` plus one meta key per sub-field per row (`field_0_title`); groups,
+	 * flexible content and clones decompose the same way. Handing the raw payload
+	 * array back under the bare name made ACF read it as the row count — intval()
+	 * of a non-empty array is 1 — and render exactly one row, filled from the
+	 * PARENT's sub-field keys. The result matched neither the current page nor the
+	 * proposal, which is worse than showing the current page unchanged: a reviewer
+	 * can recognise "this hasn't updated", but not "this is a chimera".
+	 *
+	 * Decomposing the payload into row keys here would mean reimplementing ACF's
+	 * storage layout on a read path, and getting it subtly wrong in a way that only
+	 * shows up on the client's site. These fields fall back to the parent's live
+	 * value and the before/after diff is what announces the change — the same
+	 * documented limit as an image proposed by URL.
+	 *
+	 * @return string[]
+	 */
+	private static function structured_field_types() {
+		return array( 'repeater', 'group', 'flexible_content', 'clone' );
+	}
+
+	/**
 	 * Coerce one proposed value for display, or decline to.
 	 *
 	 * Delegates to the write path's own coercion so markdown renders as markup
 	 * here exactly as it will once approved — duplicating those rules would
 	 * rebuild the divergence Phase 42.1 closed.
 	 *
-	 * Declines (returns null) for an image proposed as a URL: turning it into an
-	 * attachment ID means importing the file, and a page render is not allowed
-	 * to create media. Such a field shows the parent's current image, and the
-	 * before/after diff is what announces the change.
+	 * Declines (returns null) in two cases, both falling back to the parent's live
+	 * value with the before/after diff left to announce the change:
+	 *   - an image proposed as a URL — turning it into an attachment ID means
+	 *     importing the file, and a page render may not create media;
+	 *   - a structured field (repeater, group, flexible content, clone) — see
+	 *     structured_field_types() for why standing in for one is worse than not.
 	 *
 	 * @param Arcadia_API $api           API instance holding the coercion pipeline.
 	 * @param mixed       $raw           Proposed value as the agent sent it.
@@ -389,6 +469,10 @@ class Arcadia_Preview {
 	 * @return mixed|null Coerced value, or null to leave the field to the parent.
 	 */
 	private function resolve_for_render( $api, $raw, $field_type, $post_content, $skip_markdown ) {
+		if ( in_array( $field_type, self::structured_field_types(), true ) ) {
+			return null;
+		}
+
 		if ( 'sideload_image' === $api->describe_field_transform( $raw, $field_type, $skip_markdown ) ) {
 			return null;
 		}
@@ -429,9 +513,8 @@ class Arcadia_Preview {
 	private function merged_meta( $revision_id, $parent_id, $proposed ) {
 		$this->overlay_active = true;
 		$own                  = get_post_meta( $revision_id );
+		$inherited            = get_post_meta( $parent_id );
 		$this->overlay_active = false;
-
-		$inherited = get_post_meta( $parent_id );
 
 		$own       = is_array( $own ) ? $own : array();
 		$inherited = is_array( $inherited ) ? $inherited : array();

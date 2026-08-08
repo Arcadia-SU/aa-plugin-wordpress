@@ -989,6 +989,14 @@ if ( ! function_exists( 'sanitize_title' ) ) {
     }
 }
 
+// sanitize_key() stub — used when logging an agent-supplied field name, so the
+// name cannot inject CR/LF into the PHP error log.
+if ( ! function_exists( 'sanitize_key' ) ) {
+    function sanitize_key( $key ) {
+        return preg_replace( '/[^a-z0-9_\-]/', '', strtolower( (string) $key ) );
+    }
+}
+
 // wp_delete_attachment() stub.
 if ( ! function_exists( 'wp_delete_attachment' ) ) {
     function wp_delete_attachment( $attachment_id, $force = false ) {
