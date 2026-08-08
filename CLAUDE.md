@@ -124,6 +124,29 @@ Le script exécute ces checks avant de créer le zip :
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`, et le bump de version est annulé — un build avorté ne doit pas laisser l'arbre sur une version jamais packagée (c'est exactement ce qui s'est produit des Phases 31 à 38 : 0.1.30 → 0.1.37 sans aucun zip).
 
+### Choisir le numéro
+
+Un seul critère : **est-ce qu'un intégrateur doit lire les notes avant de mettre à jour ?**
+
+| | Quand | Exemples réels |
+|---|---|---|
+| **MAJOR** | On retire ou on casse quelque chose de publié | Suppression de `/articles*` (2027-02-01), publication WP.org en 1.0.0 |
+| **MINOR** | Il y a du nouveau à utiliser, **ou** quelque chose marche autrement qu'avant | Nouvel endpoint, nouveau scope, nouveau champ de réponse, un appel accepté qui devient 422, une écriture qui change de destination, un rendu qui change |
+| **PATCH** | Le contrat est identique, seule la conformité s'améliore | CI, analyse statique, perf, un bug qui empêchait le comportement **déjà documenté** de se produire |
+
+**Le piège : raisonner sur l'origine du changement au lieu de son effet observable.** `0.4.1` a été
+numérotée en patch parce qu'elle sortait d'une code review — alors qu'elle déplaçait la clé
+d'écriture des meta SEO, donc « quelque chose marche autrement ». C'était un minor. Ce n'est pas
+« d'où vient le correctif » qui décide, c'est « est-ce que l'appelant voit une différence ».
+
+**Le raccourci :** le check #12 oblige à écrire l'entrée de changelog avant le bump — donc relire ses
+propres puces suffit. Une puce qui dit *new*, *no longer*, *now refuses*, ou qui décrit un
+déplacement → minor. Que des *fixed* sans rien à changer côté appelant → patch.
+
+Historique à connaître : de `0.1.2` à `0.1.38`, tout est passé en patch, y compris un dashboard admin,
+un nouveau scope et la suppression d'un endpoint. C'était `./build.sh` sans argument par réflexe, pas
+un choix. Ne pas prendre cette série comme précédent.
+
 **Écrire l'entrée de changelog AVANT de builder.** Le check #12 la réclame, parce qu'après coup il est
 trop tard : les trois sources de version ne s'écrivent que par ce script, et il refuse de re-couper un
 numéro déjà pris. Un changelog corrigé après le build coûte donc un bump de plus, et le zip livré
