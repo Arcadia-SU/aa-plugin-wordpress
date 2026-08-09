@@ -5,9 +5,11 @@ le build teste désormais N-1 **et** la plus vieille version déployée, `deploy
 rituel de déploiement écrit dans [`deploy.md`](deploy.md) ; CI durcie : matrice PHPUnit
 8.1–8.3 + PHPCompatibility 8.0+ bloquant)
 
-> **Prochain front de travail :** v0.5.2 est déployée sur **les 3 sites** (2026-08-09).
-> Reste : (1) cocher `revisions:write` dans Réglages sur chaque site,
-> (2) annoncer `reject` à AA (chemin, scope, corps, codes de retour). Détail en Phase 44.
+> **Prochain front de travail :** v0.5.2 déployée sur **les 3 sites**, `revisions:write` coché
+> partout, `reject` annoncé à AA (Phase 44 → archivée). Reste ouvert : (1) la **vérification de
+> sortie 43.5 sur préprod** — désormais débloquée puisque préprod est en 0.5.2, (2) approuver
+> `92277` à la main dans l'admin préprod (restaure la page de test AA), (3) attendre le retour AA
+> (répétition e2e du `reject`, bascule connector `/contents`).
 
 > **Archives :** une phase quitte ce fichier quand **toutes** ses cases sont cochées.
 > Phases 0–26 → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md) ·
@@ -58,6 +60,7 @@ rituel de déploiement écrit dans [`deploy.md`](deploy.md) ; CI durcie : matric
 | 38 | Revue de la revue — durcissement passthrough round-trip | 2026-06 |
 | 39 | Markdown inline dans les cellules de table ACF (`acf/table`) | 2026-07 |
 | 42 | Intégrité d'écriture des champs — 4 défauts absents de v0.2.0 | 2026-08 |
+| 44 | `reject` par REST (scope `revisions:write`) + 422 sur `body.status` — v0.5.1, déployée en 0.5.2 sur les 3 sites | 2026-08 |
 | 45 | Upgrade-path test (gate #15) : le build teste la mise à jour N-1 → N + archive `dist/` | 2026-08 |
 
 ---
@@ -558,7 +561,7 @@ Phase 42 avait fermée sur le chemin d'écriture, rouverte sur le chemin de lect
 - [x] Suite complète : **630 tests / 1961 assertions** (605 → +25). PHPStan local — **No errors**
 - [x] `./build.sh 0.4.1` — **15 gates verts**, zip 406KB
 - [ ] ~~Déploiement de 0.4.1~~ — **jamais déployée** non plus, remplacée par 0.5.1 (voir 44.3)
-- [ ] Vérification sur préprod (voir ci-dessous) — sur **0.5.1**
+- [ ] Vérification sur préprod (voir ci-dessous) — sur **0.5.2** (déployée le 2026-08-09)
 
 ### Vérification de sortie — séparer les deux natures de changement
 
@@ -587,82 +590,6 @@ AA nous avait écrit le 2026-08-05 « la preview est bonne, rien ne vous attend 
 recopié tel quel dans la vérification 41.2. C'était trop large **des deux côtés** : la sonde mesurait
 la **résolution du template**, jamais le **contenu** rendu. Le template est bon, le contenu est vide.
 Voir la note ajoutée en 41.2.
-
----
-
-## Phase 44 : Les deux décisions ouvertes, tranchées
-
-*Arbitrage Oscar, 2026-08-08. Les deux dormaient dans `backlog-for-backend.md` depuis le 08-07.*
-
-### 44.1 — `reject` par REST — ✅ FAIT
-
-`POST /contents/{id}/revisions/{revision_id}/reject`, corps optionnel `{ "decision_notes": "…" }`.
-
-- [x] **Pas de jumeau `approve`, et c'est le cœur du design.** Retirer une proposition ne touche
-      jamais le contenu publié ; approuver si. C'est la seule protection que le client a demandée en
-      activant le dispositif — un agent qui approuve ses propres révisions la contournerait
-- [x] **Scope dédié `revisions:write`**, pas `articles:write` : écrire du contenu et détruire une
-      décision qu'un humain s'apprêtait à prendre sont deux pouvoirs différents. Deuxième ligne du
-      tableau de routes à rompre le motif `articles:*`, après `featured-image` — donc épinglée par
-      `ContentRouteParityTest`
-- [x] ⚠️ **Le scope arrive désactivé sur les 3 sites.** `arcadia_agents_scopes` n'utilise la liste
-      complète que si l'option n'a jamais été enregistrée ; sur un site où la page Réglages a déjà
-      été validée, un scope neuf est absent donc refusé. **Il faudra cocher la case sur chaque site**
-      — c'est le bon défaut : une capacité nouvelle se donne, elle ne s'attrape pas en mettant à jour
-- [x] **`decided_by` = `arcadia-agents-api`.** Le `sub` du JWT identifie le *site*, pas une personne :
-      inscrire un login humain dans la piste d'audit serait faux. Une identité machine garde les
-      retraits par API distinguables d'un clic dans wp-admin
-- [x] La vérification d'appartenance (`revision->post_parent === id`) est **partagée** avec le
-      handler de détail — sinon elle est présente sur l'un et oubliée sur l'autre, et n'importe
-      quelle révision serait adressable via n'importe quelle URL de post
-
-**Au passage — la liste des scopes existait en trois exemplaires.** `Arcadia_Auth::$all_scopes`, plus
-deux copies dans `admin/settings.php` (dont la map de libellés, qui est ce qui **pilote réellement le
-rendu**). Un scope ajouté au seul enforcement aurait été refusé par l'API et **incochable dans l'UI** :
-403 permanent, sans indice. `Arcadia_Auth` possède maintenant `all_scopes()` et `scope_labels()`, un
-test épingle que les clés coïncident dans le même ordre.
-
-### 44.2 — `body.status` : 422 sur le chemin révision — ✅ FAIT
-
-Ni « laisser tel quel » ni « appliquer à l'approbation » : **refuser explicitement**.
-
-- [x] **Le fait qui tranche la question :** en mode HITL (`aa_force_draft`), `body.status` n'a *déjà*
-      aucun effet nulle part — sur un post publié l'écriture devient une révision et le statut est
-      perdu, sur un post non publié `build_post_data()` force `draft` de toute façon. Le défaut
-      n'était pas l'absence d'effet, c'était le **silence** sur cette absence
-- [x] Un `PUT` avec `status` sur le chemin révision renvoie **422 `status_not_supported_for_revision`**.
-      Même précédent que `FORBIDDEN_STRUCTURAL_FIELDS` : un champ qui ne peut pas prendre effet se
-      refuse, il ne se laisse pas tomber en silence
-- [x] **Périmètre serré** : sans Force Draft, ou sur un post non publié, l'écriture s'applique
-      directement et `body.status` est honoré comme avant. Test de non-vacuité dédié
-- [x] **Ce qu'on n'a pas fait, et pourquoi.** Faire appliquer le statut à l'approbation ferait passer
-      l'écran HITL de « ceci change du texte » à « ceci peut mettre une page business hors ligne ».
-      Autre rayon d'action : il faudrait une ligne d'avertissement distincte dans le diff et une
-      décision sur l'interaction avec `aa_force_draft`, sous peine de refaire diverger les deux
-      chemins d'écriture (le défaut que 42.1 a fermé). À rouvrir **seulement** si AA répond qu'elle
-      s'appuie sur `status`
-
-### 44.3 — Vérification & release
-
-- [x] **Non-vacuité : 7 mutants, 7 tués** (appartenance contournée, identité humaine dans l'audit,
-      notes ignorées, 422 désarmé, 422 élargi à tous les chemins, scope élargi à `articles:write`,
-      libellé de scope désynchronisé)
-- [x] Suite complète : **638 tests / 2005 assertions**. PHPStan local — **No errors**
-- [x] Changelog `readme.txt` rattrapé — il s'était arrêté à 0.2.1, trois versions en arrière
-- [x] `./build.sh 0.5.1` — **16 gates verts**, zip 409KB. Bump mineur : nouvel endpoint, nouveau
-      scope, et un `PUT` jusqu'ici accepté renvoie désormais 422
-- [x] **Nouveau gate de build #12 : l'entrée de changelog doit exister avant le bump.** Le changelog
-      a été écrit *après* `./build.sh 0.5.0`, donc l'entrée décrivait une autre version que le zip.
-      Impossible à réparer sur place — les trois sources de version ne s'écrivent que par le script,
-      qui refuse de re-couper un numéro. **0.4.0, 0.4.1 et 0.5.0 ont été brûlées comme ça** ; 0.5.1
-      est la première dont le changelog soit exact. Le gate rend l'erreur impossible plutôt que
-      rattrapable, et le changelog `readme.txt` — arrêté à 0.2.1 — est rattrapé en une entrée
-      honnête qui dit que les trois versions intermédiaires n'ont jamais été publiées
-- [x] Déploiement manuel sur les 3 sites — finalement en **0.5.2** (buildée le 2026-08-09) :
-      `www.iselection.com` et `www.trottinette-tout-terrain.fr` (relevés `/health` 2026-08-09),
-      preprod-iselection (confirmé par Oscar le 2026-08-09)
-- [ ] **Cocher `revisions:write`** dans Réglages sur chacun des 3 sites (sinon 403)
-- [ ] Annoncer à AA : chemin, scope, corps, codes de retour
 
 ---
 
