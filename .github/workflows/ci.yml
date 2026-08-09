@@ -104,9 +104,13 @@ jobs:
       - name: Install PHPCompatibility
         run: |
           composer global config --no-plugins allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          # The dealerdirect plugin must be required EXPLICITLY here: unlike
+          # wpcs (which pulls it in for the job above), phpcompatibility-wp
+          # only *suggests* it — without it no standard gets registered.
           composer global require --no-progress \
             "squizlabs/php_codesniffer:^3.13" \
-            "phpcompatibility/phpcompatibility-wp:^2.1"
+            "phpcompatibility/phpcompatibility-wp:^2.1" \
+            "dealerdirect/phpcodesniffer-composer-installer:^1.0"
           ~/.composer/vendor/bin/phpcs -i
 
       - name: Check PHP 8.0+ compatibility
