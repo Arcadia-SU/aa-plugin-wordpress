@@ -9,7 +9,10 @@ Cocher les cases au fur et à mesure de l'avancement.
 
 ## Documentation
 
-- `docs/checklist.md` - Liste des tâches à faire (suivi local)
+- `docs/checklist.md` - Liste des tâches à faire (suivi local, **phases actives uniquement**)
+- `docs/archives/` - Phases terminées, texte intégral (règle : une phase dont toutes les cases
+  sont cochées est déplacée vers `archives/checklist-archive.md`, et résumée en une ligne dans
+  la table « Phases archivées » de `checklist.md`)
 - `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
 
 ### Source de vérité des specs
@@ -119,7 +122,9 @@ Le script exécute ces checks avant de créer le zip :
 | 12 | **Entrée de changelog présente** pour la version cible + version bump + sync readme `Stable tag` | Oui |
 | 13 | Création du zip | Oui |
 | 14 | Zip content audit (pas de tests/dev deps) | Oui |
-| 15 | Zip size en octets (warning si > 500KB) | Warning |
+| 15 | **Upgrade-path test** (WP éphémère : zip N-1 → zip candidat, données intactes) | Oui |
+| 16 | Zip size en octets (warning si > 500KB) | Warning |
+| 17 | Archivage `dist/arcadia-agents-<version>.zip` (baseline + rollback) | - |
 | – | Restauration dev deps + rollback version (trap EXIT) | - |
 
 Si un check bloquant échoue, **pas de zip**. Les dev deps sont toujours restaurées (même en cas d'erreur) via `trap EXIT`, et le bump de version est annulé — un build avorté ne doit pas laisser l'arbre sur une version jamais packagée (c'est exactement ce qui s'est produit des Phases 31 à 38 : 0.1.30 → 0.1.37 sans aucun zip).
@@ -144,6 +149,17 @@ endpoint : c'était `./build.sh` sans argument par réflexe. Pas un précédent.
 trop tard : les trois sources de version ne s'écrivent que par ce script, et il refuse de re-couper un
 numéro déjà pris. Un changelog corrigé après le build coûte donc un bump de plus, et le zip livré
 décrit une autre release. C'est exactement comme ça que 0.4.0, 0.4.1 et 0.5.0 ont été brûlées.
+
+**Upgrade-path test (#15) :** la seule opération que vivent les sites clients est une **mise à
+jour**, jamais une installation à neuf. Ce check monte un WordPress éphémère
+(`test/upgrade/docker-compose.upgrade.yml`, projet Docker isolé, zéro port publié), installe le
+dernier zip de `dist/`, seed des données représentatives, upgrade vers le zip candidat et vérifie :
+plugin actif, `/health` sur la nouvelle version, données stockées intactes à l'octet, CPT
+`aa_revision` toujours enregistré, aucun fatal PHP loggé. `dist/` (git-ignoré) archive chaque zip
+buildé — c'est la baseline du build suivant **et** le rollback immédiat si une version déployée se
+comporte mal chez un client. Lancement manuel :
+`./test/upgrade/run-upgrade-test.sh dist/<baseline>.zip arcadia-agents.zip <version>`
+(`KEEP_STACK=1` pour garder la stack et débugger).
 
 **Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
 

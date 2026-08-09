@@ -1,0 +1,66 @@
+# Ephemeral WordPress for the upgrade-path test (build.sh).
+#
+# Design:
+#   - A dedicated WordPress container (`upgrade-wp`) on a throwaway named
+#     volume — the dev WordPress can NOT be used: its plugin directory is a
+#     bind mount of the working tree, so installing a zip there would
+#     overwrite the source files.
+#   - NO dedicated MySQL. A second MySQL server proved unreliable on a loaded
+#     machine (3-minute inits, daemon-start timeouts). Instead the test joins
+#     the dev stack's network and uses its MySQL server (`arcadia-wp-db`,
+#     required running by build.sh check #1) with a dedicated throwaway
+#     database, wordpress_upgrade_test, created and dropped by the runner.
+#   - No published ports — all assertions run from inside the network.
+#   - The service is named `upgrade-wp` (not `wordpress`): on the shared dev
+#     network, a service named `wordpress` would collide with the dev
+#     container's DNS alias and requests could land on the wrong WordPress.
+#
+# Driven by test/upgrade/run-upgrade-test.sh, which exports
+# ARCADIA_DEV_NETWORK and runs compose with `-p arcadia-upgrade`.
+# Never `up` this file by hand.
+
+services:
+  upgrade-wp:
+    image: wordpress:latest
+    environment: &wp-env
+      WORDPRESS_DB_HOST: arcadia-wp-db
+      WORDPRESS_DB_USER: root
+      WORDPRESS_DB_PASSWORD: root
+      WORDPRESS_DB_NAME: wordpress_upgrade_test
+      WORDPRESS_DEBUG: 1
+      # Log fatals to wp-content/debug.log so the test can scan for them.
+      WORDPRESS_CONFIG_EXTRA: |
+        define( 'WP_DEBUG_LOG', true );
+        define( 'WP_DEBUG_DISPLAY', false );
+    volumes:
+      - wp_html:/var/www/html
+    networks:
+      - devnet
+
+  # wp-cli sharing the WP filesystem. Used via `docker compose run --rm cli wp ...`.
+  cli:
+    image: wordpress:cli
+    # www-data is uid 82 in this Alpine image but uid 33 in the Debian
+    # wordpress image that populates the volume — without this override,
+    # wp-cli cannot write to wp-content ("Could not create directory").
+    # HOME must then point somewhere writable for the wp-cli cache.
+    user: "33:33"
+    environment:
+      <<: *wp-env
+      HOME: /tmp
+    volumes:
+      - wp_html:/var/www/html
+      # The repo root, read-only: gives wp-cli access to the zips under test.
+      - ../..:/repo:ro
+    networks:
+      - devnet
+    depends_on:
+      - upgrade-wp
+
+networks:
+  devnet:
+    external: true
+    name: ${ARCADIA_DEV_NETWORK}
+
+volumes:
+  wp_html:

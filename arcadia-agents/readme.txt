@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.5.1
+Stable tag: 0.5.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,11 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.5.2 =
+No plugin code changed — identical contract to 0.5.1.
+
+* Fixed a release-pipeline blind spot: every build is now installed as an upgrade over the previous release on a disposable WordPress before shipping, asserting the plugin stays active, /health reports the new version, and stored content survives byte-identical
 
 = 0.5.1 =
 Covers everything since 0.3.0. Versions 0.4.0, 0.4.1 and 0.5.0 were built but never released.

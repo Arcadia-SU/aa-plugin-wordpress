@@ -374,6 +374,37 @@ else
 	pass "Zip content is clean."
 fi
 
+# ─── Upgrade-path test (real WordPress, ephemeral stack) ──────────────────
+#
+# The one operation every client site performs is an UPGRADE from the previous
+# release — never a fresh install. This check installs the last released zip
+# (newest in dist/) on a throwaway WordPress, seeds representative data, then
+# upgrades to the zip just built and asserts nothing broke: plugin active,
+# /health on the new version, stored data byte-identical, CPT registered.
+#
+# First build (empty dist/): falls back to validating the candidate zip on a
+# virgin WordPress, which is still more than any other check covers.
+
+check "Upgrade-path test (real WordPress)"
+BASELINE_ZIP=$(ls dist/arcadia-agents-*.zip 2>/dev/null | sort -V | tail -1 || true)
+if [ -n "$BASELINE_ZIP" ]; then
+	info "Upgrade scenario: ${BASELINE_ZIP} → ${ZIP_NAME} (this takes ~1-2 min)"
+	if ./test/upgrade/run-upgrade-test.sh "$BASELINE_ZIP" "$ZIP_NAME" "$NEW_VERSION"; then
+		pass "Upgrade from $(basename "$BASELINE_ZIP" .zip | sed 's/arcadia-agents-//') to ${NEW_VERSION} is safe."
+	else
+		rm -f "$ZIP_NAME"
+		fail "Upgrade-path test failed — this zip would break a client site on update. Zip deleted."
+	fi
+else
+	warn "No baseline in dist/ — fresh-install validation only (upgrade path untested)."
+	if ./test/upgrade/run-upgrade-test.sh --fresh-only "$ZIP_NAME" "$NEW_VERSION"; then
+		pass "Candidate zip installs and activates on a virgin WordPress."
+	else
+		rm -f "$ZIP_NAME"
+		fail "Candidate zip fails on a fresh WordPress. Zip deleted."
+	fi
+fi
+
 # ─── 11. Zip size ──────────────────────────────────────────────────────────
 
 check "Zip size"
@@ -385,6 +416,17 @@ if [ "$zip_size_kb" -gt "$MAX_ZIP_SIZE_KB" ]; then
 else
 	pass "Zip is ${zip_size_kb}KB (< ${MAX_ZIP_SIZE_KB}KB)."
 fi
+
+# ─── Archive to dist/ ──────────────────────────────────────────────────────
+#
+# Every released zip is kept under dist/ (git-ignored). It serves two roles:
+# baseline for the next build's upgrade-path test, and instant rollback if a
+# deployed version misbehaves on a client site.
+
+check "Archive to dist/"
+mkdir -p dist
+cp "$ZIP_NAME" "dist/arcadia-agents-${NEW_VERSION}.zip"
+pass "Archived: dist/arcadia-agents-${NEW_VERSION}.zip (upgrade baseline + rollback)"
 
 # ─── Done ───────────────────────────────────────────────────────────────────
 

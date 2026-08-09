@@ -46,3 +46,5 @@ arcadia-agents/.phpunit.cache/
 
 # Build artifacts
 arcadia-agents.zip
+# Released zips archive (upgrade-test baseline + rollback), local only
+dist/
