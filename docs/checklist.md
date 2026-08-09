@@ -1,11 +1,14 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-09 (**v0.5.2 buildée** — Phase 45 terminée et archivée : le build
-teste désormais l'upgrade N-1 → N ; prod `www.iselection.com` relevée à **0.3.0** via `/health`)
+**Dernière mise à jour :** 2026-08-09 (**v0.5.2 déployée** sur `www.iselection.com` et
+`www.trottinette-tout-terrain.fr` — relevés `/health` du 2026-08-09 après-midi. Gate #15 étendu :
+le build teste désormais N-1 **et** la plus vieille version déployée, `deployed-versions.conf` ;
+rituel de déploiement écrit dans [`deploy.md`](deploy.md))
 
-> **Prochain front de travail : déploiement de v0.5.x sur les 3 sites** (prod est à 0.3.0 —
-> relevé `/health` du 2026-08-09), puis cocher `revisions:write` dans Réglages sur chacun,
-> puis annoncer `reject` à AA (chemin, scope, corps, codes de retour). Détail en Phase 44.
+> **Prochain front de travail :** (1) déployer v0.5.2 sur **preprod-iselection** (dernier relevé
+> 0.2.1 — saut 0.2.1 → 0.5.2 validé par le gate le 2026-08-09) puis mettre à jour
+> `test/upgrade/deployed-versions.conf`, (2) cocher `revisions:write` dans Réglages sur chaque
+> site, (3) annoncer `reject` à AA (chemin, scope, corps, codes de retour). Détail en Phase 44.
 
 > **Archives :** une phase quitte ce fichier quand **toutes** ses cases sont cochées.
 > Phases 0–26 → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md) ·
@@ -656,7 +659,9 @@ Ni « laisser tel quel » ni « appliquer à l'approbation » : **refuser explic
       est la première dont le changelog soit exact. Le gate rend l'erreur impossible plutôt que
       rattrapable, et le changelog `readme.txt` — arrêté à 0.2.1 — est rattrapé en une entrée
       honnête qui dit que les trois versions intermédiaires n'ont jamais été publiées
-- [ ] Déploiement manuel sur les 3 sites (**0.5.1**, pas 0.4.1 ni 0.5.0)
+- [ ] Déploiement manuel sur les 3 sites — finalement en **0.5.2** (buildée le 2026-08-09).
+      Fait : `www.iselection.com` ✅, `www.trottinette-tout-terrain.fr` ✅ (relevés `/health`
+      2026-08-09). Reste : **preprod-iselection** (suivre [`deploy.md`](deploy.md))
 - [ ] **Cocher `revisions:write`** dans Réglages sur chacun des 3 sites (sinon 403)
 - [ ] Annoncer à AA : chemin, scope, corps, codes de retour
 

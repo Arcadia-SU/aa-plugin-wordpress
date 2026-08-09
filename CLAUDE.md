@@ -14,6 +14,7 @@ Cocher les cases au fur et à mesure de l'avancement.
   sont cochées est déplacée vers `archives/checklist-archive.md`, et résumée en une ligne dans
   la table « Phases archivées » de `checklist.md`)
 - `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
+- `docs/deploy.md` - **Rituel de déploiement** (canari preprod → trempage 24h → prod → relevés `/health`) — seul chemin autorisé vers un site client
 
 ### Source de vérité des specs
 
@@ -152,10 +153,13 @@ décrit une autre release. C'est exactement comme ça que 0.4.0, 0.4.1 et 0.5.0 
 
 **Upgrade-path test (#15) :** la seule opération que vivent les sites clients est une **mise à
 jour**, jamais une installation à neuf. Ce check monte un WordPress éphémère
-(`test/upgrade/docker-compose.upgrade.yml`, projet Docker isolé, zéro port publié), installe le
-dernier zip de `dist/`, seed des données représentatives, upgrade vers le zip candidat et vérifie :
+(`test/upgrade/docker-compose.upgrade.yml`, projet Docker isolé, zéro port publié), installe un
+zip released, seed des données représentatives, upgrade vers le zip candidat et vérifie :
 plugin actif, `/health` sur la nouvelle version, données stockées intactes à l'octet, CPT
-`aa_revision` toujours enregistré, aucun fatal PHP loggé. `dist/` (git-ignoré) archive chaque zip
+`aa_revision` toujours enregistré, aucun fatal PHP loggé. **Deux baselines testées** : N-1 (dernier
+zip de `dist/`) et la **plus vieille version encore déployée** chez un client, lue dans
+`test/upgrade/deployed-versions.conf` (maintenu par le rituel `docs/deploy.md`) — le zip de cette
+version doit exister dans `dist/`, sinon le build échoue. `dist/` (git-ignoré) archive chaque zip
 buildé — c'est la baseline du build suivant **et** le rollback immédiat si une version déployée se
 comporte mal chez un client. Lancement manuel :
 `./test/upgrade/run-upgrade-test.sh dist/<baseline>.zip arcadia-agents.zip <version>`

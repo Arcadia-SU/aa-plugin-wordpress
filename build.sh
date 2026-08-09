@@ -376,25 +376,51 @@ fi
 
 # ─── Upgrade-path test (real WordPress, ephemeral stack) ──────────────────
 #
-# The one operation every client site performs is an UPGRADE from the previous
-# release — never a fresh install. This check installs the last released zip
-# (newest in dist/) on a throwaway WordPress, seeds representative data, then
-# upgrades to the zip just built and asserts nothing broke: plugin active,
-# /health on the new version, stored data byte-identical, CPT registered.
+# The one operation every client site performs is an UPGRADE — never a fresh
+# install. This check installs a released zip on a throwaway WordPress, seeds
+# representative data, then upgrades to the zip just built and asserts nothing
+# broke: plugin active, /health on the new version, stored data byte-identical,
+# CPT registered.
+#
+# Two baselines are tested:
+#   1. N-1 (newest zip in dist/) — the normal release-to-release path.
+#   2. The OLDEST version still deployed on a client site, per
+#      test/upgrade/deployed-versions.conf (maintained by docs/deploy.md).
+#      A zip that upgrades cleanly from N-1 can still break a site that lags
+#      several releases behind — that jump is the one clients actually live.
 #
 # First build (empty dist/): falls back to validating the candidate zip on a
 # virgin WordPress, which is still more than any other check covers.
 
 check "Upgrade-path test (real WordPress)"
+DEPLOYED_CONF="test/upgrade/deployed-versions.conf"
 BASELINE_ZIP=$(ls dist/arcadia-agents-*.zip 2>/dev/null | sort -V | tail -1 || true)
 if [ -n "$BASELINE_ZIP" ]; then
-	info "Upgrade scenario: ${BASELINE_ZIP} → ${ZIP_NAME} (this takes ~1-2 min)"
-	if ./test/upgrade/run-upgrade-test.sh "$BASELINE_ZIP" "$ZIP_NAME" "$NEW_VERSION"; then
-		pass "Upgrade from $(basename "$BASELINE_ZIP" .zip | sed 's/arcadia-agents-//') to ${NEW_VERSION} is safe."
+	BASELINES="$BASELINE_ZIP"
+	if [ -f "$DEPLOYED_CONF" ]; then
+		OLDEST_DEPLOYED=$(grep -vE '^[[:space:]]*(#|$)' "$DEPLOYED_CONF" | awk '{print $2}' | sort -V | head -1)
+		if [ -n "$OLDEST_DEPLOYED" ]; then
+			OLDEST_ZIP="dist/arcadia-agents-${OLDEST_DEPLOYED}.zip"
+			if [ ! -f "$OLDEST_ZIP" ]; then
+				rm -f "$ZIP_NAME"
+				fail "deployed-versions.conf lists ${OLDEST_DEPLOYED} but ${OLDEST_ZIP} is missing. Rebuild it from the matching git tag/commit (see docs/deploy.md) or update the conf if no site runs it anymore."
+			fi
+			if [ "$OLDEST_ZIP" != "$BASELINE_ZIP" ]; then
+				BASELINES="$OLDEST_ZIP $BASELINES"
+			fi
+		fi
 	else
-		rm -f "$ZIP_NAME"
-		fail "Upgrade-path test failed — this zip would break a client site on update. Zip deleted."
+		warn "No ${DEPLOYED_CONF} — testing the N-1 upgrade only (oldest deployed version unknown)."
 	fi
+	for baseline in $BASELINES; do
+		info "Upgrade scenario: ${baseline} → ${ZIP_NAME} (this takes ~1-2 min)"
+		if ./test/upgrade/run-upgrade-test.sh "$baseline" "$ZIP_NAME" "$NEW_VERSION"; then
+			pass "Upgrade from $(basename "$baseline" .zip | sed 's/arcadia-agents-//') to ${NEW_VERSION} is safe."
+		else
+			rm -f "$ZIP_NAME"
+			fail "Upgrade-path test failed from $(basename "$baseline") — this zip would break a client site on update. Zip deleted."
+		fi
+	done
 else
 	warn "No baseline in dist/ — fresh-install validation only (upgrade path untested)."
 	if ./test/upgrade/run-upgrade-test.sh --fresh-only "$ZIP_NAME" "$NEW_VERSION"; then
