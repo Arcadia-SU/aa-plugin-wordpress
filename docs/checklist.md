@@ -1,14 +1,14 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-12 (retour séance client Technologia → **Phases 46 + 47
-ouvertes**, release groupée **v0.6.0** : fix handshake `home_url()` + chantier UI FS-1→4 +
-tooltips permissions + refonte DS Arcadia. Item backlog AA intégré en Phase 46, backlog vidé.)
+**Dernière mise à jour :** 2026-08-12 (**v0.6.0 buildée** — Phases 46 + 47 codées, testées,
+relues par Oscar : fix handshake `home_url()` + chantier UI FS-1→4 + tooltips permissions +
+i18n fr_FR + refonte DS Arcadia. 17 checks verts, zip dans `dist/`. Reste : **déploiement**.)
 
-> **Prochain front de travail :** implémenter **Phase 46** (fix handshake) puis **Phase 47**
-> (chantier UI) — un seul build 0.6.0, un seul rituel deploy. Reste ouvert par ailleurs : (1) la
-> **vérification de sortie 43.5 sur préprod** (débloquée, préprod en 0.5.2), (2) approuver `92277`
-> à la main dans l'admin préprod, (3) attendre le retour AA (répétition e2e du `reject`, bascule
-> connector `/contents`).
+> **Prochain front de travail :** **déployer v0.6.0** via le rituel [`deploy.md`](deploy.md)
+> (canari préprod → trempage 24h → prod). Reste ouvert par ailleurs : (1) la **vérification de
+> sortie 43.5 sur préprod** (débloquée, préprod en 0.5.2 — la faire pendant le canari 0.6.0),
+> (2) approuver `92277` à la main dans l'admin préprod, (3) attendre le retour AA (répétition
+> e2e du `reject`, bascule connector `/contents`).
 
 > **Archives :** une phase quitte ce fichier quand **toutes** ses cases sont cochées.
 > Phases 0–26 → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md) ·
@@ -624,7 +624,7 @@ envoyer côté AA via `backlog-for-backend.md` (+ question : re-handshake avec U
 
 ### 46.2 — Release
 
-- [ ] Part dans **v0.6.0** avec la Phase 47 (un seul build, un seul rituel deploy)
+- [x] Part dans **v0.6.0** avec la Phase 47 — buildée le 2026-08-12 (`dist/arcadia-agents-0.6.0.zip`)
 - [x] `backlog-for-backend.md` : annonce 0.6.0 + demande de précision contrat (`site_url` = base
       REST / `home_url()` ?) + question re-handshake/`site_id` (écrit 2026-08-12)
 
@@ -743,10 +743,14 @@ dans `/Users/oscarsatre/.claude/plans/on-y-va-foamy-russell.md` (décisions act�
 - [x] PHPStan vert (bootstrap constantes + baseline régénérée) ; PHPCS sur les fichiers
       neufs/modifiés : 0 violation substantielle (restent les conventions de nommage
       `class-*.php`/préfixe `aa_` partagées avec tout le legacy — job CI advisory)
-- [ ] **Textes tooltips + PO relus par Oscar avant build** (⚠️ builder avant la relecture
-      brûlerait 0.6.0 si un texte change — leçon 0.4.0/0.5.0)
+- [x] **Textes tooltips + PO relus par Oscar avant build** — relus le 2026-08-12, 6 textes
+      simplifiés à sa demande (jargon « structure en blocs »/« calibration » retiré), pot/po/mo
+      régénérés, couverture 100 % vérifiée
 - [x] Entrée changelog `= 0.6.0 =` dans `readme.txt` (écrite AVANT le build, check #12)
-- [ ] `./build.sh 0.6.0` — 17 checks (fonts 33KB, seuil 500KB OK) — **après relecture Oscar**
+- [x] `./build.sh 0.6.0` — 17 checks verts le 2026-08-12, zip 479KB, upgrade-path 0.5.2→0.6.0
+      validé (les 2 baselines se confondent : les 3 sites sont sur 0.5.2). Fix build.sh au
+      passage : exclusions zip `phpstan*` + `bin/*` (le check #14 attrapait le nouveau
+      `phpstan-bootstrap.php` ; `bin/` est de l'outillage dev sans rôle runtime)
 - [x] `backlog-for-backend.md` : annonce 0.6.0 + clarif contrat `site_url` + dérive doc scopes
       (`auth.md` en annonce 13 sans `revisions:write`, `api-contract.md` dit « 8 permissions » —
       source à jour = `Arcadia_Auth::scope_labels()`, 14) — écrit 2026-08-12
