@@ -306,9 +306,9 @@ if zip -r "$ZIP_NAME" "$PLUGIN_DIR/" \
 	-x "${PLUGIN_DIR}/phpunit.xml" \
 	-x "${PLUGIN_DIR}/composer.json" \
 	-x "${PLUGIN_DIR}/composer.lock" \
-	-x "${PLUGIN_DIR}/phpstan.neon.dist" \
-	-x "${PLUGIN_DIR}/phpstan-baseline.neon" \
+	-x "${PLUGIN_DIR}/phpstan*" \
 	-x "${PLUGIN_DIR}/phpcs.xml" \
+	-x "${PLUGIN_DIR}/bin/*" \
 	-x "${PLUGIN_DIR}/.phpunit.cache/*" \
 	-x "*/composer.json" \
 	-x "*/composer.lock" \
