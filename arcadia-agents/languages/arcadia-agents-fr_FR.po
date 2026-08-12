@@ -482,23 +482,23 @@ msgstr "Créer/supprimer des redirections"
 msgid "Update plugin settings"
 msgstr "Mettre à jour les réglages de l’extension"
 
-msgid "Read articles and pages, their block structure, and follow its own pending proposals."
-msgstr "Lire les articles et les pages, leur structure en blocs, et suivre ses propres propositions en attente."
+msgid "Read articles and pages, and follow its own pending proposals."
+msgstr "Lire les articles et les pages, et suivre ses propres propositions en attente."
 
-msgid "Create and edit articles and pages. While “Draft only” is on, new content is saved as a draft and edits to published content become proposals awaiting review."
-msgstr "Créer et modifier des articles et des pages. Tant que « Brouillon uniquement » est actif, les nouveaux contenus sont enregistrés en brouillon et les modifications de contenus publiés deviennent des propositions en attente de relecture."
+msgid "Create and edit articles and pages. While “Draft only” is on, nothing goes live: new content stays a draft and edits to published content wait for your review."
+msgstr "Créer et modifier des articles et des pages. Tant que « Brouillon uniquement » est actif, rien n’est mis en ligne : les créations restent en brouillon et les modifications attendent votre relecture."
 
 msgid "Permanently delete an article."
 msgstr "Supprimer définitivement un article."
 
-msgid "Withdraw its own pending proposals. The agent can never approve them — approval always happens here, in WordPress."
-msgstr "Retirer ses propres propositions en attente. L’agent ne peut jamais les approuver — l’approbation se fait toujours ici, dans WordPress."
+msgid "Withdraw its own pending proposals. Approving them is always your decision, here in WordPress."
+msgstr "Retirer ses propres propositions en attente. Les approuver reste votre décision, ici dans WordPress."
 
 msgid "Browse the media library."
 msgstr "Parcourir la médiathèque."
 
-msgid "Upload images, fix alternative texts, and set the featured image of a post."
-msgstr "Importer des images, corriger les textes alternatifs et définir l’image mise en avant d’une publication."
+msgid "Upload images, fix alternative texts, and set the featured image."
+msgstr "Importer des images, corriger les textes alternatifs et définir l’image mise en avant."
 
 msgid "Delete a media file."
 msgstr "Supprimer un média."
@@ -512,8 +512,8 @@ msgstr "Créer et renommer des catégories et des étiquettes."
 msgid "Delete categories and tags."
 msgstr "Supprimer des catégories et des étiquettes."
 
-msgid "Understand the site: pages, menus, authors, available block types and custom fields."
-msgstr "Comprendre le site : pages, menus, auteurs, types de blocs disponibles et champs personnalisés."
+msgid "Understand the site: pages, menus, authors and theme configuration."
+msgstr "Comprendre le site : pages, menus, auteurs et configuration du thème."
 
 msgid "List the existing redirects."
 msgstr "Consulter les redirections existantes."
@@ -521,8 +521,8 @@ msgstr "Consulter les redirections existantes."
 msgid "Create and delete redirects."
 msgstr "Créer et supprimer des redirections."
 
-msgid "Save the custom-field calibration of the theme. Does not touch the publishing guard or these permissions."
-msgstr "Enregistrer la calibration des champs personnalisés du thème. Ne touche ni au garde-fou de publication ni à ces permissions."
+msgid "Save technical settings about how the theme works. Does not touch the publishing guard or these permissions."
+msgstr "Mémoriser des réglages techniques sur le fonctionnement du thème. Ne touche ni au garde-fou de publication ni à ces permissions."
 
 msgid "Articles & pages"
 msgstr "Articles et pages"

@@ -399,20 +399,20 @@ class Arcadia_Auth {
 	 */
 	public static function scope_descriptions() {
 		return array(
-			'articles:read'     => __( 'Read articles and pages, their block structure, and follow its own pending proposals.', 'arcadia-agents' ),
-			'articles:write'    => __( 'Create and edit articles and pages. While “Draft only” is on, new content is saved as a draft and edits to published content become proposals awaiting review.', 'arcadia-agents' ),
+			'articles:read'     => __( 'Read articles and pages, and follow its own pending proposals.', 'arcadia-agents' ),
+			'articles:write'    => __( 'Create and edit articles and pages. While “Draft only” is on, nothing goes live: new content stays a draft and edits to published content wait for your review.', 'arcadia-agents' ),
 			'articles:delete'   => __( 'Permanently delete an article.', 'arcadia-agents' ),
-			'revisions:write'   => __( 'Withdraw its own pending proposals. The agent can never approve them — approval always happens here, in WordPress.', 'arcadia-agents' ),
+			'revisions:write'   => __( 'Withdraw its own pending proposals. Approving them is always your decision, here in WordPress.', 'arcadia-agents' ),
 			'media:read'        => __( 'Browse the media library.', 'arcadia-agents' ),
-			'media:write'       => __( 'Upload images, fix alternative texts, and set the featured image of a post.', 'arcadia-agents' ),
+			'media:write'       => __( 'Upload images, fix alternative texts, and set the featured image.', 'arcadia-agents' ),
 			'media:delete'      => __( 'Delete a media file.', 'arcadia-agents' ),
 			'taxonomies:read'   => __( 'Read categories and tags.', 'arcadia-agents' ),
 			'taxonomies:write'  => __( 'Create and rename categories and tags.', 'arcadia-agents' ),
 			'taxonomies:delete' => __( 'Delete categories and tags.', 'arcadia-agents' ),
-			'site:read'         => __( 'Understand the site: pages, menus, authors, available block types and custom fields.', 'arcadia-agents' ),
+			'site:read'         => __( 'Understand the site: pages, menus, authors and theme configuration.', 'arcadia-agents' ),
 			'redirects:read'    => __( 'List the existing redirects.', 'arcadia-agents' ),
 			'redirects:write'   => __( 'Create and delete redirects.', 'arcadia-agents' ),
-			'settings:write'    => __( 'Save the custom-field calibration of the theme. Does not touch the publishing guard or these permissions.', 'arcadia-agents' ),
+			'settings:write'    => __( 'Save technical settings about how the theme works. Does not touch the publishing guard or these permissions.', 'arcadia-agents' ),
 		);
 	}
 
