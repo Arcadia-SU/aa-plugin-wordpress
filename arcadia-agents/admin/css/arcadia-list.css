@@ -4,17 +4,18 @@
  * WordPress surfaces stay native.
  */
 
-/* FS-1 — post-state badge: small surface, so the primary tone is allowed. */
+/* FS-1 — post-state badge. Soft tint of the primary (same recipe as the
+   guard chip below): full-strength mint shouted next to the muted core UI. */
 .aa-badge {
 	display: inline-block;
-	padding: 2px 10px;
+	padding: 1px 8px;
 	border-radius: 9999px;
-	background: #58f2dc;
+	background: rgba(88, 242, 220, 0.22);
 	color: #00201c;
-	font-size: 12px;
+	font-size: 11px;
 	font-weight: 500;
-	line-height: 1.6;
-	vertical-align: middle;
+	line-height: 1.45;
+	vertical-align: 1px;
 }
 
 /* FS-4 — factual guard chip in the filter row. Soft tints, never red. */

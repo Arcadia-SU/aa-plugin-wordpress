@@ -74,6 +74,11 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.6.1 =
+Visual polish only — identical API contract to 0.6.0.
+
+* Fixed: the "Arcadia" badge in the admin lists overpowered the row it sat on — it is now slimmer (11px, reduced padding) and uses a soft 22% tint of the brand color instead of a solid fill, following the same recipe as the publishing-guard chip
+
 = 0.6.0 =
 The plugin's presence in WordPress is now visible and legible — feedback from the first client onboarding session.
 
