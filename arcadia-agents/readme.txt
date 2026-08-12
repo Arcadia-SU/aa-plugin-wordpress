@@ -74,6 +74,11 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.6.2 =
+Visual polish only — identical API contract to 0.6.0.
+
+* Changed: the "Agent: Draft only / Direct publishing" chip no longer appears in the Posts and Pages lists — it is a set-once setting, not permanent list chrome. It remains on the plugin dashboard and at the top of the settings page
+
 = 0.6.1 =
 Visual polish only — identical API contract to 0.6.0.
 

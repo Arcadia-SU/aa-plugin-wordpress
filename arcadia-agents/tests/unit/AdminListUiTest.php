@@ -278,12 +278,16 @@ class AdminListUiTest extends TestCase {
     // render_filter_row()
     // -------------------------------------------------------
 
-    public function test_filter_row_renders_guard_chip(): void {
+    public function test_filter_row_renders_no_guard_chip(): void {
+        // Removed in 0.6.2 (set-once setting, not permanent list chrome) —
+        // this guards against it creeping back into the shared list surface.
+        $_GET['aa_source'] = 'arcadia';
+
         ob_start();
         \Arcadia_Admin_List_UI::render_filter_row( 'post', 'top' );
         $html = ob_get_clean();
 
-        $this->assertStringContainsString( 'aa-guard-chip', $html );
+        $this->assertStringNotContainsString( 'aa-guard-chip', $html );
     }
 
     public function test_filter_row_hidden_input_when_filter_active(): void {

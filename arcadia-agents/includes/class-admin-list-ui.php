@@ -179,12 +179,13 @@ class Arcadia_Admin_List_UI {
 	}
 
 	/**
-	 * FS-4 chip + filter persistence, on restrict_manage_posts.
+	 * Arcadia-filter persistence, on restrict_manage_posts.
 	 *
-	 * The chip lives here and not in the views bar: the subsubsub list is
-	 * semantically a list of filters, a settings link there would be clicked
-	 * as one. The hidden input keeps the Arcadia filter across search, date
-	 * and category filters — the link rewrite alone only covers the views.
+	 * The hidden input keeps the Arcadia filter across search, date and
+	 * category filters — the link rewrite alone only covers the views.
+	 * (The guard chip used to render here too; removed in 0.6.2 — a
+	 * set-once setting has no business as permanent list chrome. It still
+	 * lives on the plugin dashboard and settings page.)
 	 *
 	 * @param string $post_type The list screen's post type.
 	 * @param string $which     'top' or 'bottom' tablenav ('' before WP 4.4).
@@ -198,9 +199,6 @@ class Arcadia_Admin_List_UI {
 		if ( 'top' !== $which && '' !== $which ) {
 			return;
 		}
-
-		// chip_html() is built from escaped parts only.
-		echo Arcadia_Guard_Status::chip_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		if ( self::is_filter_active() ) {
 			printf(
