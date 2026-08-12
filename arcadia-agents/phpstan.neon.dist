@@ -4,6 +4,8 @@ includes:
 
 parameters:
 	level: 5
+	bootstrapFiles:
+		- phpstan-bootstrap.php
 	paths:
 		- arcadia-agents.php
 		- uninstall.php

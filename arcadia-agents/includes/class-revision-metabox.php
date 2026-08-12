@@ -486,14 +486,30 @@ class Arcadia_Revision_Metabox {
 				'nonce'        => wp_create_nonce( 'aa_revision_action' ),
 				'ajax_url'     => admin_url( 'admin-ajax.php' ),
 				'i18n'         => array(
-					'changes_none'    => __( 'This revision proposes new page content only — no individual field is modified.', 'arcadia-agents' ),
-					/* translators: %d: number of modified fields */
-					'changes_count'   => __( '%d field(s) modified', 'arcadia-agents' ),
+					'changes_none'    => __( 'This proposal contains new page content only — no individual field is modified.', 'arcadia-agents' ),
+					// Pre-pluralized and pre-formatted here: the JS renders these
+					// verbatim, so translations never depend on JS plural logic.
+					'changes_count'   => sprintf(
+						/* translators: %d: number of modified fields */
+						_n( '%d field modified', '%d fields modified', count( $rows ), 'arcadia-agents' ),
+						count( $rows )
+					),
 					'changes_hide'    => __( 'Hide details', 'arcadia-agents' ),
-					'changes_current' => __( 'Current', 'arcadia-agents' ),
-					'changes_proposed' => __( 'Proposed', 'arcadia-agents' ),
-					'title'           => __( 'Pending Revision', 'arcadia-agents' ),
-					'approve_confirm' => __( 'Apply this revision to the live article?', 'arcadia-agents' ),
+					// The colon travels inside the string (French needs a
+					// narrow no-break space before it).
+					'changes_current' => __( 'Current:', 'arcadia-agents' ),
+					'changes_proposed' => __( 'Proposed:', 'arcadia-agents' ),
+					'panel_title'     => sprintf(
+						/* translators: %s: proposal version number */
+						__( 'Agent proposal (v%s)', 'arcadia-agents' ),
+						$version
+					),
+					/* translators: %s: proposal version number */
+					'version_badge'   => sprintf( __( 'v%s', 'arcadia-agents' ), $version ),
+					/* translators: %s: the agent's notes, quoted */
+					'notes_quoted'    => __( '“%s”', 'arcadia-agents' ),
+					'error_generic'   => __( 'Request failed.', 'arcadia-agents' ),
+					'approve_confirm' => __( 'Apply this proposal to the live article?', 'arcadia-agents' ),
 					'approving'       => __( 'Approving...', 'arcadia-agents' ),
 					'approved'        => __( 'Approved! Reloading...', 'arcadia-agents' ),
 					'rejecting'       => __( 'Rejecting...', 'arcadia-agents' ),

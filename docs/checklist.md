@@ -1,15 +1,14 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-09 (**v0.5.2 déployée sur les 3 sites**. Gate #15 étendu :
-le build teste désormais N-1 **et** la plus vieille version déployée, `deployed-versions.conf` ;
-rituel de déploiement écrit dans [`deploy.md`](deploy.md) ; CI durcie : matrice PHPUnit
-8.1–8.3 + PHPCompatibility 8.0+ bloquant)
+**Dernière mise à jour :** 2026-08-12 (retour séance client Technologia → **Phases 46 + 47
+ouvertes**, release groupée **v0.6.0** : fix handshake `home_url()` + chantier UI FS-1→4 +
+tooltips permissions + refonte DS Arcadia. Item backlog AA intégré en Phase 46, backlog vidé.)
 
-> **Prochain front de travail :** v0.5.2 déployée sur **les 3 sites**, `revisions:write` coché
-> partout, `reject` annoncé à AA (Phase 44 → archivée). Reste ouvert : (1) la **vérification de
-> sortie 43.5 sur préprod** — désormais débloquée puisque préprod est en 0.5.2, (2) approuver
-> `92277` à la main dans l'admin préprod (restaure la page de test AA), (3) attendre le retour AA
-> (répétition e2e du `reject`, bascule connector `/contents`).
+> **Prochain front de travail :** implémenter **Phase 46** (fix handshake) puis **Phase 47**
+> (chantier UI) — un seul build 0.6.0, un seul rituel deploy. Reste ouvert par ailleurs : (1) la
+> **vérification de sortie 43.5 sur préprod** (débloquée, préprod en 0.5.2), (2) approuver `92277`
+> à la main dans l'admin préprod, (3) attendre le retour AA (répétition e2e du `reject`, bascule
+> connector `/contents`).
 
 > **Archives :** une phase quitte ce fichier quand **toutes** ses cases sont cochées.
 > Phases 0–26 → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md) ·
@@ -590,6 +589,168 @@ AA nous avait écrit le 2026-08-05 « la preview est bonne, rien ne vous attend 
 recopié tel quel dans la vérification 41.2. C'était trop large **des deux côtés** : la sonde mesurait
 la **résolution du template**, jamais le **contenu** rendu. Le template est bon, le contenu est vide.
 Voir la note ajoutée en 41.2.
+
+---
+
+## Phase 46 : Handshake — transmettre `home_url()` au lieu de `site_url()`
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-08-12*
+*Constaté préprod Technologia (`technologia-arcadia.leparking.com`, plugin 0.5.2, handshake 2026-08-12) : WP installé en sous-répertoire (« give WordPress its own directory »), `site_url()` = `…/wordpress` alors que la REST API vit sous `home_url()`. AA a stocké la valeur du handshake et construit `{site_url}/wp-json/arcadia/v1/…` → 404 HTML sur chaque appel (`Failed to discover site: <!DOCTYPE html>`). Contourné à la main en base côté AA pour Technologia ; le prochain handshake en sous-répertoire retombera dedans.*
+
+### Contexte
+
+Le payload du handshake est construit dans `class-auth.php:74-93` : `$site_url = get_site_url();`
+(l.74), envoyé comme champ `site_url` (l.87). Fix : `untrailingslashit( home_url() )`
+**directement** (pas de dérivation via `get_rest_url()` : sans permaliens jolis elle retourne
+`?rest_route=/`). `get_rest_url()` dérive de `home_url()`, donc valeur transmise et base
+réellement servie ne peuvent plus diverger.
+
+**Sans impact JWT** (vérifié) : les tokens sont liés aux pins `sub`/`iss` issus de la *réponse*
+du handshake (`class-auth.php:283-313`), pas de l'URL envoyée. Sites connectés qui upgradent sans
+re-handshake : pins conservés.
+
+**Nuance vs backlog** : le backlog affirme que `api-contract.md` et `auth.md` spécifient déjà
+`home_url()` — vérifié faux, le contrat est **muet** (`auth.md:87` : exemple
+`"site_url": "https://example.com"`). Le fix reste juste ; demande de précision du contrat à
+envoyer côté AA via `backlog-for-backend.md` (+ question : re-handshake avec URL changée = même
+`site_id` ? `pin_identity_from_handshake()` écrase silencieusement).
+
+### 46.1 — Fix + test
+
+- [x] `class-auth.php:74` : `get_site_url()` → `untrailingslashit( home_url() )`
+- [x] Test unitaire : le payload handshake porte `home_url()` quand `site_url() !== home_url()`
+      (cas sous-répertoire, trailing slash normalisé) — 639 tests + PHPStan verts
+- [x] `backlog.md` AA→Plugin vidé (item intégré ici, 2026-08-12)
+
+### 46.2 — Release
+
+- [ ] Part dans **v0.6.0** avec la Phase 47 (un seul build, un seul rituel deploy)
+- [x] `backlog-for-backend.md` : annonce 0.6.0 + demande de précision contrat (`site_url` = base
+      REST / `home_url()` ?) + question re-handshake/`site_id` (écrit 2026-08-12)
+
+---
+
+## Phase 47 : Chantier UI v0.6.0 — FS-1→4 Technologia + tooltips permissions + refonte DS Arcadia
+
+*Ref: séance client Technologia (Matthieu), specs alignées en interview 2026-08-12, plan complet
+dans `/Users/oscarsatre/.claude/plans/on-y-va-foamy-russell.md` (décisions actées + arbitrage des
+25 findings des 3 reviews spécialisées UX/UI, sécurité, simplicité).*
+
+**Les 4 FS + 2 ajouts :**
+- **FS-1** : badge « Arcadia » dans les listes articles/pages — **uniquement les contenus créés
+  par l'agent** (taxonomie `arcadia_source` posée à la création, `class-post-builder.php:399-402`),
+  persiste après publication
+- **FS-2** : vue « Arcadia (n) » dans la barre de vues native, combinable avec les statuts
+  (2 clics = file de relecture), masquée si n=0
+- **FS-3** : interface plugin en `fr_FR` complet (vocabulaire WP fr), bascule EN par le mécanisme
+  natif WP, zéro réglage custom
+- **FS-4** : garde-fou `aa_force_draft` lisible — 🛡 « Brouillon uniquement » / ⚡ « Publication
+  directe », section dédiée en tête des réglages, chip factuel dans les listes + dashboard,
+  dialogue de confirmation explicite à la désactivation (persiste via `requestSubmit`)
+- **Tooltips permissions** : toggletip « ? » par scope (clic + clavier + hover), 5 groupes
+  thématiques, textes depuis `api-contract.md`
+- **Refonte UI** : skin DS Arcadia (Poppins, tokens, pill, cards) scopé `.arcadia-admin` sur les
+  2 pages du plugin uniquement — natif partout ailleurs
+
+### 47.1 — Fondations (`includes/`)
+
+- [x] Stubs bootstrap tests (+`has_term`, `esc_attr`, `admin_url`, `_n`, `esc_js`,
+      `number_format_i18n`, `get_post_stati`, `wp_remote_post` capturant, `WP_Query::$last_args`
+      + `found_posts` forçable)
+- [x] `Arcadia_Auth::scope_descriptions()` + `scope_groups()` (5 groupes) — invariants testés vs
+      `all_scopes()` (ScopeGroupsTest + AuthTest étendu)
+- [x] `class-guard-status.php` (`is_on()`, `label()`, `description()`, `chip_html()`) +
+      GuardStatusTest — requires câblés dans `arcadia-agents.php` (is_admin)
+- [x] `class-content-counter.php` — comptage **live** `found_posts`, sans cache, `$status`
+      whitelisté + ContentCounterTest
+- [x] PHPUnit (656 tests) + PHPStan verts
+
+### 47.2 — FS-1/FS-2 : listes admin
+
+- [x] `class-admin-list-ui.php` : `display_post_states` (badge), `views_edit-*` (vue Arcadia +
+      réécriture `esc_url` des liens de statut, « Tous » en sort), `restrict_manage_posts` (chip
+      « Agent : … » + hidden input combinabilité), `pre_get_posts` gated `should_filter()` (termes
+      en dur, jamais `$_GET` dans le tax_query)
+- [x] AdminListUiTest (fixture hostile `"><script>` encodé, matrice `should_filter`, masqué si
+      n=0) — 685 tests + PHPStan verts
+- [x] `admin/css/arcadia-list.css` (badge + chip)
+- [x] Wiring `arcadia-agents.php` (`Arcadia_Admin_List_UI::init()` sous is_admin)
+- [x] Manuel (Playwright + curl, dev local 2026-08-12) : badge post 8 + page 9 (absent sur
+      « Hello world! »), vue « Arcadia (1) » après « Tous », liens de statut réécrits
+      (`post_status=draft&aa_source=arcadia` = 2 clics), « Tous » sans `aa_source`, hidden input
+      présent, chip « Agent : … » dans la barre de filtres
+
+### 47.3 — Infra assets
+
+- [x] `admin/class-admin-assets.php` — enqueue par écran, **hook_suffix capturés** depuis les
+      retours d'`add_menu_page()`/`add_submenu_page()` (le compteur pending dans `$menu_title`
+      rend le suffix instable — tester AVEC des pending)
+- [x] Bonus systémique : `phpstan-bootstrap.php` déclare les constantes du plugin
+      (`ARCADIA_AGENTS_*`) → baseline régénérée, 3 entrées `PLUGIN_URL` orphelines purgées,
+      plus jamais d'erreur « Constant not found » sur un nouveau fichier
+
+### 47.4 — Settings
+
+- [x] `admin/css/arcadia-admin.css` (@font-face Poppins 400/500/600 woff2 + `OFL.txt` copiés
+      d'AAFrontend — 33KB, tokens sur `.arcadia-admin`, composants card/btn/input/badge/toggle/
+      tooltip/dialog, grille 5/7 empilée <1100px, conteneur autonome + `<hr class="wp-header-end">`)
+      — inputs préfixés `.arcadia-admin` (les sélecteurs core `input[type=…]` gagnaient en spécificité)
+- [x] Refonte `settings.php` : 2 colonnes (Publication → Connexion compacte → `<details>` Infos
+      techniques | Permissions par groupes + toggletips) ; non connecté = Connexion pleine
+      largeur ; logique POST intacte + 2 gardes : la clé n'est écrasée que si le champ est posté,
+      et « Connect » utilise la clé saisie dans le même submit (l'ancien flux exigeait Save avant
+      Connect)
+- [x] `admin/js/settings.js` : dialogue garde-fou (`showModal`, « Allow direct publishing » →
+      `requestSubmit`, Escape/Annuler/backdrop ré-cochent + focus rendu), toggletips
+      (`type="button"`, aria-expanded, Escape, hover CSS sur wrapper), test connection en
+      `textContent` (fix innerHTML)
+- [x] Manuel (Playwright, dev local 2026-08-12) : cocher = pas de dialogue + Save persiste ;
+      décocher = dialogue ; Annuler et Escape ré-cochent ; Confirmer soumet et persiste OFF ;
+      toggletip clic (aria-expanded) + Escape ferme + le « ? » ne soumet pas ; responsive 900px
+      empilé. Reste à voir par Oscar : rendu visuel final (captures envoyées)
+
+### 47.5 — Dashboard
+
+- [x] Refonte `dashboard.php` : cartes (connexion + chip, Contenus Arcadia avec liens
+      Articles / Pages filtrés, Pending → ancre table), approuvées/rejetées en pied de table ;
+      comptage via `Content_Counter` (remplace le `posts_per_page=-1`)
+- [x] `admin/js/dashboard.js` : AJAX approve/reject inchangé (mêmes endpoints + nonce), **sans
+      `location.reload()`** (retrait ligne + décrément compteur + état vide), gestion du focus,
+      DOM en `createElement`/`textContent` uniquement
+- [x] Manuel (Playwright, dev local 2026-08-12) : approve → ligne retirée, compteur 1→0, état
+      vide affiché, **zéro navigation** ; chemin d'erreur serveur affiché inline en textContent
+      (« Revision metadata is corrupted » sur révision factice) puis boutons ré-activés ; cartes
+      cliquables ; chip 🛡/⚡ correct dans les deux états
+
+### 47.6 — i18n (FS-3, en dernier — chaînes figées)
+
+- [x] Fixes chaînes en dur `revision-sidebar.js` : fallback `error_generic`, `version_badge` et
+      `panel_title` pré-formatés côté PHP (sprintf), `notes_quoted` (`« %s »` en fr),
+      `changes_current/proposed` avec `:` porté par la chaîne, `changes_count` pré-pluralisé
+      `_n()` côté PHP ; terminologie unifiée « **propositions de l'agent** » (msgids sidebar +
+      PO fr pour le metabox classique)
+- [x] `bin/make-pot.sh` (docker `wordpress:cli wp i18n make-pot` / `--mo` pour make-mo)
+- [x] `languages/arcadia-agents.pot` (214 entrées) + `arcadia-agents-fr_FR.po` (couverture 100 %,
+      vérifiée msgcomm) + `.mo` compilé
+- [x] Manuel en `fr_FR` (mu-plugin locale temporaire, retiré après test) : réglages + dashboard +
+      listes traduits (« L'agent enregistre en brouillon uniquement », « Agent : Brouillon
+      uniquement », « Propositions de l'agent », tooltips fr). Sidebar Gutenberg : même mécanisme
+      `wp_localize_script` + `__()`, à re-vérifier lors du test site client. Bascule EN : native
+      (langue du site/profil), rien de custom
+
+### 47.7 — Release 0.6.0
+
+- [x] PHPStan vert (bootstrap constantes + baseline régénérée) ; PHPCS sur les fichiers
+      neufs/modifiés : 0 violation substantielle (restent les conventions de nommage
+      `class-*.php`/préfixe `aa_` partagées avec tout le legacy — job CI advisory)
+- [ ] **Textes tooltips + PO relus par Oscar avant build** (⚠️ builder avant la relecture
+      brûlerait 0.6.0 si un texte change — leçon 0.4.0/0.5.0)
+- [x] Entrée changelog `= 0.6.0 =` dans `readme.txt` (écrite AVANT le build, check #12)
+- [ ] `./build.sh 0.6.0` — 17 checks (fonts 33KB, seuil 500KB OK) — **après relecture Oscar**
+- [x] `backlog-for-backend.md` : annonce 0.6.0 + clarif contrat `site_url` + dérive doc scopes
+      (`auth.md` en annonce 13 sans `revisions:write`, `api-contract.md` dit « 8 permissions » —
+      source à jour = `Arcadia_Auth::scope_labels()`, 14) — écrit 2026-08-12
+- [ ] Déploiement : rituel [`deploy.md`](deploy.md) (canari préprod → 24h → prod)
 
 ---
 

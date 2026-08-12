@@ -26,6 +26,14 @@ class AuthTest extends TestCase {
     }
 
     /**
+     * Reset the home_url() override so it never leaks into other test files
+     * (unset() on a `global`-imported variable only drops the local alias).
+     */
+    protected function tearDown(): void {
+        unset( $GLOBALS['_test_home_url'] );
+    }
+
+    /**
      * Test check_scope with enabled scope (WP admin settings only).
      */
     public function test_check_scope_enabled(): void {
@@ -316,6 +324,41 @@ class AuthTest extends TestCase {
         $this->assertSame( 'site-123', $_test_options['arcadia_agents_site_id'] );
     }
 
+    // -------------------------------------------------------
+    // handshake() — payload carries home_url(), the REST base
+    // -------------------------------------------------------
+
+    /**
+     * On "WordPress in its own directory" installs, site_url() and home_url()
+     * diverge and the REST API lives under home_url(). The handshake payload
+     * must carry home_url() — AA builds every call as {site_url}/wp-json/…
+     * from this value (preprod Technologia outage, 2026-08-12).
+     */
+    public function test_handshake_payload_carries_home_url_not_site_url(): void {
+        global $_test_home_url, $_test_remote_posts;
+
+        // Subdirectory install: home_url() !== site_url() (bootstrap stub
+        // appends /wordpress to get_site_url()). Trailing slash on purpose —
+        // the payload value must be normalized without it.
+        $_test_home_url     = 'https://technologia-arcadia.leparking.com/';
+        $_test_remote_posts = array();
+
+        $this->assertNotSame( home_url(), get_site_url() );
+
+        $auth   = \Arcadia_Auth::get_instance();
+        $result = $auth->handshake( 'ck_test' );
+
+        // The stubbed wp_remote_post returns a WP_Error (no network in unit
+        // tests) — the handshake fails downstream, but the payload was built.
+        $this->assertInstanceOf( \WP_Error::class, $result );
+        $this->assertCount( 1, $_test_remote_posts );
+
+        $payload = json_decode( $_test_remote_posts[0]['args']['body'], true );
+
+        $this->assertSame( 'https://technologia-arcadia.leparking.com', $payload['site_url'] );
+        $this->assertStringNotContainsString( '/wordpress', $payload['site_url'] );
+    }
+
     /**
      * Test check_scope uses default all_scopes when no option set.
      */
@@ -386,6 +429,22 @@ class AuthTest extends TestCase {
      */
     public function test_revision_withdrawal_has_its_own_scope(): void {
         $this->assertContains( 'revisions:write', \Arcadia_Auth::all_scopes() );
+    }
+
+    /**
+     * Same invariant as the labels, for the tooltip texts: every scope has a
+     * description, in the same order — a scope without one would render a
+     * checkbox with an empty tooltip.
+     */
+    public function test_scope_descriptions_cover_every_scope_in_order(): void {
+        $this->assertSame(
+            \Arcadia_Auth::all_scopes(),
+            array_keys( \Arcadia_Auth::scope_descriptions() )
+        );
+
+        foreach ( \Arcadia_Auth::scope_descriptions() as $scope => $description ) {
+            $this->assertNotSame( '', trim( $description ), sprintf( 'Scope %s has no description.', $scope ) );
+        }
     }
 
     // -------------------------------------------------------

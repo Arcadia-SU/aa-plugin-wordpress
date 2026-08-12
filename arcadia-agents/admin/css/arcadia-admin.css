@@ -1,0 +1,753 @@
+/**
+ * Arcadia design system — full skin for the plugin's two admin pages.
+ *
+ * Scoped: everything lives under .arcadia-admin (plus the aa-page-header
+ * above the notices anchor). Shared WordPress surfaces stay native.
+ *
+ * DS rules (AAFrontend "Luminous Minimalism"):
+ * - no-line: separation by tonal shift, ghost-borders <= 20% opacity;
+ * - no raw white backgrounds outside cards, no pure black text;
+ * - font weight capped at 600;
+ * - shadows always ink-tinted rgba(42,35,96,a);
+ * - tokens only — no one-off colors. Light-only, like the app.
+ */
+
+/* ---------------------------------------------------------- fonts */
+
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 400;
+	font-display: swap;
+	src: url('../../assets/fonts/poppins-400.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 500;
+	font-display: swap;
+	src: url('../../assets/fonts/poppins-500.woff2') format('woff2');
+}
+
+@font-face {
+	font-family: 'Poppins';
+	font-style: normal;
+	font-weight: 600;
+	font-display: swap;
+	src: url('../../assets/fonts/poppins-600.woff2') format('woff2');
+}
+
+/* ---------------------------------------------------------- tokens */
+
+.arcadia-admin {
+	--aa-primary: #58f2dc;
+	--aa-on-primary: #00201c;
+	--aa-secondary: #8b37df;
+	--aa-ink: #2a2360;
+	--aa-ink-70: rgba(42, 35, 96, 0.7);
+	--aa-page: #fcf8ff;
+	--aa-card: #ffffff;
+	--aa-field: #f6f1ff;
+	--aa-elevated: #f0ebf5;
+	--aa-good: #10b981;
+	--aa-good-text: #047857;
+	--aa-warn: #f59e0b;
+	--aa-warn-text: #b45309;
+	--aa-bad: #ef4444;
+	--aa-bad-text: #b91c1c;
+	--aa-shadow-sm: 0 1px 2px rgba(42, 35, 96, 0.06);
+	--aa-shadow-md: 0 4px 16px rgba(42, 35, 96, 0.1);
+	--aa-font: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* ------------------------------------------------- page container */
+
+/* Autonomous rounded surface, laid on the WP admin gray — not a "page". */
+.arcadia-admin {
+	background: var(--aa-page);
+	border-radius: 24px;
+	padding: 32px;
+	margin-top: 16px;
+	max-width: 1240px;
+	box-shadow: var(--aa-shadow-sm);
+	font-family: var(--aa-font);
+	color: var(--aa-ink);
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.aa-page-header {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	margin: 12px 0 4px;
+}
+
+.aa-page-header__logo {
+	width: 36px;
+	height: 36px;
+	border-radius: 10px;
+}
+
+.aa-page-header__title {
+	margin: 0;
+	padding: 0;
+	font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+	font-weight: 600;
+	color: #2a2360;
+}
+
+/* ----------------------------------------------------------- grid */
+
+.aa-grid {
+	display: grid;
+	grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+	gap: 24px;
+	align-items: start;
+}
+
+@media (max-width: 1100px) {
+	.aa-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.aa-col > * + * {
+	margin-top: 24px;
+}
+
+/* ----------------------------------------------------------- card */
+
+.aa-card {
+	background: var(--aa-card);
+	border-radius: 16px;
+	padding: 24px;
+	box-shadow: var(--aa-shadow-sm);
+}
+
+.aa-card--connect {
+	margin-bottom: 24px;
+}
+
+.aa-card__title {
+	margin: 0 0 12px;
+	padding: 0;
+	font-family: var(--aa-font);
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--aa-ink);
+}
+
+/* ----------------------------------------------------------- text */
+
+.arcadia-admin .aa-muted {
+	color: var(--aa-ink-70);
+}
+
+.arcadia-admin .aa-small {
+	font-size: 12px;
+	margin: 4px 0;
+}
+
+.arcadia-admin .aa-good {
+	color: var(--aa-good-text);
+}
+
+.arcadia-admin code {
+	background: var(--aa-field);
+	color: var(--aa-ink);
+	border-radius: 6px;
+	padding: 2px 6px;
+	font-size: 12px;
+}
+
+/* -------------------------------------------------------- buttons */
+
+.aa-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 10px 22px;
+	border: 0;
+	border-radius: 9999px;
+	font-family: var(--aa-font);
+	font-size: 14px;
+	font-weight: 500;
+	line-height: 1.4;
+	cursor: pointer;
+	text-decoration: none;
+	transition: filter 0.15s ease, background-color 0.15s ease;
+}
+
+.aa-btn:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+}
+
+.aa-btn--primary {
+	background: var(--aa-primary);
+	color: var(--aa-on-primary);
+}
+
+.aa-btn--primary:hover {
+	filter: brightness(0.95);
+}
+
+.aa-btn--ghost {
+	background: var(--aa-field);
+	color: var(--aa-ink);
+}
+
+.aa-btn--ghost:hover {
+	background: var(--aa-elevated);
+}
+
+.aa-btn--warn {
+	background: var(--aa-warn);
+	color: #ffffff;
+}
+
+.aa-btn--warn:hover {
+	filter: brightness(0.95);
+}
+
+.aa-actions {
+	margin-top: 16px;
+}
+
+.aa-actions--footer {
+	margin-top: 24px;
+}
+
+/* --------------------------------------------------------- inputs */
+
+.aa-label {
+	display: block;
+	margin-bottom: 6px;
+	font-weight: 500;
+}
+
+/* Prefixed with .arcadia-admin: WP core's input[type=…] selectors would
+   otherwise win on specificity and keep the native border/background. */
+.arcadia-admin .aa-input {
+	display: block;
+	width: 100%;
+	max-width: 420px;
+	height: 44px;
+	padding: 0 14px;
+	background: var(--aa-field);
+	color: var(--aa-ink);
+	border: 0;
+	border-radius: 12px;
+	box-shadow: none;
+	font-family: var(--aa-font);
+	font-size: 14px;
+	/* Ghost-border as outline, not border: no layout shift, no-line rule. */
+	outline: 1px solid rgba(42, 35, 96, 0.12);
+	outline-offset: -1px;
+}
+
+.arcadia-admin .aa-input:focus,
+.arcadia-admin .aa-input:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: -1px;
+	box-shadow: none;
+}
+
+.arcadia-admin .aa-input[readonly] {
+	color: var(--aa-ink-70);
+}
+
+.aa-field-row {
+	margin: 12px 0;
+}
+
+/* -------------------------------------------------- status (dot) */
+
+.aa-status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0 0 8px;
+	font-weight: 500;
+}
+
+.aa-status__dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 9999px;
+	flex: none;
+}
+
+.aa-status--on .aa-status__dot {
+	background: var(--aa-good);
+}
+
+.aa-status--on {
+	color: var(--aa-good-text);
+}
+
+.aa-status--off .aa-status__dot {
+	background: var(--aa-bad);
+}
+
+.aa-status--off {
+	color: var(--aa-bad-text);
+}
+
+/* ------------------------------------------- FS-4: guard toggle */
+
+/* Native checkbox, visually hidden but focusable: keyboard and screen
+   readers come for free; the track/thumb is presentation only. */
+.aa-toggle {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	min-height: 40px;
+	cursor: pointer;
+}
+
+.aa-toggle__input {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+.aa-toggle__track {
+	position: relative;
+	flex: none;
+	width: 44px;
+	height: 24px;
+	margin-top: 2px;
+	border-radius: 9999px;
+	background: var(--aa-elevated);
+	transition: background-color 0.15s ease;
+}
+
+.aa-toggle__track::after {
+	content: '';
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 18px;
+	height: 18px;
+	border-radius: 9999px;
+	background: var(--aa-card);
+	box-shadow: var(--aa-shadow-sm);
+	transition: transform 0.15s ease;
+}
+
+.aa-toggle__input:checked ~ .aa-toggle__track {
+	background: var(--aa-primary);
+}
+
+.aa-toggle__input:checked ~ .aa-toggle__track::after {
+	transform: translateX(20px);
+}
+
+/* Project the input's focus ring onto the visual track. */
+.aa-toggle__input:focus-visible ~ .aa-toggle__track {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+}
+
+.aa-toggle__text {
+	font-weight: 500;
+	padding-top: 2px;
+}
+
+.aa-guard-hint {
+	margin: 12px 0 0;
+	font-size: 12px;
+}
+
+/* -------------------------------------------------- permissions */
+
+.aa-perm-group {
+	margin: 16px 0 0;
+	padding: 0;
+	border: 0;
+}
+
+.aa-perm-group__legend {
+	padding: 0;
+	margin-bottom: 4px;
+	font-weight: 600;
+	font-size: 13px;
+	color: var(--aa-ink);
+}
+
+.aa-perm {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 6px 8px;
+	border-radius: 10px;
+}
+
+.aa-perm:hover {
+	background: var(--aa-field);
+}
+
+.aa-perm__label {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
+}
+
+/* ---------------------------------------------------- toggletips */
+
+.aa-help {
+	position: relative;
+	display: inline-flex;
+	flex: none;
+}
+
+.aa-help__btn {
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	border: 0;
+	border-radius: 9999px;
+	background: var(--aa-field);
+	color: var(--aa-ink-70);
+	font-family: var(--aa-font);
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.aa-help__btn:hover {
+	background: var(--aa-elevated);
+	color: var(--aa-ink);
+}
+
+.aa-help__btn:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+}
+
+.aa-tooltip {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	right: 0;
+	z-index: 20;
+	width: max-content;
+	max-width: 260px;
+	padding: 10px 14px;
+	border-radius: 12px;
+	background: var(--aa-ink);
+	color: #ffffff;
+	font-size: 12px;
+	font-weight: 400;
+	line-height: 1.5;
+	box-shadow: var(--aa-shadow-md);
+	visibility: hidden;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+/* Open on click (aria-expanded) and on hover/focus of the WRAPPER, so the
+   pointer can travel onto the tooltip without it vanishing (WCAG 1.4.13). */
+.aa-help__btn[aria-expanded='true'] + .aa-tooltip,
+.aa-help:hover .aa-tooltip,
+.aa-help:focus-within .aa-tooltip {
+	visibility: visible;
+	opacity: 1;
+}
+
+/* Cards must not clip tooltips. */
+.aa-card,
+.aa-perm-group,
+.aa-perm {
+	overflow: visible;
+}
+
+/* -------------------------------------------------------- dialog */
+
+.aa-dialog {
+	border: 0;
+	border-radius: 16px;
+	padding: 24px;
+	max-width: 420px;
+	background: var(--aa-card);
+	color: var(--aa-ink);
+	font-family: var(--aa-font);
+	box-shadow: var(--aa-shadow-md);
+}
+
+.aa-dialog::backdrop {
+	background: rgba(42, 35, 96, 0.4);
+}
+
+.aa-dialog__title {
+	margin: 0 0 8px;
+	font-family: var(--aa-font);
+	font-size: 16px;
+	font-weight: 600;
+	color: var(--aa-ink);
+}
+
+.aa-dialog__body {
+	margin: 0 0 20px;
+	color: var(--aa-ink-70);
+}
+
+.aa-dialog__actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 10px;
+}
+
+/* ------------------------------------------------------- details */
+
+.aa-details {
+	background: var(--aa-card);
+	border-radius: 16px;
+	box-shadow: var(--aa-shadow-sm);
+}
+
+.aa-details__summary {
+	padding: 16px 24px;
+	font-weight: 600;
+	cursor: pointer;
+	border-radius: 16px;
+	list-style-position: inside;
+}
+
+.aa-details__summary:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: -2px;
+}
+
+.aa-details__body {
+	padding: 0 24px 20px;
+}
+
+/* --------------------------------------------------- debug table */
+
+.aa-debug-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 16px;
+}
+
+.aa-debug-table td {
+	padding: 8px 12px 8px 0;
+	vertical-align: top;
+}
+
+/* Tonal hairline: horizontal separation only, per the no-line rule. */
+.aa-debug-table tr + tr td {
+	border-top: 1px solid rgba(42, 35, 96, 0.08);
+}
+
+/* --------------------------------------------------- test result */
+
+.aa-test-result {
+	margin-left: 10px;
+	color: var(--aa-ink-70);
+}
+
+.aa-test-result--ok {
+	color: var(--aa-good-text);
+}
+
+.aa-test-result--bad {
+	color: var(--aa-bad-text);
+}
+
+/* -------------------------------------------- dashboard elements */
+
+.aa-cards-row {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	gap: 24px;
+	margin-bottom: 24px;
+}
+
+.aa-stat {
+	display: block;
+	text-decoration: none;
+	color: inherit;
+}
+
+a.aa-stat:hover {
+	box-shadow: var(--aa-shadow-md);
+}
+
+a.aa-stat:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+}
+
+.aa-stat__value {
+	font-size: 28px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: var(--aa-ink);
+}
+
+.aa-stat__label {
+	margin-top: 4px;
+	color: var(--aa-ink-70);
+	font-size: 13px;
+}
+
+.aa-stat__links {
+	margin-top: 8px;
+	display: flex;
+	gap: 12px;
+	font-size: 13px;
+}
+
+.arcadia-admin a {
+	color: var(--aa-secondary);
+}
+
+.arcadia-admin a:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+}
+
+/* Tables (revision queue, decisions) inside the skin. */
+.aa-table {
+	width: 100%;
+	border-collapse: collapse;
+	background: var(--aa-card);
+	border-radius: 16px;
+	overflow: hidden;
+	box-shadow: var(--aa-shadow-sm);
+}
+
+.aa-table th {
+	text-align: left;
+	padding: 12px 16px;
+	font-weight: 600;
+	font-size: 13px;
+	background: var(--aa-elevated);
+	color: var(--aa-ink);
+}
+
+.aa-table td {
+	padding: 12px 16px;
+	vertical-align: middle;
+}
+
+.aa-table tr + tr td {
+	border-top: 1px solid rgba(42, 35, 96, 0.08);
+}
+
+.aa-table-footer {
+	margin-top: 8px;
+	font-size: 12px;
+}
+
+.aa-btn--small {
+	padding: 6px 14px;
+	font-size: 12px;
+}
+
+.aa-row-actions {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.aa-row-actions__confirm {
+	display: flex;
+	gap: 6px;
+	margin-top: 6px;
+}
+
+.aa-row-status {
+	font-size: 12px;
+	color: var(--aa-ink-70);
+}
+
+.aa-row-status--bad {
+	color: var(--aa-bad-text);
+}
+
+.aa-is-busy {
+	opacity: 0.5;
+	pointer-events: none;
+}
+
+.arcadia-admin .aa-reject-notes {
+	width: 100%;
+	max-width: 320px;
+	padding: 8px 12px;
+	background: var(--aa-field);
+	color: var(--aa-ink);
+	border: 0;
+	border-radius: 12px;
+	font-family: var(--aa-font);
+	font-size: 12px;
+	outline: 1px solid rgba(42, 35, 96, 0.12);
+	outline-offset: -1px;
+}
+
+.arcadia-admin .aa-reject-notes:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: -1px;
+	box-shadow: none;
+}
+
+.aa-decision {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 9999px;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.02em;
+}
+
+.aa-decision--approved {
+	background: rgba(16, 185, 129, 0.12);
+	color: var(--aa-good-text);
+}
+
+.aa-decision--rejected {
+	background: rgba(239, 68, 68, 0.1);
+	color: var(--aa-bad-text);
+}
+
+.aa-dashboard-footer {
+	margin-top: 16px;
+}
+
+/* Guard chip reuse inside the skin (same classes as arcadia-list.css). */
+.arcadia-admin .aa-guard-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 12px;
+	border-radius: 9999px;
+	font-size: 12px;
+	font-weight: 500;
+	text-decoration: none;
+}
+
+.arcadia-admin .aa-guard-chip--on {
+	background: var(--aa-field);
+	color: var(--aa-ink);
+}
+
+.arcadia-admin .aa-guard-chip--off {
+	background: rgba(245, 158, 11, 0.1);
+	color: var(--aa-warn-text);
+}

@@ -1,0 +1,58 @@
+/**
+ * Arcadia badge (FS-1) + publishing-guard chip (FS-4) on the native
+ * edit.php list screens. Scoped to our own classes only — the shared
+ * WordPress surfaces stay native.
+ */
+
+/* FS-1 — post-state badge: small surface, so the primary tone is allowed. */
+.aa-badge {
+	display: inline-block;
+	padding: 2px 10px;
+	border-radius: 9999px;
+	background: #58f2dc;
+	color: #00201c;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.6;
+	vertical-align: middle;
+}
+
+/* FS-4 — factual guard chip in the filter row. Soft tints, never red. */
+.aa-guard-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	margin-right: 8px;
+	padding: 4px 12px;
+	border-radius: 9999px;
+	font-size: 12px;
+	font-weight: 500;
+	line-height: 1.6;
+	text-decoration: none;
+	vertical-align: middle;
+}
+
+.aa-guard-chip--on {
+	background: #f6f1ff;
+	color: #2a2360;
+}
+
+.aa-guard-chip--off {
+	background: rgba(245, 158, 11, 0.1);
+	color: #b45309;
+}
+
+a.aa-guard-chip:hover,
+a.aa-guard-chip:focus {
+	text-decoration: underline;
+}
+
+a.aa-guard-chip:focus-visible {
+	outline: 2px solid #8b37df;
+	outline-offset: 2px;
+}
+
+.aa-guard-chip__icon {
+	font-size: 13px;
+	line-height: 1;
+}

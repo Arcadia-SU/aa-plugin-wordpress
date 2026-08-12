@@ -1,0 +1,1011 @@
+# Copyright (C) 2026 Arcadia
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Arcadia Agents 0.5.2\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/arcadia-agents\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-08-12T16:04:36+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: arcadia-agents\n"
+
+#. Plugin Name of the plugin
+#: arcadia-agents.php
+#: admin/dashboard.php:49
+#: arcadia-agents.php:358
+#: arcadia-agents.php:377
+msgid "Arcadia Agents"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+#: arcadia-agents.php
+msgid "https://arcadia-agents.com"
+msgstr ""
+
+#. Description of the plugin
+#: arcadia-agents.php
+msgid "Connect your WordPress site to Arcadia Agents for autonomous SEO content management."
+msgstr ""
+
+#. Author of the plugin
+#: arcadia-agents.php
+#: includes/class-admin-list-ui.php:84
+#: includes/class-admin-list-ui.php:142
+msgid "Arcadia"
+msgstr ""
+
+#: admin/class-admin-assets.php:122
+msgid "Testing…"
+msgstr ""
+
+#: admin/class-admin-assets.php:123
+msgid "Error:"
+msgstr ""
+
+#: admin/class-admin-assets.php:124
+#: admin/class-admin-assets.php:143
+#: includes/class-revision-metabox.php:511
+msgid "Request failed."
+msgstr ""
+
+#. translators: %s: plugin version reported by the health endpoint
+#: admin/class-admin-assets.php:126
+#, php-format
+msgid "Connection OK — plugin version %s."
+msgstr ""
+
+#: admin/class-admin-assets.php:141
+msgid "Approve this proposal?"
+msgstr ""
+
+#: admin/class-admin-assets.php:142
+msgid "Reason for rejection (optional):"
+msgstr ""
+
+#: admin/class-admin-assets.php:144
+#: admin/dashboard.php:142
+#: includes/class-revision-metabox.php:182
+#: includes/class-revision-metabox.php:518
+msgid "Approve"
+msgstr ""
+
+#: admin/class-admin-assets.php:145
+#: admin/dashboard.php:143
+#: includes/class-revision-metabox.php:185
+#: includes/class-revision-metabox.php:519
+msgid "Reject"
+msgstr ""
+
+#: admin/class-admin-assets.php:146
+#: admin/settings.php:352
+#: includes/class-revision-metabox.php:200
+#: includes/class-revision-metabox.php:523
+msgid "Cancel"
+msgstr ""
+
+#: admin/class-admin-assets.php:147
+msgid "Working…"
+msgstr ""
+
+#: admin/dashboard.php:62
+#: admin/settings.php:201
+msgid "Connected"
+msgstr ""
+
+#: admin/dashboard.php:62
+#: admin/settings.php:150
+msgid "Not connected"
+msgstr ""
+
+#. translators: %s: connection date
+#: admin/dashboard.php:68
+#, php-format
+msgid "Since %s"
+msgstr ""
+
+#: admin/dashboard.php:73
+msgid "Configure connection"
+msgstr ""
+
+#: admin/dashboard.php:84
+msgid "Arcadia contents"
+msgstr ""
+
+#. translators: %s: number of posts
+#: admin/dashboard.php:89
+#, php-format
+msgid "Articles (%s)"
+msgstr ""
+
+#. translators: %s: number of pages
+#: admin/dashboard.php:95
+#, php-format
+msgid "Pages (%s)"
+msgstr ""
+
+#: admin/dashboard.php:104
+#: admin/dashboard.php:112
+msgid "Agent proposals awaiting review"
+msgstr ""
+
+#: admin/dashboard.php:116
+msgid "No pending proposals. All clear!"
+msgstr ""
+
+#: admin/dashboard.php:123
+#: admin/dashboard.php:164
+msgid "Article"
+msgstr ""
+
+#: admin/dashboard.php:124
+#: admin/dashboard.php:165
+msgid "Version"
+msgstr ""
+
+#: admin/dashboard.php:125
+msgid "Notes"
+msgstr ""
+
+#: admin/dashboard.php:126
+#: admin/dashboard.php:168
+msgid "Date"
+msgstr ""
+
+#: admin/dashboard.php:127
+msgid "Actions"
+msgstr ""
+
+#: admin/dashboard.php:136
+msgid "No notes"
+msgstr ""
+
+#: admin/dashboard.php:141
+#: includes/class-revision-metabox.php:179
+#: includes/class-revision-metabox.php:517
+msgid "Preview"
+msgstr ""
+
+#: admin/dashboard.php:144
+msgid "Edit"
+msgstr ""
+
+#: admin/dashboard.php:156
+msgid "Recent decisions"
+msgstr ""
+
+#: admin/dashboard.php:159
+msgid "No decisions yet."
+msgstr ""
+
+#: admin/dashboard.php:166
+msgid "Decision"
+msgstr ""
+
+#: admin/dashboard.php:167
+msgid "By"
+msgstr ""
+
+#: admin/dashboard.php:178
+msgid "Approved"
+msgstr ""
+
+#: admin/dashboard.php:180
+msgid "Rejected"
+msgstr ""
+
+#. translators: 1: approved count, 2: rejected count
+#: admin/dashboard.php:194
+#, php-format
+msgid "Approved: %1$s · Rejected: %2$s"
+msgstr ""
+
+#. translators: %s: plugin version
+#: admin/dashboard.php:202
+#, php-format
+msgid "Arcadia Agents v%s"
+msgstr ""
+
+#: admin/dashboard.php:205
+#: arcadia-agents.php:399
+#: arcadia-agents.php:400
+msgid "Settings"
+msgstr ""
+
+#: admin/dashboard.php:234
+#: admin/dashboard.php:301
+msgid "(deleted)"
+msgstr ""
+
+#: admin/settings.php:68
+msgid "Settings saved."
+msgstr ""
+
+#: admin/settings.php:86
+msgid "Please enter a Connection Key first."
+msgstr ""
+
+#: admin/settings.php:98
+msgid "Successfully connected to Arcadia Agents!"
+msgstr ""
+
+#: admin/settings.php:110
+msgid "Disconnected from Arcadia Agents."
+msgstr ""
+
+#: admin/settings.php:130
+msgid "Arcadia Agents — Settings"
+msgstr ""
+
+#: admin/settings.php:147
+#: admin/settings.php:198
+msgid "Connection"
+msgstr ""
+
+#: admin/settings.php:152
+msgid "Enter the Connection Key from your Arcadia Agents dashboard, then click \"Connect\"."
+msgstr ""
+
+#: admin/settings.php:154
+#: admin/settings.php:220
+msgid "Connection Key"
+msgstr ""
+
+#: admin/settings.php:166
+msgid "Connect to Arcadia Agents"
+msgstr ""
+
+#: admin/settings.php:176
+msgid "Publishing"
+msgstr ""
+
+#: admin/settings.php:187
+#: includes/class-guard-status.php:52
+msgid "The agent saves as draft only."
+msgstr ""
+
+#: admin/settings.php:191
+msgid "When enabled, the agent can never change your live site on its own. New articles are saved as drafts, and edits to already-published articles are held as proposals you approve from the article editor — your live article is never taken offline. When disabled, the agent publishes new articles and applies edits to live articles directly, with no review step."
+msgstr ""
+
+#. translators: %s: date/time of connection
+#: admin/settings.php:207
+#, php-format
+msgid "Connected since: %s"
+msgstr ""
+
+#. translators: %s: date/time of last agent activity
+#: admin/settings.php:215
+#, php-format
+msgid "Last activity: %s"
+msgstr ""
+
+#: admin/settings.php:229
+msgid "Connected. To change the key, disconnect first."
+msgstr ""
+
+#: admin/settings.php:233
+msgid "Disconnect"
+msgstr ""
+
+#: admin/settings.php:241
+msgid "Technical information"
+msgstr ""
+
+#: admin/settings.php:246
+msgid "Plugin Version"
+msgstr ""
+
+#: admin/settings.php:250
+msgid "WordPress Version"
+msgstr ""
+
+#: admin/settings.php:254
+msgid "PHP Version"
+msgstr ""
+
+#: admin/settings.php:258
+msgid "Block Adapter"
+msgstr ""
+
+#: admin/settings.php:262
+msgid "ACF detected"
+msgstr ""
+
+#: admin/settings.php:267
+msgid "REST API Base"
+msgstr ""
+
+#: admin/settings.php:275
+msgid "Test Health Endpoint"
+msgstr ""
+
+#. translators: %s: health check URL
+#: admin/settings.php:284
+#, php-format
+msgid "Health check endpoint: %s"
+msgstr ""
+
+#: admin/settings.php:298
+msgid "Permissions"
+msgstr ""
+
+#: admin/settings.php:299
+msgid "Control what the agent can do on your site."
+msgstr ""
+
+#. translators: %s: permission name
+#: admin/settings.php:323
+#, php-format
+msgid "What does \"%s\" allow?"
+msgstr ""
+
+#: admin/settings.php:339
+msgid "Save Settings"
+msgstr ""
+
+#: admin/settings.php:346
+msgid "Allow direct publishing?"
+msgstr ""
+
+#: admin/settings.php:348
+msgid "The agent will be able to publish new content and edit your live pages immediately, without a review step."
+msgstr ""
+
+#: admin/settings.php:355
+msgid "Allow direct publishing"
+msgstr ""
+
+#: arcadia-agents.php:35
+msgid "Arcadia Agents: Firebase JWT library is already loaded by another plugin. This may cause version conflicts. If you experience authentication errors, check for conflicting plugins."
+msgstr ""
+
+#: arcadia-agents.php:51
+msgid "Arcadia Agents: Composer dependencies are missing. Please run \"composer install\" in the plugin directory."
+msgstr ""
+
+#: arcadia-agents.php:389
+#: arcadia-agents.php:390
+msgid "Dashboard"
+msgstr ""
+
+#: includes/adapters/class-adapter-acf.php:239
+msgid "media_sideload_image() is not available."
+msgstr ""
+
+#: includes/api/trait-api-acf-fields.php:161
+msgid "ACF is required to process acf_fields."
+msgstr ""
+
+#: includes/api/trait-api-field-schema.php:145
+msgid "Request body must be a JSON object with post type keys."
+msgstr ""
+
+#. translators: %s: post type name
+#: includes/api/trait-api-field-schema.php:160
+#, php-format
+msgid "Value for post type '%s' must be an object."
+msgstr ""
+
+#. translators: 1: field name, 2: post type
+#: includes/api/trait-api-field-schema.php:181
+#, php-format
+msgid "Mapping for field '%1$s' in '%2$s' must include a 'type' key."
+msgstr ""
+
+#. translators: 1: received type, 2: allowed types
+#: includes/api/trait-api-field-schema.php:194
+#, php-format
+msgid "Invalid mapping type '%1$s'. Allowed: %2$s."
+msgstr ""
+
+#. translators: 1: received source, 2: field name, 3: allowed sources
+#: includes/api/trait-api-field-schema.php:215
+#, php-format
+msgid "Unknown mapping source '%1$s' for field '%2$s'. Allowed: %3$s."
+msgstr ""
+
+#: includes/api/trait-api-media.php:39
+msgid "Image URL is required."
+msgstr ""
+
+#. translators: %d: attachment ID
+#: includes/api/trait-api-media.php:79
+#, php-format
+msgid "Failed to read attachment %d after upload."
+msgstr ""
+
+#. translators: %d: post ID
+#: includes/api/trait-api-media.php:113
+#: includes/api/trait-api-posts.php:442
+#: includes/api/trait-api-posts.php:626
+#: includes/api/trait-api-posts.php:733
+#: includes/api/trait-api-preview.php:41
+#, php-format
+msgid "Post with ID %d not found."
+msgstr ""
+
+#: includes/api/trait-api-media.php:130
+msgid "Invalid attachment ID or not an image."
+msgstr ""
+
+#: includes/api/trait-api-media.php:143
+msgid "Either attachment_id or url is required."
+msgstr ""
+
+#. translators: 1: post ID, 2: attachment ID
+#: includes/api/trait-api-media.php:155
+#, php-format
+msgid "Failed to set featured image on post %1$d (attachment %2$d)."
+msgstr ""
+
+#. translators: %s: error message
+#: includes/api/trait-api-media.php:201
+#, php-format
+msgid "Failed to download image: %s"
+msgstr ""
+
+#. translators: %s: error message
+#: includes/api/trait-api-media.php:228
+#, php-format
+msgid "Failed to import image: %s"
+msgstr ""
+
+#. translators: %d: attachment ID
+#: includes/api/trait-api-media.php:353
+#: includes/api/trait-api-media.php:417
+#, php-format
+msgid "Media with ID %d not found."
+msgstr ""
+
+#: includes/api/trait-api-media.php:386
+msgid "No updateable fields provided. Allowed: title, caption, alt_text."
+msgstr ""
+
+#. translators: %d: attachment ID
+#: includes/api/trait-api-media.php:434
+#, php-format
+msgid "Failed to delete media %d."
+msgstr ""
+
+#. translators: %s: post type slug
+#: includes/api/trait-api-posts.php:42
+#: includes/api/trait-api-posts.php:349
+#, php-format
+msgid "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page)."
+msgstr ""
+
+#. translators: %d: post ID
+#: includes/api/trait-api-posts.php:403
+#, php-format
+msgid "Failed to read post %d after creation."
+msgstr ""
+
+#: includes/api/trait-api-posts.php:457
+msgid "Changing post_type via update is not allowed. Delete and re-create instead."
+msgstr ""
+
+#: includes/api/trait-api-posts.php:501
+msgid "This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly."
+msgstr ""
+
+#. translators: %d: post ID
+#: includes/api/trait-api-posts.php:586
+#, php-format
+msgid "Failed to read post %d after update."
+msgstr ""
+
+#. translators: %d: post ID
+#: includes/api/trait-api-posts.php:750
+#, php-format
+msgid "Failed to delete post %d."
+msgstr ""
+
+#: includes/api/trait-api-redirects.php:78
+msgid "Source URL is required."
+msgstr ""
+
+#: includes/api/trait-api-redirects.php:86
+msgid "Target URL is required."
+msgstr ""
+
+#: includes/api/trait-api-redirects.php:94
+msgid "Redirect type must be 301 or 302."
+msgstr ""
+
+#. translators: %d: redirect ID
+#: includes/api/trait-api-redirects.php:148
+#, php-format
+msgid "Redirect with ID %d not found."
+msgstr ""
+
+#: includes/api/trait-api-taxonomies.php:73
+msgid "Category name is required. Provide a non-empty \"name\" field."
+msgstr ""
+
+#. translators: %s: category name
+#: includes/api/trait-api-taxonomies.php:105
+#, php-format
+msgid "Failed to read existing category '%s'."
+msgstr ""
+
+#. translators: %d: term ID
+#: includes/api/trait-api-taxonomies.php:131
+#, php-format
+msgid "Failed to read category (ID %d) after creation."
+msgstr ""
+
+#: includes/api/trait-api-taxonomies.php:160
+msgid "Tag name is required. Provide a non-empty \"name\" field."
+msgstr ""
+
+#. translators: %s: tag name
+#: includes/api/trait-api-taxonomies.php:188
+#, php-format
+msgid "Failed to read existing tag '%s'."
+msgstr ""
+
+#. translators: %d: term ID
+#: includes/api/trait-api-taxonomies.php:214
+#, php-format
+msgid "Failed to read tag (ID %d) after creation."
+msgstr ""
+
+#. translators: %d: term ID
+#: includes/api/trait-api-taxonomies.php:246
+#: includes/api/trait-api-taxonomies.php:374
+#, php-format
+msgid "Category with ID %d not found."
+msgstr ""
+
+#: includes/api/trait-api-taxonomies.php:275
+msgid "No updateable fields provided. Allowed: name, slug, description, parent."
+msgstr ""
+
+#. translators: %d: term ID
+#: includes/api/trait-api-taxonomies.php:312
+#: includes/api/trait-api-taxonomies.php:411
+#, php-format
+msgid "Tag with ID %d not found."
+msgstr ""
+
+#: includes/api/trait-api-taxonomies.php:337
+msgid "No updateable fields provided. Allowed: name, slug, description."
+msgstr ""
+
+#: includes/class-acf-validator.php:133
+msgid "ACF block validation failed."
+msgstr ""
+
+#: includes/class-auth.php:69
+msgid "Connection key is required."
+msgstr ""
+
+#. translators: %s: error message
+#: includes/class-auth.php:103
+#, php-format
+msgid "Failed to connect to ArcadiaAgents: %s"
+msgstr ""
+
+#: includes/class-auth.php:115
+msgid "Unknown error"
+msgstr ""
+
+#: includes/class-auth.php:126
+msgid "Invalid response from ArcadiaAgents: missing public key."
+msgstr ""
+
+#: includes/class-auth.php:160
+msgid "Plugin not configured. Please complete the handshake first."
+msgstr ""
+
+#: includes/class-auth.php:190
+msgid "Token has expired."
+msgstr ""
+
+#: includes/class-auth.php:196
+msgid "Token is not valid yet."
+msgstr ""
+
+#: includes/class-auth.php:202
+msgid "Token signature verification failed."
+msgstr ""
+
+#: includes/class-auth.php:208
+msgid "Invalid token format or algorithm."
+msgstr ""
+
+#. translators: %s: error message
+#: includes/class-auth.php:216
+#, php-format
+msgid "JWT validation error: %s"
+msgstr ""
+
+#: includes/class-auth.php:281
+msgid "Token does not identify a site (missing sub claim)."
+msgstr ""
+
+#: includes/class-auth.php:296
+msgid "Token was issued for a different site."
+msgstr ""
+
+#: includes/class-auth.php:310
+msgid "Token issuer does not match the connected issuer."
+msgstr ""
+
+#: includes/class-auth.php:374
+msgid "Read articles"
+msgstr ""
+
+#: includes/class-auth.php:375
+msgid "Create/edit articles"
+msgstr ""
+
+#: includes/class-auth.php:376
+msgid "Delete articles"
+msgstr ""
+
+#: includes/class-auth.php:377
+msgid "Withdraw its own pending revisions"
+msgstr ""
+
+#: includes/class-auth.php:378
+msgid "Read media library"
+msgstr ""
+
+#: includes/class-auth.php:379
+msgid "Upload/edit media"
+msgstr ""
+
+#: includes/class-auth.php:380
+msgid "Delete media"
+msgstr ""
+
+#: includes/class-auth.php:381
+msgid "Read categories/tags"
+msgstr ""
+
+#: includes/class-auth.php:382
+msgid "Create/edit categories/tags"
+msgstr ""
+
+#: includes/class-auth.php:383
+msgid "Delete categories/tags"
+msgstr ""
+
+#: includes/class-auth.php:384
+msgid "Read site info & pages"
+msgstr ""
+
+#: includes/class-auth.php:385
+msgid "Read redirects"
+msgstr ""
+
+#: includes/class-auth.php:386
+msgid "Create/delete redirects"
+msgstr ""
+
+#: includes/class-auth.php:387
+msgid "Update plugin settings"
+msgstr ""
+
+#: includes/class-auth.php:402
+msgid "Read articles and pages, their block structure, and follow its own pending proposals."
+msgstr ""
+
+#: includes/class-auth.php:403
+msgid "Create and edit articles and pages. While “Draft only” is on, new content is saved as a draft and edits to published content become proposals awaiting review."
+msgstr ""
+
+#: includes/class-auth.php:404
+msgid "Permanently delete an article."
+msgstr ""
+
+#: includes/class-auth.php:405
+msgid "Withdraw its own pending proposals. The agent can never approve them — approval always happens here, in WordPress."
+msgstr ""
+
+#: includes/class-auth.php:406
+msgid "Browse the media library."
+msgstr ""
+
+#: includes/class-auth.php:407
+msgid "Upload images, fix alternative texts, and set the featured image of a post."
+msgstr ""
+
+#: includes/class-auth.php:408
+msgid "Delete a media file."
+msgstr ""
+
+#: includes/class-auth.php:409
+msgid "Read categories and tags."
+msgstr ""
+
+#: includes/class-auth.php:410
+msgid "Create and rename categories and tags."
+msgstr ""
+
+#: includes/class-auth.php:411
+msgid "Delete categories and tags."
+msgstr ""
+
+#: includes/class-auth.php:412
+msgid "Understand the site: pages, menus, authors, available block types and custom fields."
+msgstr ""
+
+#: includes/class-auth.php:413
+msgid "List the existing redirects."
+msgstr ""
+
+#: includes/class-auth.php:414
+msgid "Create and delete redirects."
+msgstr ""
+
+#: includes/class-auth.php:415
+msgid "Save the custom-field calibration of the theme. Does not touch the publishing guard or these permissions."
+msgstr ""
+
+#: includes/class-auth.php:431
+msgid "Articles & pages"
+msgstr ""
+
+#: includes/class-auth.php:435
+msgid "Agent proposals"
+msgstr ""
+
+#: includes/class-auth.php:439
+msgid "Media"
+msgstr ""
+
+#: includes/class-auth.php:443
+msgid "Categories & tags"
+msgstr ""
+
+#: includes/class-auth.php:447
+msgid "Site & technical"
+msgstr ""
+
+#. translators: %s: scope name
+#: includes/class-auth.php:470
+#, php-format
+msgid "This action requires the '%s' scope which is not enabled in WordPress settings."
+msgstr ""
+
+#: includes/class-auth.php:520
+msgid "No valid Bearer token found. Send it via Authorization or X-AA-Token header."
+msgstr ""
+
+#: includes/class-auth.php:547
+msgid "JWT payload is not a valid array."
+msgstr ""
+
+#. translators: 1: field name, 2: block type
+#: includes/class-block-registry.php:247
+#, php-format
+msgid "Required field '%1$s' is missing for block type '%2$s'."
+msgstr ""
+
+#. translators: %s: block type name
+#: includes/class-blocks.php:269
+#, php-format
+msgid "Block type '%s' is not registered."
+msgstr ""
+
+#: includes/class-guard-status.php:41
+msgid "Draft only"
+msgstr ""
+
+#: includes/class-guard-status.php:42
+msgid "Direct publishing"
+msgstr ""
+
+#: includes/class-guard-status.php:53
+msgid "The agent can publish live."
+msgstr ""
+
+#. translators: %s: guard state label ("Draft only" / "Direct publishing")
+#: includes/class-guard-status.php:74
+#, php-format
+msgid "Agent: %s"
+msgstr ""
+
+#. translators: %s: request field path, e.g. meta.post_parent
+#: includes/class-post-builder.php:237
+#, php-format
+msgid "Field '%s' controls site structure and cannot be set through this API. Content is editable; the page tree, menu order and page template are not."
+msgstr ""
+
+#. translators: 1: received status, 2: allowed statuses
+#: includes/class-post-builder.php:436
+#, php-format
+msgid "Invalid post status '%1$s'. Allowed: %2$s."
+msgstr ""
+
+#: includes/class-revision-diff.php:537
+msgid "Markdown will be converted to HTML and sanitised on approval; disallowed tags such as iframe or script are removed."
+msgstr ""
+
+#: includes/class-revision-diff.php:540
+msgid "The HTML will be sanitised on approval; disallowed tags such as iframe or script are removed."
+msgstr ""
+
+#: includes/class-revision-diff.php:543
+msgid "This field will receive the proposed page content."
+msgstr ""
+
+#: includes/class-revision-diff.php:546
+msgid "The image will be imported into the media library on approval."
+msgstr ""
+
+#. translators: %s: mapping source name, e.g. meta_title
+#: includes/class-revision-diff.php:553
+#, php-format
+msgid "Calibrated field — the payload does not name it; the value is derived from %s."
+msgstr ""
+
+#: includes/class-revision-metabox.php:44
+msgid "Arcadia Agents — Pending Revision"
+msgstr ""
+
+#: includes/class-revision-metabox.php:53
+msgid "Arcadia Revisions"
+msgstr ""
+
+#: includes/class-revision-metabox.php:75
+msgid "No pending revision."
+msgstr ""
+
+#. translators: 1: version number, 2: date
+#: includes/class-revision-metabox.php:110
+#, php-format
+msgid "Proposed modification v%1$d — %2$s"
+msgstr ""
+
+#: includes/class-revision-metabox.php:126
+msgid "This revision proposes new page content only — no individual field is modified. Use Preview to review it."
+msgstr ""
+
+#. translators: %d: number of modified fields
+#: includes/class-revision-metabox.php:134
+#: includes/class-revision-metabox.php:494
+#, php-format
+msgid "%d field modified"
+msgid_plural "%d fields modified"
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/class-revision-metabox.php:143
+msgid "Field"
+msgstr ""
+
+#: includes/class-revision-metabox.php:146
+msgid "Current"
+msgstr ""
+
+#: includes/class-revision-metabox.php:149
+msgid "Proposed"
+msgstr ""
+
+#: includes/class-revision-metabox.php:192
+#: includes/class-revision-metabox.php:520
+msgid "Rejection notes (optional):"
+msgstr ""
+
+#: includes/class-revision-metabox.php:197
+#: includes/class-revision-metabox.php:522
+msgid "Confirm Rejection"
+msgstr ""
+
+#: includes/class-revision-metabox.php:225
+msgid "Apply this revision to the live article?"
+msgstr ""
+
+#: includes/class-revision-metabox.php:227
+#: includes/class-revision-metabox.php:513
+msgid "Approving..."
+msgstr ""
+
+#: includes/class-revision-metabox.php:238
+#: includes/class-revision-metabox.php:514
+msgid "Approved! Reloading..."
+msgstr ""
+
+#: includes/class-revision-metabox.php:258
+#: includes/class-revision-metabox.php:515
+msgid "Rejecting..."
+msgstr ""
+
+#: includes/class-revision-metabox.php:271
+#: includes/class-revision-metabox.php:516
+msgid "Rejected. Reloading..."
+msgstr ""
+
+#: includes/class-revision-metabox.php:297
+msgid "No revisions yet."
+msgstr ""
+
+#: includes/class-revision-metabox.php:335
+#: includes/class-revision-metabox.php:378
+msgid "Missing revision ID."
+msgstr ""
+
+#: includes/class-revision-metabox.php:351
+msgid "Revision approved and applied."
+msgstr ""
+
+#. translators: %s: semicolon-separated list of non-fatal warnings
+#: includes/class-revision-metabox.php:355
+#, php-format
+msgid "Warnings: %s"
+msgstr ""
+
+#: includes/class-revision-metabox.php:393
+msgid "Revision rejected."
+msgstr ""
+
+#: includes/class-revision-metabox.php:412
+msgid "Revision not found."
+msgstr ""
+
+#: includes/class-revision-metabox.php:417
+msgid "Permission denied."
+msgstr ""
+
+#: includes/class-revision-metabox.php:489
+msgid "This proposal contains new page content only — no individual field is modified."
+msgstr ""
+
+#: includes/class-revision-metabox.php:497
+msgid "Hide details"
+msgstr ""
+
+#: includes/class-revision-metabox.php:500
+msgid "Current:"
+msgstr ""
+
+#: includes/class-revision-metabox.php:501
+msgid "Proposed:"
+msgstr ""
+
+#. translators: %s: proposal version number
+#: includes/class-revision-metabox.php:504
+#, php-format
+msgid "Agent proposal (v%s)"
+msgstr ""
+
+#. translators: %s: proposal version number
+#: includes/class-revision-metabox.php:508
+#, php-format
+msgid "v%s"
+msgstr ""
+
+#. translators: %s: the agent's notes, quoted
+#: includes/class-revision-metabox.php:510
+#, php-format
+msgid "“%s”"
+msgstr ""
+
+#: includes/class-revision-metabox.php:512
+msgid "Apply this proposal to the live article?"
+msgstr ""
+
+#: includes/class-revision-metabox.php:521
+msgid "Confirm"
+msgstr ""
+
+#: includes/class-revision-metabox.php:524
+msgid "Network error"
+msgstr ""
+
+#: includes/class-url-guard.php:41
+msgid "Only HTTP and HTTPS URLs are allowed."
+msgstr ""
+
+#: includes/class-url-guard.php:50
+msgid "URL is not allowed (private/reserved IP)."
+msgstr ""

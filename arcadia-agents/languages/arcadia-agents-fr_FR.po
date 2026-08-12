@@ -1,0 +1,708 @@
+# French translation for Arcadia Agents.
+# Copyright (C) 2026 Arcadia
+# This file is distributed under the GPL v2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Arcadia Agents 0.6.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/arcadia-agents\n"
+"Last-Translator: Arcadia <contact@arcadia-agents.com>\n"
+"Language-Team: French <contact@arcadia-agents.com>\n"
+"Language: fr_FR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n > 1;\n"
+"POT-Creation-Date: 2026-08-12T16:02:12+00:00\n"
+"PO-Revision-Date: 2026-08-12T18:00:00+00:00\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: arcadia-agents\n"
+
+#. Plugin Name of the plugin
+msgid "Arcadia Agents"
+msgstr "Arcadia Agents"
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+msgid "https://arcadia-agents.com"
+msgstr "https://arcadia-agents.com"
+
+#. Description of the plugin
+msgid "Connect your WordPress site to Arcadia Agents for autonomous SEO content management."
+msgstr "Connectez votre site WordPress à Arcadia Agents pour une gestion autonome du contenu SEO."
+
+#. Author of the plugin
+msgid "Arcadia"
+msgstr "Arcadia"
+
+msgid "Testing…"
+msgstr "Test en cours…"
+
+msgid "Error:"
+msgstr "Erreur :"
+
+msgid "Request failed."
+msgstr "La requête a échoué."
+
+#, php-format
+msgid "Connection OK — plugin version %s."
+msgstr "Connexion OK — extension en version %s."
+
+msgid "Approve this proposal?"
+msgstr "Approuver cette proposition ?"
+
+msgid "Reason for rejection (optional):"
+msgstr "Motif du refus (facultatif) :"
+
+msgid "Approve"
+msgstr "Approuver"
+
+msgid "Reject"
+msgstr "Refuser"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Working…"
+msgstr "Traitement…"
+
+msgid "Connected"
+msgstr "Connecté"
+
+msgid "Not connected"
+msgstr "Non connecté"
+
+#, php-format
+msgid "Since %s"
+msgstr "Depuis le %s"
+
+msgid "Configure connection"
+msgstr "Configurer la connexion"
+
+msgid "Arcadia contents"
+msgstr "Contenus Arcadia"
+
+#, php-format
+msgid "Articles (%s)"
+msgstr "Articles (%s)"
+
+#, php-format
+msgid "Pages (%s)"
+msgstr "Pages (%s)"
+
+msgid "Agent proposals awaiting review"
+msgstr "Propositions de l’agent en attente de relecture"
+
+msgid "No pending proposals. All clear!"
+msgstr "Aucune proposition en attente. Tout est à jour !"
+
+msgid "Article"
+msgstr "Article"
+
+msgid "Version"
+msgstr "Version"
+
+msgid "Notes"
+msgstr "Notes"
+
+msgid "Date"
+msgstr "Date"
+
+msgid "Actions"
+msgstr "Actions"
+
+msgid "No notes"
+msgstr "Aucune note"
+
+msgid "Preview"
+msgstr "Prévisualiser"
+
+msgid "Edit"
+msgstr "Modifier"
+
+msgid "Recent decisions"
+msgstr "Décisions récentes"
+
+msgid "No decisions yet."
+msgstr "Aucune décision pour le moment."
+
+msgid "Decision"
+msgstr "Décision"
+
+msgid "By"
+msgstr "Par"
+
+msgid "Approved"
+msgstr "Approuvée"
+
+msgid "Rejected"
+msgstr "Refusée"
+
+#, php-format
+msgid "Approved: %1$s · Rejected: %2$s"
+msgstr "Approuvées : %1$s · Refusées : %2$s"
+
+#, php-format
+msgid "Arcadia Agents v%s"
+msgstr "Arcadia Agents v%s"
+
+msgid "Settings"
+msgstr "Réglages"
+
+msgid "(deleted)"
+msgstr "(supprimé)"
+
+msgid "Settings saved."
+msgstr "Réglages enregistrés."
+
+msgid "Please enter a Connection Key first."
+msgstr "Veuillez d’abord saisir une clé de connexion."
+
+msgid "Successfully connected to Arcadia Agents!"
+msgstr "Connexion à Arcadia Agents réussie !"
+
+msgid "Disconnected from Arcadia Agents."
+msgstr "Déconnecté d’Arcadia Agents."
+
+msgid "Arcadia Agents — Settings"
+msgstr "Arcadia Agents — Réglages"
+
+msgid "Connection"
+msgstr "Connexion"
+
+msgid "Enter the Connection Key from your Arcadia Agents dashboard, then click \"Connect\"."
+msgstr "Saisissez la clé de connexion fournie par votre tableau de bord Arcadia Agents, puis cliquez sur « Connecter »."
+
+msgid "Connection Key"
+msgstr "Clé de connexion"
+
+msgid "Connect to Arcadia Agents"
+msgstr "Connecter à Arcadia Agents"
+
+msgid "Publishing"
+msgstr "Publication"
+
+msgid "The agent saves as draft only."
+msgstr "L’agent enregistre en brouillon uniquement."
+
+msgid "When enabled, the agent can never change your live site on its own. New articles are saved as drafts, and edits to already-published articles are held as proposals you approve from the article editor — your live article is never taken offline. When disabled, the agent publishes new articles and applies edits to live articles directly, with no review step."
+msgstr "Lorsque cette option est activée, l’agent ne peut jamais modifier votre site en ligne de lui-même. Les nouveaux articles sont enregistrés en brouillon, et les modifications d’articles déjà publiés sont conservées comme propositions que vous approuvez depuis l’éditeur d’article — votre article en ligne n’est jamais mis hors ligne. Lorsqu’elle est désactivée, l’agent publie les nouveaux articles et applique directement les modifications aux articles en ligne, sans étape de relecture."
+
+#, php-format
+msgid "Connected since: %s"
+msgstr "Connecté depuis : %s"
+
+#, php-format
+msgid "Last activity: %s"
+msgstr "Dernière activité : %s"
+
+msgid "Connected. To change the key, disconnect first."
+msgstr "Connecté. Pour changer de clé, déconnectez-vous d’abord."
+
+msgid "Disconnect"
+msgstr "Déconnecter"
+
+msgid "Technical information"
+msgstr "Informations techniques"
+
+msgid "Plugin Version"
+msgstr "Version de l’extension"
+
+msgid "WordPress Version"
+msgstr "Version de WordPress"
+
+msgid "PHP Version"
+msgstr "Version de PHP"
+
+msgid "Block Adapter"
+msgstr "Adaptateur de blocs"
+
+msgid "ACF detected"
+msgstr "ACF détecté"
+
+msgid "REST API Base"
+msgstr "Base de l’API REST"
+
+msgid "Test Health Endpoint"
+msgstr "Tester le point de contrôle"
+
+#, php-format
+msgid "Health check endpoint: %s"
+msgstr "Point de contrôle de santé : %s"
+
+msgid "Permissions"
+msgstr "Permissions"
+
+msgid "Control what the agent can do on your site."
+msgstr "Contrôlez ce que l’agent peut faire sur votre site."
+
+#, php-format
+msgid "What does \"%s\" allow?"
+msgstr "Que permet « %s » ?"
+
+msgid "Save Settings"
+msgstr "Enregistrer les réglages"
+
+msgid "Allow direct publishing?"
+msgstr "Autoriser la publication directe ?"
+
+msgid "The agent will be able to publish new content and edit your live pages immediately, without a review step."
+msgstr "L’agent pourra publier de nouveaux contenus et modifier vos pages en ligne immédiatement, sans étape de relecture."
+
+msgid "Allow direct publishing"
+msgstr "Autoriser la publication directe"
+
+msgid "Arcadia Agents: Firebase JWT library is already loaded by another plugin. This may cause version conflicts. If you experience authentication errors, check for conflicting plugins."
+msgstr "Arcadia Agents : la bibliothèque Firebase JWT est déjà chargée par une autre extension. Cela peut provoquer des conflits de versions. En cas d’erreurs d’authentification, vérifiez les extensions en conflit."
+
+msgid "Arcadia Agents: Composer dependencies are missing. Please run \"composer install\" in the plugin directory."
+msgstr "Arcadia Agents : les dépendances Composer sont manquantes. Exécutez « composer install » dans le dossier de l’extension."
+
+msgid "Dashboard"
+msgstr "Tableau de bord"
+
+msgid "media_sideload_image() is not available."
+msgstr "media_sideload_image() n’est pas disponible."
+
+msgid "ACF is required to process acf_fields."
+msgstr "ACF est requis pour traiter acf_fields."
+
+msgid "Request body must be a JSON object with post type keys."
+msgstr "Le corps de la requête doit être un objet JSON dont les clés sont des types de publication."
+
+#, php-format
+msgid "Value for post type '%s' must be an object."
+msgstr "La valeur du type de publication « %s » doit être un objet."
+
+#, php-format
+msgid "Mapping for field '%1$s' in '%2$s' must include a 'type' key."
+msgstr "Le mapping du champ « %1$s » dans « %2$s » doit inclure une clé « type »."
+
+#, php-format
+msgid "Invalid mapping type '%1$s'. Allowed: %2$s."
+msgstr "Type de mapping « %1$s » invalide. Autorisés : %2$s."
+
+#, php-format
+msgid "Unknown mapping source '%1$s' for field '%2$s'. Allowed: %3$s."
+msgstr "Source de mapping « %1$s » inconnue pour le champ « %2$s ». Autorisées : %3$s."
+
+msgid "Image URL is required."
+msgstr "L’URL de l’image est requise."
+
+#, php-format
+msgid "Failed to read attachment %d after upload."
+msgstr "Impossible de lire le média %d après le téléversement."
+
+#, php-format
+msgid "Post with ID %d not found."
+msgstr "Publication avec l’ID %d introuvable."
+
+msgid "Invalid attachment ID or not an image."
+msgstr "ID de média invalide, ou le fichier n’est pas une image."
+
+msgid "Either attachment_id or url is required."
+msgstr "attachment_id ou url est requis."
+
+#, php-format
+msgid "Failed to set featured image on post %1$d (attachment %2$d)."
+msgstr "Impossible de définir l’image mise en avant sur la publication %1$d (média %2$d)."
+
+#, php-format
+msgid "Failed to download image: %s"
+msgstr "Impossible de télécharger l’image : %s"
+
+#, php-format
+msgid "Failed to import image: %s"
+msgstr "Impossible d’importer l’image : %s"
+
+#, php-format
+msgid "Media with ID %d not found."
+msgstr "Média avec l’ID %d introuvable."
+
+msgid "No updateable fields provided. Allowed: title, caption, alt_text."
+msgstr "Aucun champ modifiable fourni. Autorisés : title, caption, alt_text."
+
+#, php-format
+msgid "Failed to delete media %d."
+msgstr "Impossible de supprimer le média %d."
+
+#, php-format
+msgid "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page)."
+msgstr "Le type de publication « %s » n’est pas autorisé. Il doit s’agir d’un type public autre que « attachment » (ex. post, page)."
+
+#, php-format
+msgid "Failed to read post %d after creation."
+msgstr "Impossible de lire la publication %d après sa création."
+
+msgid "Changing post_type via update is not allowed. Delete and re-create instead."
+msgstr "Changer post_type via une mise à jour n’est pas autorisé. Supprimez puis recréez la publication."
+
+msgid "This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly."
+msgstr "Cette modification est retenue pour approbation, et une approbation ne peut pas changer l’état de la publication — n’envoyez « status » que sur une écriture appliquée directement."
+
+#, php-format
+msgid "Failed to read post %d after update."
+msgstr "Impossible de lire la publication %d après sa mise à jour."
+
+#, php-format
+msgid "Failed to delete post %d."
+msgstr "Impossible de supprimer la publication %d."
+
+msgid "Source URL is required."
+msgstr "L’URL source est requise."
+
+msgid "Target URL is required."
+msgstr "L’URL cible est requise."
+
+msgid "Redirect type must be 301 or 302."
+msgstr "Le type de redirection doit être 301 ou 302."
+
+#, php-format
+msgid "Redirect with ID %d not found."
+msgstr "Redirection avec l’ID %d introuvable."
+
+msgid "Category name is required. Provide a non-empty \"name\" field."
+msgstr "Le nom de la catégorie est requis. Fournissez un champ « name » non vide."
+
+#, php-format
+msgid "Failed to read existing category '%s'."
+msgstr "Impossible de lire la catégorie existante « %s »."
+
+#, php-format
+msgid "Failed to read category (ID %d) after creation."
+msgstr "Impossible de lire la catégorie (ID %d) après sa création."
+
+msgid "Tag name is required. Provide a non-empty \"name\" field."
+msgstr "Le nom de l’étiquette est requis. Fournissez un champ « name » non vide."
+
+#, php-format
+msgid "Failed to read existing tag '%s'."
+msgstr "Impossible de lire l’étiquette existante « %s »."
+
+#, php-format
+msgid "Failed to read tag (ID %d) after creation."
+msgstr "Impossible de lire l’étiquette (ID %d) après sa création."
+
+#, php-format
+msgid "Category with ID %d not found."
+msgstr "Catégorie avec l’ID %d introuvable."
+
+msgid "No updateable fields provided. Allowed: name, slug, description, parent."
+msgstr "Aucun champ modifiable fourni. Autorisés : name, slug, description, parent."
+
+#, php-format
+msgid "Tag with ID %d not found."
+msgstr "Étiquette avec l’ID %d introuvable."
+
+msgid "No updateable fields provided. Allowed: name, slug, description."
+msgstr "Aucun champ modifiable fourni. Autorisés : name, slug, description."
+
+msgid "ACF block validation failed."
+msgstr "La validation du bloc ACF a échoué."
+
+msgid "Connection key is required."
+msgstr "La clé de connexion est requise."
+
+#, php-format
+msgid "Failed to connect to ArcadiaAgents: %s"
+msgstr "Impossible de se connecter à ArcadiaAgents : %s"
+
+msgid "Unknown error"
+msgstr "Erreur inconnue"
+
+msgid "Invalid response from ArcadiaAgents: missing public key."
+msgstr "Réponse invalide d’ArcadiaAgents : clé publique manquante."
+
+msgid "Plugin not configured. Please complete the handshake first."
+msgstr "Extension non configurée. Effectuez d’abord le handshake."
+
+msgid "Token has expired."
+msgstr "Le jeton a expiré."
+
+msgid "Token is not valid yet."
+msgstr "Le jeton n’est pas encore valide."
+
+msgid "Token signature verification failed."
+msgstr "La vérification de la signature du jeton a échoué."
+
+msgid "Invalid token format or algorithm."
+msgstr "Format ou algorithme de jeton invalide."
+
+#, php-format
+msgid "JWT validation error: %s"
+msgstr "Erreur de validation JWT : %s"
+
+msgid "Token does not identify a site (missing sub claim)."
+msgstr "Le jeton n’identifie pas de site (claim sub manquant)."
+
+msgid "Token was issued for a different site."
+msgstr "Le jeton a été émis pour un autre site."
+
+msgid "Token issuer does not match the connected issuer."
+msgstr "L’émetteur du jeton ne correspond pas à l’émetteur connecté."
+
+msgid "Read articles"
+msgstr "Lire les articles"
+
+msgid "Create/edit articles"
+msgstr "Créer/modifier des articles"
+
+msgid "Delete articles"
+msgstr "Supprimer des articles"
+
+msgid "Withdraw its own pending revisions"
+msgstr "Retirer ses propres propositions en attente"
+
+msgid "Read media library"
+msgstr "Lire la médiathèque"
+
+msgid "Upload/edit media"
+msgstr "Téléverser/modifier des médias"
+
+msgid "Delete media"
+msgstr "Supprimer des médias"
+
+msgid "Read categories/tags"
+msgstr "Lire les catégories/étiquettes"
+
+msgid "Create/edit categories/tags"
+msgstr "Créer/modifier des catégories/étiquettes"
+
+msgid "Delete categories/tags"
+msgstr "Supprimer des catégories/étiquettes"
+
+msgid "Read site info & pages"
+msgstr "Lire les infos du site et les pages"
+
+msgid "Read redirects"
+msgstr "Lire les redirections"
+
+msgid "Create/delete redirects"
+msgstr "Créer/supprimer des redirections"
+
+msgid "Update plugin settings"
+msgstr "Mettre à jour les réglages de l’extension"
+
+msgid "Read articles and pages, their block structure, and follow its own pending proposals."
+msgstr "Lire les articles et les pages, leur structure en blocs, et suivre ses propres propositions en attente."
+
+msgid "Create and edit articles and pages. While “Draft only” is on, new content is saved as a draft and edits to published content become proposals awaiting review."
+msgstr "Créer et modifier des articles et des pages. Tant que « Brouillon uniquement » est actif, les nouveaux contenus sont enregistrés en brouillon et les modifications de contenus publiés deviennent des propositions en attente de relecture."
+
+msgid "Permanently delete an article."
+msgstr "Supprimer définitivement un article."
+
+msgid "Withdraw its own pending proposals. The agent can never approve them — approval always happens here, in WordPress."
+msgstr "Retirer ses propres propositions en attente. L’agent ne peut jamais les approuver — l’approbation se fait toujours ici, dans WordPress."
+
+msgid "Browse the media library."
+msgstr "Parcourir la médiathèque."
+
+msgid "Upload images, fix alternative texts, and set the featured image of a post."
+msgstr "Importer des images, corriger les textes alternatifs et définir l’image mise en avant d’une publication."
+
+msgid "Delete a media file."
+msgstr "Supprimer un média."
+
+msgid "Read categories and tags."
+msgstr "Lire les catégories et les étiquettes."
+
+msgid "Create and rename categories and tags."
+msgstr "Créer et renommer des catégories et des étiquettes."
+
+msgid "Delete categories and tags."
+msgstr "Supprimer des catégories et des étiquettes."
+
+msgid "Understand the site: pages, menus, authors, available block types and custom fields."
+msgstr "Comprendre le site : pages, menus, auteurs, types de blocs disponibles et champs personnalisés."
+
+msgid "List the existing redirects."
+msgstr "Consulter les redirections existantes."
+
+msgid "Create and delete redirects."
+msgstr "Créer et supprimer des redirections."
+
+msgid "Save the custom-field calibration of the theme. Does not touch the publishing guard or these permissions."
+msgstr "Enregistrer la calibration des champs personnalisés du thème. Ne touche ni au garde-fou de publication ni à ces permissions."
+
+msgid "Articles & pages"
+msgstr "Articles et pages"
+
+msgid "Agent proposals"
+msgstr "Propositions de l’agent"
+
+msgid "Media"
+msgstr "Médias"
+
+msgid "Categories & tags"
+msgstr "Catégories et étiquettes"
+
+msgid "Site & technical"
+msgstr "Site et technique"
+
+#, php-format
+msgid "This action requires the '%s' scope which is not enabled in WordPress settings."
+msgstr "Cette action requiert la permission « %s », qui n’est pas activée dans les réglages WordPress."
+
+msgid "No valid Bearer token found. Send it via Authorization or X-AA-Token header."
+msgstr "Aucun jeton Bearer valide trouvé. Envoyez-le via l’en-tête Authorization ou X-AA-Token."
+
+msgid "JWT payload is not a valid array."
+msgstr "Le payload JWT n’est pas un tableau valide."
+
+#, php-format
+msgid "Required field '%1$s' is missing for block type '%2$s'."
+msgstr "Le champ requis « %1$s » est manquant pour le type de bloc « %2$s »."
+
+#, php-format
+msgid "Block type '%s' is not registered."
+msgstr "Le type de bloc « %s » n’est pas enregistré."
+
+msgid "Draft only"
+msgstr "Brouillon uniquement"
+
+msgid "Direct publishing"
+msgstr "Publication directe"
+
+msgid "The agent can publish live."
+msgstr "L’agent peut publier en ligne."
+
+#, php-format
+msgid "Agent: %s"
+msgstr "Agent : %s"
+
+#, php-format
+msgid "Field '%s' controls site structure and cannot be set through this API. Content is editable; the page tree, menu order and page template are not."
+msgstr "Le champ « %s » contrôle la structure du site et ne peut pas être défini via cette API. Le contenu est modifiable ; l’arborescence des pages, l’ordre des menus et le modèle de page ne le sont pas."
+
+#, php-format
+msgid "Invalid post status '%1$s'. Allowed: %2$s."
+msgstr "État de publication « %1$s » invalide. Autorisés : %2$s."
+
+msgid "Markdown will be converted to HTML and sanitised on approval; disallowed tags such as iframe or script are removed."
+msgstr "Le Markdown sera converti en HTML et assaini à l’approbation ; les balises interdites comme iframe ou script sont retirées."
+
+msgid "The HTML will be sanitised on approval; disallowed tags such as iframe or script are removed."
+msgstr "Le HTML sera assaini à l’approbation ; les balises interdites comme iframe ou script sont retirées."
+
+msgid "This field will receive the proposed page content."
+msgstr "Ce champ recevra le contenu de page proposé."
+
+msgid "The image will be imported into the media library on approval."
+msgstr "L’image sera importée dans la médiathèque à l’approbation."
+
+#, php-format
+msgid "Calibrated field — the payload does not name it; the value is derived from %s."
+msgstr "Champ calibré — le payload ne le nomme pas ; la valeur est dérivée de %s."
+
+msgid "Arcadia Agents — Pending Revision"
+msgstr "Arcadia Agents — Proposition de l’agent"
+
+msgid "Arcadia Revisions"
+msgstr "Propositions Arcadia"
+
+msgid "No pending revision."
+msgstr "Aucune proposition en attente."
+
+#, php-format
+msgid "Proposed modification v%1$d — %2$s"
+msgstr "Modification proposée v%1$d — %2$s"
+
+msgid "This revision proposes new page content only — no individual field is modified. Use Preview to review it."
+msgstr "Cette proposition contient uniquement un nouveau contenu de page — aucun champ individuel n’est modifié. Utilisez la prévisualisation pour la relire."
+
+#, php-format
+msgid "%d field modified"
+msgid_plural "%d fields modified"
+msgstr[0] "%d champ modifié"
+msgstr[1] "%d champs modifiés"
+
+msgid "Field"
+msgstr "Champ"
+
+msgid "Current"
+msgstr "Actuel"
+
+msgid "Proposed"
+msgstr "Proposé"
+
+msgid "Rejection notes (optional):"
+msgstr "Notes de refus (facultatif) :"
+
+msgid "Confirm Rejection"
+msgstr "Confirmer le refus"
+
+msgid "Apply this revision to the live article?"
+msgstr "Appliquer cette proposition à l’article en ligne ?"
+
+msgid "Approving..."
+msgstr "Approbation…"
+
+msgid "Approved! Reloading..."
+msgstr "Approuvée ! Rechargement…"
+
+msgid "Rejecting..."
+msgstr "Refus en cours…"
+
+msgid "Rejected. Reloading..."
+msgstr "Refusée. Rechargement…"
+
+msgid "No revisions yet."
+msgstr "Aucune proposition pour le moment."
+
+msgid "Missing revision ID."
+msgstr "ID de proposition manquant."
+
+msgid "Revision approved and applied."
+msgstr "Proposition approuvée et appliquée."
+
+#, php-format
+msgid "Warnings: %s"
+msgstr "Avertissements : %s"
+
+msgid "Revision rejected."
+msgstr "Proposition refusée."
+
+msgid "Revision not found."
+msgstr "Proposition introuvable."
+
+msgid "Permission denied."
+msgstr "Permission refusée."
+
+msgid "This proposal contains new page content only — no individual field is modified."
+msgstr "Cette proposition contient uniquement un nouveau contenu de page — aucun champ individuel n’est modifié."
+
+msgid "Hide details"
+msgstr "Masquer le détail"
+
+msgid "Current:"
+msgstr "Actuel :"
+
+msgid "Proposed:"
+msgstr "Proposé :"
+
+#, php-format
+msgid "Agent proposal (v%s)"
+msgstr "Proposition de l’agent (v%s)"
+
+#, php-format
+msgid "v%s"
+msgstr "v%s"
+
+#, php-format
+msgid "“%s”"
+msgstr "« %s »"
+
+msgid "Apply this proposal to the live article?"
+msgstr "Appliquer cette proposition à l’article en ligne ?"
+
+msgid "Confirm"
+msgstr "Confirmer"
+
+msgid "Network error"
+msgstr "Erreur réseau"
+
+msgid "Only HTTP and HTTPS URLs are allowed."
+msgstr "Seules les URL HTTP et HTTPS sont autorisées."
+
+msgid "URL is not allowed (private/reserved IP)."
+msgstr "URL non autorisée (IP privée/réservée)."

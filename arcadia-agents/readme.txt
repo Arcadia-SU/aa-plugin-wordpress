@@ -74,6 +74,20 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.6.0 =
+The plugin's presence in WordPress is now visible and legible — feedback from the first client onboarding session.
+
+* New: agent-created articles and pages carry an "Arcadia" badge in the admin lists, from draft to published; content the agent merely edited is not badged
+* New: an "Arcadia (n)" view in the Posts and Pages lists, combinable with the status links — Arcadia then Drafts is the review queue in two clicks
+* New: the publishing guard is readable at a glance — "Draft only" / "Direct publishing" chip in the lists and the dashboard, a dedicated Publishing section at the top of the settings, and switching it off now asks for an explicit confirmation that saves immediately
+* New: every permission checkbox has a "?" tooltip explaining what it unlocks (works on click, keyboard and hover); permissions are grouped by theme
+* New: full French translation (fr_FR) — the interface follows the site or profile language, nothing to configure
+* New: settings and dashboard redesigned to the Arcadia design system, scoped to the plugin's own pages only — the rest of the admin stays native
+* Changed: the handshake now sends `home_url()` instead of `site_url()` — on "WordPress in its own directory" installs the old value pointed REST calls at a 404
+* Changed: "Connect" now uses the key typed in the same submit — no need to save it first
+* Fixed: the connection test result is rendered as text, not injected as HTML
+* Fixed: approving or rejecting a proposal from the dashboard no longer reloads the page
+
 = 0.5.2 =
 No plugin code changed — identical contract to 0.5.1.
 

@@ -113,6 +113,8 @@ class Arcadia_Agents {
 
 		// Admin.
 		if ( is_admin() ) {
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-guard-status.php';
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-content-counter.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/dashboard.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/settings.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revision-metabox.php';
@@ -157,6 +159,14 @@ class Arcadia_Agents {
 			add_action( 'wp_ajax_aa_approve_revision', array( $metabox, 'ajax_approve' ) );
 			add_action( 'wp_ajax_aa_reject_revision', array( $metabox, 'ajax_reject' ) );
 			add_action( 'enqueue_block_editor_assets', array( $metabox, 'enqueue_sidebar_script' ) );
+
+			// List screens: Arcadia badge (FS-1), views filter (FS-2), guard chip (FS-4).
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-admin-list-ui.php';
+			Arcadia_Admin_List_UI::init();
+
+			// Per-screen asset loading (list styles, plugin-page skin + scripts).
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/class-admin-assets.php';
+			Arcadia_Admin_Assets::init();
 		}
 
 		// Admin menu + icon styling.
@@ -359,7 +369,11 @@ class Arcadia_Agents {
 		// Top-level menu → Dashboard page.
 		$icon = ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo-icon.png';
 
-		add_menu_page(
+		// The returned hook suffixes are captured for asset loading and MUST
+		// NOT be hardcoded anywhere: the pending-count bubble in $menu_title
+		// survives sanitize_title(), so the suffixes change with state
+		// (e.g. "arcadia-agents-3_page_arcadia-agents-settings").
+		$dashboard_hook = add_menu_page(
 			__( 'Arcadia Agents', 'arcadia-agents' ),
 			$menu_title,
 			'manage_options',
@@ -380,7 +394,7 @@ class Arcadia_Agents {
 		);
 
 		// Submenu: Settings.
-		add_submenu_page(
+		$settings_hook = add_submenu_page(
 			'arcadia-agents',
 			__( 'Settings', 'arcadia-agents' ),
 			__( 'Settings', 'arcadia-agents' ),
@@ -388,6 +402,11 @@ class Arcadia_Agents {
 			'arcadia-agents-settings',
 			'arcadia_agents_settings_page'
 		);
+
+		if ( class_exists( 'Arcadia_Admin_Assets' ) ) {
+			Arcadia_Admin_Assets::set_page_hook( 'dashboard', $dashboard_hook );
+			Arcadia_Admin_Assets::set_page_hook( 'settings', $settings_hook );
+		}
 	}
 
 	/**

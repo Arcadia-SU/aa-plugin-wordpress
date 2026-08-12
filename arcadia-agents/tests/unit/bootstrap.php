@@ -28,6 +28,11 @@ if ( ! function_exists( 'esc_html' ) ) {
 
 if ( ! function_exists( 'esc_url' ) ) {
     function esc_url( $url ) {
+        // Mirror the real esc_url() closely enough for security assertions:
+        // WP strips double quotes and angle brackets from URLs (they are not
+        // in its allowed-character list), which is what kills attribute
+        // breakouts. FILTER_SANITIZE_URL alone keeps all three.
+        $url = str_replace( array( '"', '<', '>' ), '', (string) $url );
         return filter_var( $url, FILTER_SANITIZE_URL );
     }
 }
@@ -40,7 +45,49 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 
 if ( ! function_exists( 'home_url' ) ) {
     function home_url( $path = '' ) {
-        return 'http://localhost' . $path;
+        global $_test_home_url;
+        $base = isset( $_test_home_url ) ? $_test_home_url : 'http://localhost';
+        return $base . $path;
+    }
+}
+
+if ( ! function_exists( 'get_site_url' ) ) {
+    // Diverges from home_url() by default ("WordPress in its own directory")
+    // so tests catch any handshake regression back to site_url().
+    function get_site_url( $blog_id = null, $path = '' ) {
+        return home_url( '/wordpress' ) . $path;
+    }
+}
+
+if ( ! function_exists( 'untrailingslashit' ) ) {
+    function untrailingslashit( $value ) {
+        return rtrim( $value, '/' );
+    }
+}
+
+if ( ! function_exists( 'get_bloginfo' ) ) {
+    function get_bloginfo( $show = '' ) {
+        return 'Test Site';
+    }
+}
+
+if ( ! function_exists( 'wp_remote_post' ) ) {
+    // Captures every call; returns $_test_remote_post_response (WP_Error by
+    // default so callers bail out right after building their payload).
+    global $_test_remote_posts, $_test_remote_post_response;
+    $_test_remote_posts         = array();
+    $_test_remote_post_response = null;
+
+    function wp_remote_post( $url, $args = array() ) {
+        global $_test_remote_posts, $_test_remote_post_response;
+        $_test_remote_posts[] = array(
+            'url'  => $url,
+            'args' => $args,
+        );
+        if ( null !== $_test_remote_post_response ) {
+            return $_test_remote_post_response;
+        }
+        return new WP_Error( 'test_no_network', 'No network in unit tests.' );
     }
 }
 
@@ -387,13 +434,27 @@ if ( ! class_exists( 'WP_Query' ) ) {
         private static $result_queue = array();
 
         /**
+         * Constructor args of the most recent WP_Query instance, for tests
+         * asserting what a query was built with (e.g. Content_Counter).
+         */
+        public static $last_args = array();
+
+        /**
+         * found_posts to force on the next instance(s), one per queued call.
+         * Lets tests simulate paginated counts (posts_per_page=1, found=42).
+         */
+        private static $found_queue = array();
+
+        /**
          * Set the result the next WP_Query instance should return.
          * Can be called multiple times to queue results for sequential queries.
          *
-         * @param array $posts Array of post objects.
+         * @param array    $posts Array of post objects.
+         * @param int|null $found Optional found_posts override (defaults to count($posts)).
          */
-        public static function set_next_result( $posts ) {
+        public static function set_next_result( $posts, $found = null ) {
             self::$result_queue[] = $posts;
+            self::$found_queue[]  = $found;
         }
 
         /**
@@ -401,13 +462,20 @@ if ( ! class_exists( 'WP_Query' ) ) {
          */
         public static function reset() {
             self::$result_queue = array();
+            self::$found_queue  = array();
+            self::$last_args    = array();
         }
 
         public function __construct( $args = array() ) {
+            self::$last_args = is_array( $args ) ? $args : array();
+            if ( is_array( $args ) ) {
+                $this->query_vars = $args;
+            }
             if ( ! empty( self::$result_queue ) ) {
                 $result            = array_shift( self::$result_queue );
+                $found             = array_shift( self::$found_queue );
                 $this->posts       = $result;
-                $this->found_posts = count( $result );
+                $this->found_posts = null !== $found ? $found : count( $result );
             }
         }
 
@@ -1106,10 +1174,11 @@ if ( ! function_exists( 'register_post_type' ) ) {
     }
 }
 
-// is_admin() stub.
+// is_admin() stub. Configurable via $_test_is_admin (default false).
 if ( ! function_exists( 'is_admin' ) ) {
     function is_admin() {
-        return false;
+        global $_test_is_admin;
+        return isset( $_test_is_admin ) ? (bool) $_test_is_admin : false;
     }
 }
 
@@ -1541,6 +1610,81 @@ if ( ! function_exists( 'register_rest_route' ) ) {
 if ( ! function_exists( 'rest_url' ) ) {
     function rest_url( $path = '' ) {
         return 'http://localhost/wp-json/' . ltrim( $path, '/' );
+    }
+}
+
+// --- Admin UI stubs (Phase 47: list badge/filter, guard chip, settings) ---
+
+if ( ! function_exists( 'esc_attr' ) ) {
+    function esc_attr( $text ) {
+        return htmlspecialchars( (string) $text, ENT_QUOTES, 'UTF-8' );
+    }
+}
+
+if ( ! function_exists( 'esc_attr__' ) ) {
+    function esc_attr__( $text, $domain = 'default' ) {
+        return esc_attr( $text );
+    }
+}
+
+if ( ! function_exists( 'esc_html__' ) ) {
+    function esc_html__( $text, $domain = 'default' ) {
+        return esc_html( $text );
+    }
+}
+
+if ( ! function_exists( 'esc_js' ) ) {
+    function esc_js( $text ) {
+        return addslashes( (string) $text );
+    }
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+    function admin_url( $path = '' ) {
+        return 'http://localhost/wp-admin/' . ltrim( $path, '/' );
+    }
+}
+
+if ( ! function_exists( '_n' ) ) {
+    function _n( $single, $plural, $number, $domain = 'default' ) {
+        return ( 1 === (int) $number ) ? $single : $plural;
+    }
+}
+
+if ( ! function_exists( 'number_format_i18n' ) ) {
+    function number_format_i18n( $number, $decimals = 0 ) {
+        return number_format( (float) $number, $decimals );
+    }
+}
+
+if ( ! function_exists( 'get_post_stati' ) ) {
+    function get_post_stati( $args = array(), $output = 'names' ) {
+        return array(
+            'publish' => 'publish',
+            'future'  => 'future',
+            'draft'   => 'draft',
+            'pending' => 'pending',
+            'private' => 'private',
+            'trash'   => 'trash',
+        );
+    }
+}
+
+// has_term() stub. Configure via $_test_object_terms[post_id][taxonomy] = ['slug', …].
+if ( ! function_exists( 'has_term' ) ) {
+    global $_test_object_terms;
+    $_test_object_terms = array();
+
+    function has_term( $term = '', $taxonomy = '', $post = null ) {
+        global $_test_object_terms;
+        $post_id = is_object( $post ) ? $post->ID : (int) $post;
+        $slugs   = isset( $_test_object_terms[ $post_id ][ $taxonomy ] )
+            ? $_test_object_terms[ $post_id ][ $taxonomy ]
+            : array();
+        if ( '' === $term || null === $term ) {
+            return ! empty( $slugs );
+        }
+        return in_array( $term, $slugs, true );
     }
 }
 

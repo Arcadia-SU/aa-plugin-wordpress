@@ -2,8 +2,11 @@
 /**
  * Admin dashboard page — Arcadia Agents control center.
  *
- * Shows connection status, pending revisions to review,
- * and recent revision decisions.
+ * Arcadia design system (skin scoped .arcadia-admin). Shows connection
+ * status + publishing guard, agent-created content counts (with direct
+ * links to the filtered lists), the review queue and recent decisions.
+ * Approve/reject AJAX is handled by admin/js/dashboard.js — same endpoints
+ * and nonce as before, but without location.reload().
  *
  * @package ArcadiaAgents
  * @since   0.2.0
@@ -22,307 +25,187 @@ function arcadia_agents_dashboard_page() {
 		return;
 	}
 
-	$is_connected  = get_option( 'arcadia_agents_connected', false );
-	$connected_at  = get_option( 'arcadia_agents_connected_at', '' );
-	$last_activity = get_option( 'arcadia_agents_last_activity', '' );
+	$is_connected = get_option( 'arcadia_agents_connected', false );
+	$connected_at = get_option( 'arcadia_agents_connected_at', '' );
 
-	// Count articles managed by Arcadia (tagged with arcadia_source taxonomy).
-	$managed_count = 0;
-	$managed_query = new WP_Query(
-		array(
-			'post_type'      => 'post',
-			'post_status'    => 'publish',
-			'posts_per_page' => -1,
-			'fields'         => 'ids',
-			'no_found_rows'  => true,
-			'tax_query'      => array( // phpcs:ignore WordPress.DB.SlowDBQuery
-				array(
-					'taxonomy' => 'arcadia_source',
-					'operator' => 'EXISTS',
-				),
-			),
-		)
-	);
-	$managed_count = $managed_query->post_count;
+	// Agent-created content (arcadia_source term), live count — the same
+	// counter that feeds the "Arcadia (n)" list view.
+	$managed_posts = Arcadia_Content_Counter::count( 'post' );
+	$managed_pages = Arcadia_Content_Counter::count( 'page' );
 
 	// Revision stats.
-	$pending_revisions  = arcadia_dashboard_get_revisions( 'pending', 50 );
-	$pending_count      = count( $pending_revisions );
-	$approved_count     = arcadia_dashboard_count_revisions( 'approved' );
-	$rejected_count     = arcadia_dashboard_count_revisions( 'rejected' );
-	$recent_decisions   = arcadia_dashboard_get_recent_decisions( 10 );
+	$pending_revisions = arcadia_dashboard_get_revisions( 'pending', 50 );
+	$pending_count     = count( $pending_revisions );
+	$approved_count    = arcadia_dashboard_count_revisions( 'approved' );
+	$rejected_count    = arcadia_dashboard_count_revisions( 'rejected' );
+	$recent_decisions  = arcadia_dashboard_get_recent_decisions( 10 );
+
+	$review_queue_url = admin_url( 'admin.php?page=arcadia-agents' ) . '#aa-pending';
 
 	?>
-	<div class="wrap arcadia-dashboard">
-
-		<div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
-			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo.png' ); ?>" alt="Arcadia Agents" style="width: 36px; height: 36px; border-radius: 6px;" />
-			<h1 style="margin: 0;"><?php esc_html_e( 'Arcadia Agents', 'arcadia-agents' ); ?></h1>
+	<div class="wrap">
+		<div class="aa-page-header">
+			<img src="<?php echo esc_url( ARCADIA_AGENTS_PLUGIN_URL . 'assets/logo.png' ); ?>" alt="" class="aa-page-header__logo" />
+			<h1 class="aa-page-header__title"><?php esc_html_e( 'Arcadia Agents', 'arcadia-agents' ); ?></h1>
 		</div>
+		<hr class="wp-header-end" />
 
-		<!-- Top cards row -->
-		<div style="display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 24px;">
+		<div class="arcadia-admin">
 
-			<!-- Connection card -->
-			<div style="flex: 1; min-width: 200px; background: #fff; border: 1px solid #c3c4c7; border-left: 4px solid <?php echo $is_connected ? '#00a32a' : '#d63638'; ?>; padding: 16px; border-radius: 0 4px 4px 0;">
-				<div style="font-size: 13px; color: #646970; margin-bottom: 4px;"><?php esc_html_e( 'Connection', 'arcadia-agents' ); ?></div>
-				<?php if ( $is_connected ) : ?>
-					<div style="font-size: 18px; font-weight: 600; color: #00a32a; margin-bottom: 4px;"><?php esc_html_e( 'Connected', 'arcadia-agents' ); ?></div>
-					<?php if ( $connected_at ) : ?>
-						<div style="font-size: 12px; color: #646970;"><?php echo esc_html( sprintf( __( 'Since %s', 'arcadia-agents' ), wp_date( 'j M Y', strtotime( $connected_at ) ) ) ); ?></div>
+			<!-- Top cards row -->
+			<div class="aa-cards-row">
+
+				<!-- Connection + guard -->
+				<div class="aa-card aa-stat">
+					<p class="aa-status <?php echo $is_connected ? 'aa-status--on' : 'aa-status--off'; ?>">
+						<span class="aa-status__dot" aria-hidden="true"></span>
+						<?php $is_connected ? esc_html_e( 'Connected', 'arcadia-agents' ) : esc_html_e( 'Not connected', 'arcadia-agents' ); ?>
+					</p>
+					<?php if ( $is_connected && $connected_at ) : ?>
+						<div class="aa-stat__label">
+							<?php
+							/* translators: %s: connection date */
+							echo esc_html( sprintf( __( 'Since %s', 'arcadia-agents' ), wp_date( 'j M Y', strtotime( $connected_at ) ) ) );
+							?>
+						</div>
+					<?php elseif ( ! $is_connected ) : ?>
+						<div class="aa-stat__label">
+							<a href="<?php echo esc_url( admin_url( 'admin.php?page=arcadia-agents-settings' ) ); ?>"><?php esc_html_e( 'Configure connection', 'arcadia-agents' ); ?></a>
+						</div>
 					<?php endif; ?>
-				<?php else : ?>
-					<div style="font-size: 18px; font-weight: 600; color: #d63638;"><?php esc_html_e( 'Not connected', 'arcadia-agents' ); ?></div>
-					<div style="font-size: 12px; color: #646970;">
-						<a href="<?php echo esc_url( admin_url( 'admin.php?page=arcadia-agents-settings' ) ); ?>"><?php esc_html_e( 'Configure connection', 'arcadia-agents' ); ?></a>
+					<div class="aa-stat__links">
+						<?php echo Arcadia_Guard_Status::chip_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts. ?>
 					</div>
-				<?php endif; ?>
-			</div>
-
-			<!-- Stats cards -->
-			<div style="flex: 1; min-width: 140px; background: #fff; border: 1px solid #c3c4c7; padding: 16px; border-radius: 4px;">
-				<div style="font-size: 13px; color: #646970; margin-bottom: 4px;"><?php esc_html_e( 'Articles managed', 'arcadia-agents' ); ?></div>
-				<div style="font-size: 28px; font-weight: 600; color: #1d2327;"><?php echo (int) $managed_count; ?></div>
-			</div>
-
-			<div style="flex: 1; min-width: 140px; background: #fff; border: 1px solid #c3c4c7; border-left: 4px solid <?php echo $pending_count > 0 ? '#dba617' : '#c3c4c7'; ?>; padding: 16px; border-radius: 0 4px 4px 0;">
-				<div style="font-size: 13px; color: #646970; margin-bottom: 4px;"><?php esc_html_e( 'Pending review', 'arcadia-agents' ); ?></div>
-				<div style="font-size: 28px; font-weight: 600; color: <?php echo $pending_count > 0 ? '#9a6700' : '#1d2327'; ?>;"><?php echo (int) $pending_count; ?></div>
-			</div>
-
-			<div style="flex: 1; min-width: 140px; background: #fff; border: 1px solid #c3c4c7; padding: 16px; border-radius: 4px;">
-				<div style="font-size: 13px; color: #646970; margin-bottom: 4px;"><?php esc_html_e( 'Approved / Rejected', 'arcadia-agents' ); ?></div>
-				<div style="font-size: 28px; font-weight: 600; color: #1d2327;">
-					<span style="color: #00a32a;"><?php echo (int) $approved_count; ?></span>
-					<span style="color: #c3c4c7; font-weight: 300;">/</span>
-					<span style="color: #d63638;"><?php echo (int) $rejected_count; ?></span>
 				</div>
+
+				<!-- Arcadia contents, linked to the filtered lists (FS-2). -->
+				<div class="aa-card aa-stat">
+					<div class="aa-stat__value"><?php echo (int) ( $managed_posts + $managed_pages ); ?></div>
+					<div class="aa-stat__label"><?php esc_html_e( 'Arcadia contents', 'arcadia-agents' ); ?></div>
+					<div class="aa-stat__links">
+						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&aa_source=arcadia' ) ); ?>">
+							<?php
+							/* translators: %s: number of posts */
+							echo esc_html( sprintf( __( 'Articles (%s)', 'arcadia-agents' ), number_format_i18n( $managed_posts ) ) );
+							?>
+						</a>
+						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=page&aa_source=arcadia' ) ); ?>">
+							<?php
+							/* translators: %s: number of pages */
+							echo esc_html( sprintf( __( 'Pages (%s)', 'arcadia-agents' ), number_format_i18n( $managed_pages ) ) );
+							?>
+						</a>
+					</div>
+				</div>
+
+				<!-- Review queue, one click away. -->
+				<a class="aa-card aa-stat" href="<?php echo esc_url( $review_queue_url ); ?>">
+					<div class="aa-stat__value" id="aa-pending-value"><?php echo (int) $pending_count; ?></div>
+					<div class="aa-stat__label"><?php esc_html_e( 'Agent proposals awaiting review', 'arcadia-agents' ); ?></div>
+				</a>
+
 			</div>
 
-		</div>
-
-		<!-- Pending Revisions table -->
-		<div style="background: #fff; border: 1px solid #c3c4c7; border-radius: 4px; margin-bottom: 24px;">
-			<div style="padding: 16px 20px; border-bottom: 1px solid #c3c4c7; display: flex; align-items: center; gap: 8px;">
-				<h2 style="margin: 0; font-size: 14px;">
-					<?php esc_html_e( 'Pending Revisions', 'arcadia-agents' ); ?>
+			<!-- Pending proposals table -->
+			<section class="aa-card" id="aa-pending">
+				<h2 class="aa-card__title">
+					<?php esc_html_e( 'Agent proposals awaiting review', 'arcadia-agents' ); ?>
 				</h2>
-				<?php if ( $pending_count > 0 ) : ?>
-					<span style="background: #dba617; color: #fff; padding: 1px 8px; border-radius: 10px; font-size: 12px; font-weight: 600;"><?php echo (int) $pending_count; ?></span>
+
+				<div id="aa-pending-empty" class="aa-muted" <?php echo empty( $pending_revisions ) ? '' : 'hidden'; ?>>
+					<?php esc_html_e( 'No pending proposals. All clear!', 'arcadia-agents' ); ?>
+				</div>
+
+				<?php if ( ! empty( $pending_revisions ) ) : ?>
+					<table class="aa-table" id="aa-pending-table">
+						<thead>
+							<tr>
+								<th scope="col"><?php esc_html_e( 'Article', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Version', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Notes', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Date', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Actions', 'arcadia-agents' ); ?></th>
+							</tr>
+						</thead>
+						<tbody>
+							<?php foreach ( $pending_revisions as $rev ) : ?>
+								<tr>
+									<td><strong><?php echo esc_html( $rev['parent_title'] ); ?></strong></td>
+									<td>v<?php echo (int) $rev['version']; ?></td>
+									<td class="aa-muted">
+										<?php echo $rev['notes'] ? esc_html( wp_trim_words( $rev['notes'], 10 ) ) : '<em>' . esc_html__( 'No notes', 'arcadia-agents' ) . '</em>'; ?>
+									</td>
+									<td class="aa-muted"><?php echo esc_html( $rev['date'] ); ?></td>
+									<td>
+										<div class="aa-row-actions" data-revision-id="<?php echo (int) $rev['revision_id']; ?>">
+											<a href="<?php echo esc_url( $rev['preview_url'] ); ?>" target="_blank" class="aa-btn aa-btn--ghost aa-btn--small"><?php esc_html_e( 'Preview', 'arcadia-agents' ); ?></a>
+											<button type="button" class="aa-btn aa-btn--primary aa-btn--small aa-dash-approve"><?php esc_html_e( 'Approve', 'arcadia-agents' ); ?></button>
+											<button type="button" class="aa-btn aa-btn--ghost aa-btn--small aa-dash-reject"><?php esc_html_e( 'Reject', 'arcadia-agents' ); ?></button>
+											<a href="<?php echo esc_url( get_edit_post_link( $rev['parent_id'] ) ); ?>" class="aa-btn aa-btn--ghost aa-btn--small"><?php esc_html_e( 'Edit', 'arcadia-agents' ); ?></a>
+										</div>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
 				<?php endif; ?>
-			</div>
+			</section>
 
-			<?php if ( empty( $pending_revisions ) ) : ?>
-				<div style="padding: 40px 20px; text-align: center; color: #646970;">
-					<span class="dashicons dashicons-yes-alt" style="font-size: 36px; width: 36px; height: 36px; color: #00a32a; display: block; margin: 0 auto 8px;"></span>
-					<?php esc_html_e( 'No pending revisions. All clear!', 'arcadia-agents' ); ?>
-				</div>
-			<?php else : ?>
-				<table class="widefat striped" style="border: none; box-shadow: none;">
-					<thead>
-						<tr>
-							<th style="padding-left: 20px;"><?php esc_html_e( 'Article', 'arcadia-agents' ); ?></th>
-							<th style="width: 70px;"><?php esc_html_e( 'Version', 'arcadia-agents' ); ?></th>
-							<th style="width: 200px;"><?php esc_html_e( 'Notes', 'arcadia-agents' ); ?></th>
-							<th style="width: 120px;"><?php esc_html_e( 'Date', 'arcadia-agents' ); ?></th>
-							<th style="width: 280px;"><?php esc_html_e( 'Actions', 'arcadia-agents' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $pending_revisions as $rev ) : ?>
+			<!-- Recent decisions -->
+			<section class="aa-card" id="aa-decisions">
+				<h2 class="aa-card__title"><?php esc_html_e( 'Recent decisions', 'arcadia-agents' ); ?></h2>
+
+				<?php if ( empty( $recent_decisions ) ) : ?>
+					<p class="aa-muted"><?php esc_html_e( 'No decisions yet.', 'arcadia-agents' ); ?></p>
+				<?php else : ?>
+					<table class="aa-table">
+						<thead>
 							<tr>
-								<td style="padding-left: 20px;">
-									<strong><?php echo esc_html( $rev['parent_title'] ); ?></strong>
-								</td>
-								<td>
-									<span style="background: #fff3cd; color: #664d03; padding: 2px 8px; border-radius: 3px; font-size: 12px; font-weight: 600;">v<?php echo (int) $rev['version']; ?></span>
-								</td>
-								<td style="color: #646970; font-size: 13px;">
-									<?php echo $rev['notes'] ? esc_html( wp_trim_words( $rev['notes'], 10 ) ) : '<em>' . esc_html__( 'No notes', 'arcadia-agents' ) . '</em>'; ?>
-								</td>
-								<td style="color: #646970;"><?php echo esc_html( $rev['date'] ); ?></td>
-								<td>
-									<div class="aa-row-actions" data-revision-id="<?php echo (int) $rev['revision_id']; ?>" style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
-										<a href="<?php echo esc_url( $rev['preview_url'] ); ?>" target="_blank" class="button button-small"><?php esc_html_e( 'Preview', 'arcadia-agents' ); ?></a>
-										<button type="button" class="button button-small button-primary aa-dash-approve"><?php esc_html_e( 'Approve', 'arcadia-agents' ); ?></button>
-										<button type="button" class="button button-small aa-dash-reject" style="color: #b32d2e; border-color: #b32d2e;"><?php esc_html_e( 'Reject', 'arcadia-agents' ); ?></button>
-										<a href="<?php echo esc_url( get_edit_post_link( $rev['parent_id'] ) ); ?>" class="button button-small" style="color: #646970;"><?php esc_html_e( 'Edit', 'arcadia-agents' ); ?></a>
-									</div>
-								</td>
+								<th scope="col"><?php esc_html_e( 'Article', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Version', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Decision', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'By', 'arcadia-agents' ); ?></th>
+								<th scope="col"><?php esc_html_e( 'Date', 'arcadia-agents' ); ?></th>
 							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			<?php endif; ?>
+						</thead>
+						<tbody>
+							<?php foreach ( $recent_decisions as $dec ) : ?>
+								<tr>
+									<td><?php echo esc_html( $dec['parent_title'] ); ?></td>
+									<td>v<?php echo (int) $dec['version']; ?></td>
+									<td>
+										<?php if ( 'approved' === $dec['status'] ) : ?>
+											<span class="aa-decision aa-decision--approved"><?php esc_html_e( 'Approved', 'arcadia-agents' ); ?></span>
+										<?php else : ?>
+											<span class="aa-decision aa-decision--rejected"><?php esc_html_e( 'Rejected', 'arcadia-agents' ); ?></span>
+										<?php endif; ?>
+									</td>
+									<td class="aa-muted"><?php echo esc_html( $dec['decided_by'] ? $dec['decided_by'] : '—' ); ?></td>
+									<td class="aa-muted"><?php echo esc_html( $dec['date'] ); ?></td>
+								</tr>
+							<?php endforeach; ?>
+						</tbody>
+					</table>
+				<?php endif; ?>
+
+				<p class="aa-table-footer aa-muted">
+					<?php
+					/* translators: 1: approved count, 2: rejected count */
+					echo esc_html( sprintf( __( 'Approved: %1$s · Rejected: %2$s', 'arcadia-agents' ), number_format_i18n( $approved_count ), number_format_i18n( $rejected_count ) ) );
+					?>
+				</p>
+			</section>
+
+			<p class="aa-muted aa-small aa-dashboard-footer">
+				<?php
+				/* translators: %s: plugin version */
+				echo esc_html( sprintf( __( 'Arcadia Agents v%s', 'arcadia-agents' ), ARCADIA_AGENTS_VERSION ) );
+				?>
+				&middot;
+				<a href="<?php echo esc_url( admin_url( 'admin.php?page=arcadia-agents-settings' ) ); ?>"><?php esc_html_e( 'Settings', 'arcadia-agents' ); ?></a>
+			</p>
+
 		</div>
-
-		<!-- Recent Decisions table -->
-		<div style="background: #fff; border: 1px solid #c3c4c7; border-radius: 4px;">
-			<div style="padding: 16px 20px; border-bottom: 1px solid #c3c4c7;">
-				<h2 style="margin: 0; font-size: 14px;"><?php esc_html_e( 'Recent Decisions', 'arcadia-agents' ); ?></h2>
-			</div>
-
-			<?php if ( empty( $recent_decisions ) ) : ?>
-				<div style="padding: 40px 20px; text-align: center; color: #646970;">
-					<?php esc_html_e( 'No decisions yet.', 'arcadia-agents' ); ?>
-				</div>
-			<?php else : ?>
-				<table class="widefat striped" style="border: none; box-shadow: none;">
-					<thead>
-						<tr>
-							<th style="padding-left: 20px;"><?php esc_html_e( 'Article', 'arcadia-agents' ); ?></th>
-							<th style="width: 70px;"><?php esc_html_e( 'Version', 'arcadia-agents' ); ?></th>
-							<th style="width: 100px;"><?php esc_html_e( 'Decision', 'arcadia-agents' ); ?></th>
-							<th style="width: 100px;"><?php esc_html_e( 'By', 'arcadia-agents' ); ?></th>
-							<th style="width: 120px;"><?php esc_html_e( 'Date', 'arcadia-agents' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $recent_decisions as $dec ) : ?>
-							<tr>
-								<td style="padding-left: 20px;">
-									<?php echo esc_html( $dec['parent_title'] ); ?>
-								</td>
-								<td>v<?php echo (int) $dec['version']; ?></td>
-								<td>
-									<?php
-									$badge_style = 'approved' === $dec['status']
-										? 'background: #d1e7dd; color: #0a5c36;'
-										: 'background: #f8d7da; color: #842029;';
-									$label = 'approved' === $dec['status']
-										? __( 'Approved', 'arcadia-agents' )
-										: __( 'Rejected', 'arcadia-agents' );
-									?>
-									<span style="<?php echo esc_attr( $badge_style ); ?> padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 600; text-transform: uppercase;">
-										<?php echo esc_html( $label ); ?>
-									</span>
-								</td>
-								<td style="color: #646970;"><?php echo esc_html( $dec['decided_by'] ?: '—' ); ?></td>
-								<td style="color: #646970;"><?php echo esc_html( $dec['date'] ); ?></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			<?php endif; ?>
-		</div>
-
-		<p style="margin-top: 16px; color: #646970; font-size: 12px;">
-			Arcadia Agents v<?php echo esc_html( ARCADIA_AGENTS_VERSION ); ?>
-			&middot;
-			<a href="<?php echo esc_url( admin_url( 'admin.php?page=arcadia-agents-settings' ) ); ?>"><?php esc_html_e( 'Settings', 'arcadia-agents' ); ?></a>
-		</p>
-
-		<?php if ( ! empty( $pending_revisions ) ) : ?>
-		<script>
-		(function() {
-			var ajaxUrl = '<?php echo esc_js( admin_url( 'admin-ajax.php' ) ); ?>';
-			var nonce   = '<?php echo esc_js( wp_create_nonce( 'aa_revision_action' ) ); ?>';
-
-			function doAction( action, revisionId, row ) {
-				var buttons = row.querySelectorAll( 'button, a.button' );
-				buttons.forEach( function( b ) { b.disabled = true; b.style.opacity = '0.5'; b.style.pointerEvents = 'none'; } );
-
-				var statusEl = document.createElement( 'span' );
-				statusEl.style.fontSize = '12px';
-				statusEl.style.marginLeft = '4px';
-				statusEl.textContent = '<?php echo esc_js( __( 'Processing...', 'arcadia-agents' ) ); ?>';
-				statusEl.style.color = '#664d03';
-				row.appendChild( statusEl );
-
-				var data = new FormData();
-				data.append( 'action', action );
-				data.append( 'revision_id', revisionId );
-				data.append( 'nonce', nonce );
-
-				fetch( ajaxUrl, { method: 'POST', body: data, credentials: 'same-origin' } )
-					.then( function( r ) { return r.json(); } )
-					.then( function( resp ) {
-						if ( resp.success ) {
-							var tr = row.closest( 'tr' );
-							tr.style.transition = 'opacity 0.3s';
-							tr.style.opacity = '0.3';
-							statusEl.textContent = action === 'aa_approve_revision'
-								? '<?php echo esc_js( __( 'Approved!', 'arcadia-agents' ) ); ?>'
-								: '<?php echo esc_js( __( 'Rejected!', 'arcadia-agents' ) ); ?>';
-							statusEl.style.color = '#0a5c36';
-							setTimeout( function() { location.reload(); }, 800 );
-						} else {
-							statusEl.textContent = resp.data || 'Error';
-							statusEl.style.color = '#b32d2e';
-							buttons.forEach( function( b ) { b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = ''; } );
-						}
-					} )
-					.catch( function() {
-						statusEl.textContent = '<?php echo esc_js( __( 'Network error', 'arcadia-agents' ) ); ?>';
-						statusEl.style.color = '#b32d2e';
-						buttons.forEach( function( b ) { b.disabled = false; b.style.opacity = '1'; b.style.pointerEvents = ''; } );
-					} );
-			}
-
-			function bindRow( row ) {
-				var revisionId = row.dataset.revisionId;
-				var original   = row.innerHTML;
-
-				row.querySelector( '.aa-dash-approve' ).addEventListener( 'click', function() {
-					row.innerHTML =
-						'<span style="color: #0a5c36; font-size: 13px;"><?php echo esc_js( __( 'Apply to live?', 'arcadia-agents' ) ); ?></span> ' +
-						'<button type="button" class="button button-small button-primary aa-confirm-yes"><?php echo esc_js( __( 'Confirm', 'arcadia-agents' ) ); ?></button> ' +
-						'<button type="button" class="button button-small aa-confirm-no"><?php echo esc_js( __( 'Cancel', 'arcadia-agents' ) ); ?></button>';
-					row.querySelector( '.aa-confirm-yes' ).addEventListener( 'click', function() {
-						doAction( 'aa_approve_revision', revisionId, row );
-					} );
-					row.querySelector( '.aa-confirm-no' ).addEventListener( 'click', function() {
-						row.innerHTML = original;
-						bindRow( row );
-					} );
-				} );
-
-				row.querySelector( '.aa-dash-reject' ).addEventListener( 'click', function() {
-					row.innerHTML =
-						'<div style="display: flex; flex-direction: column; gap: 6px;">' +
-						'<textarea class="aa-reject-notes" rows="2" placeholder="<?php echo esc_js( __( 'Rejection notes (optional)', 'arcadia-agents' ) ); ?>" style="width: 100%; font-size: 12px;"></textarea>' +
-						'<div style="display: flex; gap: 6px;">' +
-						'<button type="button" class="button button-small aa-confirm-reject" style="color: #b32d2e; border-color: #b32d2e;"><?php echo esc_js( __( 'Confirm Rejection', 'arcadia-agents' ) ); ?></button>' +
-						'<button type="button" class="button button-small aa-confirm-no"><?php echo esc_js( __( 'Cancel', 'arcadia-agents' ) ); ?></button>' +
-						'</div></div>';
-					row.querySelector( '.aa-confirm-reject' ).addEventListener( 'click', function() {
-						var notes = row.querySelector( '.aa-reject-notes' ).value;
-						var fd = new FormData();
-						fd.append( 'action', 'aa_reject_revision' );
-						fd.append( 'revision_id', revisionId );
-						fd.append( 'decision_notes', notes );
-						fd.append( 'nonce', nonce );
-
-						var buttons = row.querySelectorAll( 'button' );
-						buttons.forEach( function( b ) { b.disabled = true; } );
-
-						fetch( ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' } )
-							.then( function( r ) { return r.json(); } )
-							.then( function( resp ) {
-								if ( resp.success ) {
-									var tr = row.closest( 'tr' );
-									tr.style.transition = 'opacity 0.3s';
-									tr.style.opacity = '0.3';
-									setTimeout( function() { location.reload(); }, 800 );
-								} else {
-									row.innerHTML = original;
-									bindRow( row );
-								}
-							} )
-							.catch( function() { row.innerHTML = original; bindRow( row ); } );
-					} );
-					row.querySelector( '.aa-confirm-no' ).addEventListener( 'click', function() {
-						row.innerHTML = original;
-						bindRow( row );
-					} );
-				} );
-			}
-
-			document.querySelectorAll( '.aa-row-actions' ).forEach( bindRow );
-		})();
-		</script>
-		<?php endif; ?>
-
 	</div>
 	<?php
 }
@@ -351,9 +234,9 @@ function arcadia_dashboard_get_revisions( $status, $limit ) {
 		$parent_title = $parent ? $parent->post_title : __( '(deleted)', 'arcadia-agents' );
 
 		// Build preview URL.
-		$preview      = Arcadia_Preview::get_instance();
-		$token        = $preview->get_or_create_token( $rev->ID );
-		$preview_url  = add_query_arg(
+		$preview     = Arcadia_Preview::get_instance();
+		$token       = $preview->get_or_create_token( $rev->ID );
+		$preview_url = add_query_arg(
 			array(
 				'p'          => $rev->ID,
 				'aa_preview' => $token,

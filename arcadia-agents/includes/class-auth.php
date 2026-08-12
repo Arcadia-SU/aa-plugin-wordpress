@@ -71,7 +71,10 @@ class Arcadia_Auth {
 			);
 		}
 
-		$site_url  = get_site_url();
+		// home_url(), not site_url(): the REST API is served under home_url().
+		// On "WordPress in its own directory" installs the two diverge, and AA
+		// builds every call as {site_url}/wp-json/… from this value.
+		$site_url  = untrailingslashit( home_url() );
 		$site_name = get_bloginfo( 'name' );
 
 		$response = wp_remote_post(
@@ -382,6 +385,68 @@ class Arcadia_Auth {
 			'redirects:read'    => __( 'Read redirects', 'arcadia-agents' ),
 			'redirects:write'   => __( 'Create/delete redirects', 'arcadia-agents' ),
 			'settings:write'    => __( 'Update plugin settings', 'arcadia-agents' ),
+		);
+	}
+
+	/**
+	 * Tooltip text for each scope: what it unlocks, phrased for the site owner.
+	 *
+	 * Keys MUST be exactly all_scopes(), in the same order — asserted by a test
+	 * (same invariant as scope_labels(): a scope without a description would
+	 * render a checkbox with an empty tooltip).
+	 *
+	 * @return array<string, string>
+	 */
+	public static function scope_descriptions() {
+		return array(
+			'articles:read'     => __( 'Read articles and pages, their block structure, and follow its own pending proposals.', 'arcadia-agents' ),
+			'articles:write'    => __( 'Create and edit articles and pages. While “Draft only” is on, new content is saved as a draft and edits to published content become proposals awaiting review.', 'arcadia-agents' ),
+			'articles:delete'   => __( 'Permanently delete an article.', 'arcadia-agents' ),
+			'revisions:write'   => __( 'Withdraw its own pending proposals. The agent can never approve them — approval always happens here, in WordPress.', 'arcadia-agents' ),
+			'media:read'        => __( 'Browse the media library.', 'arcadia-agents' ),
+			'media:write'       => __( 'Upload images, fix alternative texts, and set the featured image of a post.', 'arcadia-agents' ),
+			'media:delete'      => __( 'Delete a media file.', 'arcadia-agents' ),
+			'taxonomies:read'   => __( 'Read categories and tags.', 'arcadia-agents' ),
+			'taxonomies:write'  => __( 'Create and rename categories and tags.', 'arcadia-agents' ),
+			'taxonomies:delete' => __( 'Delete categories and tags.', 'arcadia-agents' ),
+			'site:read'         => __( 'Understand the site: pages, menus, authors, available block types and custom fields.', 'arcadia-agents' ),
+			'redirects:read'    => __( 'List the existing redirects.', 'arcadia-agents' ),
+			'redirects:write'   => __( 'Create and delete redirects.', 'arcadia-agents' ),
+			'settings:write'    => __( 'Save the custom-field calibration of the theme. Does not touch the publishing guard or these permissions.', 'arcadia-agents' ),
+		);
+	}
+
+	/**
+	 * Thematic groups for the permissions column of the settings page.
+	 *
+	 * The union of all group scopes MUST equal all_scopes() with no duplicates —
+	 * asserted by a test, so a scope added to $all_scopes without a group makes
+	 * the suite fail instead of silently never rendering a checkbox.
+	 *
+	 * @return array<string, array{label: string, scopes: string[]}>
+	 */
+	public static function scope_groups() {
+		return array(
+			'content'    => array(
+				'label'  => __( 'Articles & pages', 'arcadia-agents' ),
+				'scopes' => array( 'articles:read', 'articles:write', 'articles:delete' ),
+			),
+			'proposals'  => array(
+				'label'  => __( 'Agent proposals', 'arcadia-agents' ),
+				'scopes' => array( 'revisions:write' ),
+			),
+			'media'      => array(
+				'label'  => __( 'Media', 'arcadia-agents' ),
+				'scopes' => array( 'media:read', 'media:write', 'media:delete' ),
+			),
+			'taxonomies' => array(
+				'label'  => __( 'Categories & tags', 'arcadia-agents' ),
+				'scopes' => array( 'taxonomies:read', 'taxonomies:write', 'taxonomies:delete' ),
+			),
+			'site'       => array(
+				'label'  => __( 'Site & technical', 'arcadia-agents' ),
+				'scopes' => array( 'site:read', 'redirects:read', 'redirects:write', 'settings:write' ),
+			),
 		);
 	}
 

@@ -39,17 +39,3 @@ parameters:
 			message: "#^Function acf_get_block_types not found\\.$#"
 			count: 1
 			path: includes/class-blocks.php
-
-		-
-			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
-			count: 1
-			path: includes/class-revision-metabox.php
-		-
-			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
-			count: 1
-			path: admin/dashboard.php
-
-		-
-			message: "#^Constant ARCADIA_AGENTS_PLUGIN_URL not found\\.$#"
-			count: 1
-			path: admin/settings.php

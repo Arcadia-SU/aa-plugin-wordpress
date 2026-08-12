@@ -78,7 +78,7 @@
 						setTimeout( function() { location.reload(); }, 1000 );
 					} else {
 						setStatus( 'error' );
-						setMessage( resp.data || 'Error' );
+						setMessage( resp.data || data.i18n.error_generic );
 					}
 				} )
 				.catch( function() {
@@ -98,7 +98,7 @@
 						setTimeout( function() { location.reload(); }, 1000 );
 					} else {
 						setStatus( 'error' );
-						setMessage( resp.data || 'Error' );
+						setMessage( resp.data || data.i18n.error_generic );
 					}
 				} )
 				.catch( function() {
@@ -126,7 +126,7 @@
 					marginBottom: '12px',
 				},
 			},
-				el( 'strong', null, 'v' + data.version ),
+				el( 'strong', null, data.i18n.version_badge ),
 				el( 'span', {
 					style: { color: '#664d03', marginLeft: '8px' },
 				}, data.date ),
@@ -138,7 +138,7 @@
 							color: '#664d03',
 							fontSize: '12px',
 						},
-					}, '\u201C' + data.notes + '\u201D' )
+					}, data.i18n.notes_quoted.replace( '%s', data.notes ) )
 					: null
 			)
 		);
@@ -162,7 +162,8 @@
 					style: { marginBottom: '8px' },
 				}, showDiff
 					? data.i18n.changes_hide
-					: data.i18n.changes_count.replace( '%d', changes.length ) )
+					// Pre-pluralized server-side with _n() — no %d replace here.
+					: data.i18n.changes_count )
 			);
 		}
 
@@ -198,12 +199,16 @@
 								},
 							}, row.note )
 							: null,
+						// The colon lives inside the translated string (French uses
+						// a narrow no-break space before it).
 						el( 'div', { style: { color: '#666', marginBottom: '2px' } },
-							el( 'strong', null, data.i18n.changes_current + ': ' ),
+							el( 'strong', null, data.i18n.changes_current ),
+							' ',
 							row.current
 						),
 						el( 'div', { style: { color: '#0a5c36' } },
-							el( 'strong', null, data.i18n.changes_proposed + ': ' ),
+							el( 'strong', null, data.i18n.changes_proposed ),
+							' ',
 							row.proposed
 						)
 					);
@@ -341,7 +346,8 @@
 
 		return el( PluginDocumentSettingPanel, {
 			name: 'arcadia-pending-revision',
-			title: data.i18n.title + ' (v' + data.version + ')',
+			// Pre-formatted server-side (sprintf) — no concatenation here.
+			title: data.i18n.panel_title,
 			className: 'arcadia-revision-panel',
 		}, children );
 	}
