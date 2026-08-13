@@ -3,7 +3,7 @@
  * Per-screen admin asset loading.
  *
  * Three tiers, from broadest to narrowest:
- * - edit.php for posts/pages → arcadia-list.css (badge + guard chip);
+ * - edit.php for supported post types → arcadia-list.css (badge);
  * - our two plugin pages → arcadia-admin.css (full Arcadia skin) + the
  *   page's script with its localized payload.
  *
@@ -60,10 +60,12 @@ class Arcadia_Admin_Assets {
 	 * @param string $hook_suffix Current admin page hook suffix.
 	 */
 	public static function enqueue( $hook_suffix ) {
-		// Native list screens: badge + chip styles only.
+		// Native list screens: badge styles only. Same post-type rule as the
+		// view/filter (all public admin-visible types) — the badge renders on
+		// any list screen holding agent content, CPTs included.
 		if ( 'edit.php' === $hook_suffix ) {
 			$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-			if ( $screen && in_array( $screen->post_type, array( 'post', 'page' ), true ) ) {
+			if ( $screen && Arcadia_Admin_List_UI::is_supported_post_type( $screen->post_type ) ) {
 				wp_enqueue_style(
 					'arcadia-list',
 					ARCADIA_AGENTS_PLUGIN_URL . 'admin/css/arcadia-list.css',

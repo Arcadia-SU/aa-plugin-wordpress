@@ -2,7 +2,8 @@
 /**
  * Admin list-screen UI: Arcadia badge (FS-1) and Arcadia view/filter (FS-2).
  *
- * Everything renders on the native edit.php screens for posts and pages:
+ * Everything renders on the native edit.php screens of the supported post
+ * types (every public, admin-visible type — see supported_post_types()):
  * - a post-state badge on contents CREATED by the agent (the arcadia_source
  *   term is set at creation only — agent edits of human content never badge);
  * - an "Arcadia (n)" link in the native views bar, combinable with the status
@@ -44,29 +45,81 @@ class Arcadia_Admin_List_UI {
 	const TAXONOMY = 'arcadia_source';
 
 	/**
-	 * Post types whose list screens get the badge, view and filter.
+	 * Post types whose list screens get the view and filter: every public,
+	 * admin-visible post type except attachments — the same rule as the API's
+	 * is_allowed_post_type() (trait-api-posts), plus show_ui so an edit.php
+	 * screen actually exists. Resolved live, never hardcoded: client sites
+	 * built on custom post types (iSelection's `article`, `programme`, …)
+	 * hold agent content too, and a 'post'/'page' whitelist left their
+	 * review queue without a view (found on the 0.6.2 canary).
 	 *
-	 * @var string[]
+	 * The badge itself (display_post_states) needs no gate: it only renders
+	 * where the arcadia_source term is, whatever the post type.
+	 *
+	 * @return string[]
 	 */
-	private static $post_types = array( 'post', 'page' );
+	public static function supported_post_types() {
+		$types = get_post_types(
+			array(
+				'public'  => true,
+				'show_ui' => true,
+			),
+			'names'
+		);
+
+		unset( $types['attachment'] );
+
+		return array_values( $types );
+	}
+
+	/**
+	 * Whether a post type's list screen gets the Arcadia view and filter.
+	 *
+	 * @param mixed $post_type Candidate post type (screen or query value).
+	 * @return bool
+	 */
+	public static function is_supported_post_type( $post_type ) {
+		return is_string( $post_type )
+			&& in_array( $post_type, self::supported_post_types(), true );
+	}
 
 	/**
 	 * Register hooks. Called from the plugin entry point (admin only).
+	 *
+	 * The views_edit-{post_type} filter is registered from current_screen,
+	 * not at plugin load: custom post types are registered by themes/plugins
+	 * on init, so the supported set cannot be enumerated yet — and only the
+	 * current screen's filter is ever needed.
 	 */
 	public static function init() {
 		add_filter( 'display_post_states', array( __CLASS__, 'filter_post_states' ), 10, 2 );
-
-		foreach ( self::$post_types as $post_type ) {
-			add_filter(
-				"views_edit-{$post_type}",
-				static function ( $views ) use ( $post_type ) {
-					return Arcadia_Admin_List_UI::filter_views( $views, $post_type );
-				}
-			);
-		}
-
+		add_action( 'current_screen', array( __CLASS__, 'register_views_filter' ) );
 		add_action( 'restrict_manage_posts', array( __CLASS__, 'render_filter_row' ), 10, 2 );
 		add_action( 'pre_get_posts', array( __CLASS__, 'filter_admin_query' ) );
+	}
+
+	/**
+	 * Hook filter_views() on the current list screen, if supported.
+	 *
+	 * @param object $screen The current WP_Screen.
+	 */
+	public static function register_views_filter( $screen ) {
+		if ( ! is_object( $screen ) || ! isset( $screen->base, $screen->post_type ) || 'edit' !== $screen->base ) {
+			return;
+		}
+
+		$post_type = $screen->post_type;
+
+		if ( ! self::is_supported_post_type( $post_type ) ) {
+			return;
+		}
+
+		add_filter(
+			"views_edit-{$post_type}",
+			static function ( $views ) use ( $post_type ) {
+				return Arcadia_Admin_List_UI::filter_views( $views, $post_type );
+			}
+		);
 	}
 
 	/**
@@ -191,7 +244,7 @@ class Arcadia_Admin_List_UI {
 	 * @param string $which     'top' or 'bottom' tablenav ('' before WP 4.4).
 	 */
 	public static function render_filter_row( $post_type, $which = 'top' ) {
-		if ( ! in_array( $post_type, self::$post_types, true ) ) {
+		if ( ! self::is_supported_post_type( $post_type ) ) {
 			return;
 		}
 
@@ -266,7 +319,7 @@ class Arcadia_Admin_List_UI {
 			return false;
 		}
 
-		if ( ! in_array( $post_type, self::$post_types, true ) ) {
+		if ( ! self::is_supported_post_type( $post_type ) ) {
 			return false;
 		}
 

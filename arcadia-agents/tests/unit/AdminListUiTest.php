@@ -28,8 +28,80 @@ class AdminListUiTest extends TestCase {
 
     protected function tearDown(): void {
         $_GET = array();
-        unset( $GLOBALS['_test_is_admin'], $GLOBALS['pagenow'], $GLOBALS['_test_user_can'] );
+        unset( $GLOBALS['_test_is_admin'], $GLOBALS['pagenow'], $GLOBALS['_test_user_can'], $GLOBALS['_test_post_types'] );
         \WP_Query::reset();
+    }
+
+    /**
+     * Register a CPT-built site in the stub registry: a public `article` CPT
+     * (the iSelection case) plus a non-public internal type.
+     */
+    private function register_cpt_site(): void {
+        $GLOBALS['_test_post_types'] = array(
+            'post'       => (object) array( 'name' => 'post', 'label' => 'Posts', 'public' => true, 'show_ui' => true, 'hierarchical' => false ),
+            'page'       => (object) array( 'name' => 'page', 'label' => 'Pages', 'public' => true, 'show_ui' => true, 'hierarchical' => true ),
+            'attachment' => (object) array( 'name' => 'attachment', 'label' => 'Media', 'public' => true, 'show_ui' => true, 'hierarchical' => false ),
+            'article'    => (object) array( 'name' => 'article', 'label' => 'Articles', 'public' => true, 'show_ui' => true, 'hierarchical' => false ),
+            'aa_hidden'  => (object) array( 'name' => 'aa_hidden', 'label' => 'Hidden', 'public' => false, 'show_ui' => false, 'hierarchical' => false ),
+        );
+    }
+
+    // -------------------------------------------------------
+    // supported_post_types() — the post-type rule
+    // -------------------------------------------------------
+
+    public function test_supported_post_types_defaults_to_post_and_page(): void {
+        $this->assertSame( array( 'post', 'page' ), \Arcadia_Admin_List_UI::supported_post_types() );
+    }
+
+    public function test_supported_post_types_includes_public_cpts(): void {
+        // The 0.6.0..0.6.2 hardcoded post/page whitelist left CPT-built
+        // sites (iSelection) without the Arcadia view — the rule is now
+        // "public + show_ui, minus attachment", same as the API's
+        // is_allowed_post_type().
+        $this->register_cpt_site();
+
+        $supported = \Arcadia_Admin_List_UI::supported_post_types();
+
+        $this->assertContains( 'article', $supported );
+        $this->assertNotContains( 'attachment', $supported );
+        $this->assertNotContains( 'aa_hidden', $supported );
+    }
+
+    public function test_should_filter_accepts_registered_cpt(): void {
+        $this->register_cpt_site();
+
+        $this->assertTrue(
+            \Arcadia_Admin_List_UI::should_filter( true, 'edit.php', true, 'article', array( 'aa_source' => 'arcadia' ) )
+        );
+        $this->assertFalse(
+            \Arcadia_Admin_List_UI::should_filter( true, 'edit.php', true, 'unregistered', array( 'aa_source' => 'arcadia' ) )
+        );
+    }
+
+    // -------------------------------------------------------
+    // register_views_filter() — lazy per-screen hook
+    // -------------------------------------------------------
+
+    public function test_views_filter_registered_for_supported_screen(): void {
+        global $_test_filters;
+        $_test_filters = array();
+        $this->register_cpt_site();
+
+        $screen = (object) array( 'base' => 'edit', 'post_type' => 'article' );
+        \Arcadia_Admin_List_UI::register_views_filter( $screen );
+
+        $this->assertArrayHasKey( 'views_edit-article', $_test_filters );
+    }
+
+    public function test_views_filter_skipped_for_unsupported_screen(): void {
+        global $_test_filters;
+        $_test_filters = array();
+
+        \Arcadia_Admin_List_UI::register_views_filter( (object) array( 'base' => 'edit', 'post_type' => 'attachment' ) );
+        \Arcadia_Admin_List_UI::register_views_filter( (object) array( 'base' => 'post', 'post_type' => 'post' ) );
+
+        $this->assertSame( array(), $_test_filters );
     }
 
     // -------------------------------------------------------

@@ -82,12 +82,11 @@ msgid "Arcadia contents"
 msgstr "Contenus Arcadia"
 
 #, php-format
-msgid "Articles (%s)"
-msgstr "Articles (%s)"
+msgid "%1$s (%2$s)"
+msgstr "%1$s (%2$s)"
 
-#, php-format
-msgid "Pages (%s)"
-msgstr "Pages (%s)"
+msgid "No agent-created content yet."
+msgstr "Aucun contenu créé par l’agent pour le moment."
 
 msgid "Agent proposals awaiting review"
 msgstr "Propositions de l’agent en attente de relecture"

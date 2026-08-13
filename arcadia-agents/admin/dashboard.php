@@ -29,9 +29,18 @@ function arcadia_agents_dashboard_page() {
 	$connected_at = get_option( 'arcadia_agents_connected_at', '' );
 
 	// Agent-created content (arcadia_source term), live count — the same
-	// counter that feeds the "Arcadia (n)" list view.
-	$managed_posts = Arcadia_Content_Counter::count( 'post' );
-	$managed_pages = Arcadia_Content_Counter::count( 'page' );
+	// counter that feeds the "Arcadia (n)" list view. Enumerated over every
+	// supported post type, never a hardcoded post/page pair: on CPT-built
+	// sites (iSelection) the agent's content lives in custom types.
+	$managed_counts = array();
+	$managed_total  = 0;
+	foreach ( Arcadia_Admin_List_UI::supported_post_types() as $managed_type ) {
+		$type_count     = Arcadia_Content_Counter::count( $managed_type );
+		$managed_total += $type_count;
+		if ( $type_count > 0 ) {
+			$managed_counts[ $managed_type ] = $type_count;
+		}
+	}
 
 	// Revision stats.
 	$pending_revisions = arcadia_dashboard_get_revisions( 'pending', 50 );
@@ -78,23 +87,36 @@ function arcadia_agents_dashboard_page() {
 					</div>
 				</div>
 
-				<!-- Arcadia contents, linked to the filtered lists (FS-2). -->
+				<!-- Arcadia contents, linked to the filtered lists (FS-2).
+				     One link per post type actually holding agent content;
+				     labels come from the post type objects (already localized). -->
 				<div class="aa-card aa-stat">
-					<div class="aa-stat__value"><?php echo (int) ( $managed_posts + $managed_pages ); ?></div>
+					<div class="aa-stat__value"><?php echo (int) $managed_total; ?></div>
 					<div class="aa-stat__label"><?php esc_html_e( 'Arcadia contents', 'arcadia-agents' ); ?></div>
 					<div class="aa-stat__links">
-						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=post&aa_source=arcadia' ) ); ?>">
-							<?php
-							/* translators: %s: number of posts */
-							echo esc_html( sprintf( __( 'Articles (%s)', 'arcadia-agents' ), number_format_i18n( $managed_posts ) ) );
-							?>
-						</a>
-						<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=page&aa_source=arcadia' ) ); ?>">
-							<?php
-							/* translators: %s: number of pages */
-							echo esc_html( sprintf( __( 'Pages (%s)', 'arcadia-agents' ), number_format_i18n( $managed_pages ) ) );
-							?>
-						</a>
+						<?php if ( empty( $managed_counts ) ) : ?>
+							<span class="aa-muted"><?php esc_html_e( 'No agent-created content yet.', 'arcadia-agents' ); ?></span>
+						<?php else : ?>
+							<?php foreach ( $managed_counts as $managed_type => $type_count ) : ?>
+								<?php
+								$type_object = get_post_type_object( $managed_type );
+								$type_label  = $type_object && isset( $type_object->labels->name ) ? $type_object->labels->name : $managed_type;
+								$type_url    = add_query_arg(
+									array(
+										'post_type' => $managed_type,
+										'aa_source' => 'arcadia',
+									),
+									admin_url( 'edit.php' )
+								);
+								?>
+								<a href="<?php echo esc_url( $type_url ); ?>">
+									<?php
+									/* translators: 1: post type name (e.g. Posts), 2: number of contents */
+									echo esc_html( sprintf( __( '%1$s (%2$s)', 'arcadia-agents' ), $type_label, number_format_i18n( $type_count ) ) );
+									?>
+								</a>
+							<?php endforeach; ?>
+						<?php endif; ?>
 					</div>
 				</div>
 

@@ -74,6 +74,13 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.7.0 =
+The admin list UI now covers custom post types — found on the first CPT-built client site, where all agent content lives in a custom `article` type.
+
+* New: the "Arcadia (n)" view, the list filter and the badge styling now appear on every public post type's list screen, not just Posts and Pages — the rule is the same as the API's write surface (public types except media), so the review queue works on sites built on custom post types
+* New: the dashboard "Arcadia contents" card enumerates every post type actually holding agent content, one link per type, instead of a hardcoded Posts/Pages pair (which read "0" on CPT-built sites)
+* Unchanged: the badge itself already rendered on all post types; API contract identical to 0.6.0
+
 = 0.6.2 =
 Visual polish only — identical API contract to 0.6.0.
 

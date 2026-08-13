@@ -555,27 +555,31 @@ if ( ! function_exists( 'current_user_can' ) ) {
     }
 }
 
-// get_post_types() stub.
+// get_post_types() stub. Generic arg matching over a configurable registry:
+// tests may override $GLOBALS['_test_post_types'] (name => flags object) to
+// register CPTs; reset it to null in tearDown to restore the defaults.
 if ( ! function_exists( 'get_post_types' ) ) {
     function get_post_types( $args = array(), $output = 'names' ) {
-        $types = array(
-            'post'       => (object) array( 'name' => 'post', 'label' => 'Posts', 'public' => true, 'hierarchical' => false ),
-            'page'       => (object) array( 'name' => 'page', 'label' => 'Pages', 'public' => true, 'hierarchical' => true ),
-            'attachment' => (object) array( 'name' => 'attachment', 'label' => 'Media', 'public' => true, 'hierarchical' => false ),
+        global $_test_post_types;
+
+        $types = is_array( $_test_post_types ) ? $_test_post_types : array(
+            'post'       => (object) array( 'name' => 'post', 'label' => 'Posts', 'public' => true, 'show_ui' => true, 'hierarchical' => false ),
+            'page'       => (object) array( 'name' => 'page', 'label' => 'Pages', 'public' => true, 'show_ui' => true, 'hierarchical' => true ),
+            'attachment' => (object) array( 'name' => 'attachment', 'label' => 'Media', 'public' => true, 'show_ui' => true, 'hierarchical' => false ),
         );
 
-        if ( ! empty( $args['public'] ) ) {
-            if ( 'objects' === $output ) {
-                return $types;
+        $out = array();
+        foreach ( $types as $name => $obj ) {
+            foreach ( $args as $key => $value ) {
+                $actual = isset( $obj->$key ) ? $obj->$key : false;
+                if ( $actual !== $value ) {
+                    continue 2;
+                }
             }
-            return array( 'post' => 'post', 'page' => 'page', 'attachment' => 'attachment' );
+            $out[ $name ] = ( 'objects' === $output ) ? $obj : $name;
         }
 
-        if ( 'objects' === $output ) {
-            unset( $types['attachment'] );
-            return $types;
-        }
-        return array( 'post' => 'post', 'page' => 'page' );
+        return $out;
     }
 }
 
