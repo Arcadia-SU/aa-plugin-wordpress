@@ -705,3 +705,51 @@ msgstr "Seules les URL HTTP et HTTPS sont autorisées."
 
 msgid "URL is not allowed (private/reserved IP)."
 msgstr "URL non autorisée (IP privée/réservée)."
+
+msgid "Select all proposals"
+msgstr "Tout sélectionner"
+
+msgid "Select “%s”"
+msgstr "Sélectionner « %s »"
+
+msgid "Approve “%s”"
+msgstr "Approuver « %s »"
+
+msgid "Reject “%s”"
+msgstr "Refuser « %s »"
+
+msgid "Dismiss"
+msgstr "Fermer"
+
+msgid "%s proposal selected"
+msgstr "%s proposition sélectionnée"
+
+msgid "%s proposals selected"
+msgstr "%s propositions sélectionnées"
+
+msgid "Clear selection"
+msgstr "Vider la sélection"
+
+msgid "Apply %s proposals to the live articles?"
+msgstr "Appliquer %s propositions aux articles en ligne ?"
+
+msgid "Reject this proposal?"
+msgstr "Refuser cette proposition ?"
+
+msgid "Reject %s proposals?"
+msgstr "Refuser %s propositions ?"
+
+msgid "Reason, applied to every selected proposal (optional):"
+msgstr "Motif, appliqué à toutes les propositions sélectionnées (facultatif) :"
+
+msgid "Processing %1$s of %2$s…"
+msgstr "Traitement de %1$s sur %2$s…"
+
+msgid "%1$s processed, %2$s failed — the failed proposals are still listed."
+msgstr "%1$s traitées, %2$s en échec — les propositions en échec sont toujours listées."
+
+msgid "Simplified preview: your site’s design is not shown here."
+msgstr "Aperçu simplifié : le design de votre site n’est pas affiché ici."
+
+msgid "The text below is the content that will be published. Once you approve it, it appears in your site’s usual layout, with the header, the menu and the styles."
+msgstr "Le texte ci-dessous est bien le contenu qui sera publié. Une fois que vous l’aurez validé, il s’affichera dans la mise en page habituelle de votre site, avec l’en-tête, le menu et les styles."

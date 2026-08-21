@@ -1352,10 +1352,44 @@ if ( ! function_exists( 'setup_postdata' ) ) {
     }
 }
 
-// get_single_template() stub.
+// Template-getter stubs — configurable per getter, so a test can make one
+// branch of the hierarchy miss and check the next one is taken.
 if ( ! function_exists( 'get_single_template' ) ) {
+    global $_test_template_getters;
+    $_test_template_getters = array(
+        'single'   => '/tmp/single.php',
+        'page'     => '/tmp/page.php',
+        'singular' => '',
+    );
+
     function get_single_template() {
-        return '/tmp/single.php';
+        global $_test_template_getters;
+        apply_filters( 'single_template_hierarchy', array( 'single.php' ) );
+        return $_test_template_getters['single'];
+    }
+
+    function get_page_template() {
+        global $_test_template_getters;
+        apply_filters( 'page_template_hierarchy', array( 'page.php' ) );
+        return $_test_template_getters['page'];
+    }
+
+    function get_singular_template() {
+        global $_test_template_getters;
+        apply_filters( 'singular_template_hierarchy', array( 'singular.php' ) );
+        return $_test_template_getters['singular'];
+    }
+}
+
+// Query conditionals read the same wp_query the plugin populates, so a test
+// drives them by calling setup_preview_state() rather than by setting a flag.
+if ( ! function_exists( 'is_single' ) ) {
+    function is_single() {
+        return isset( $GLOBALS['wp_query'] ) && ! empty( $GLOBALS['wp_query']->is_single );
+    }
+
+    function is_page() {
+        return isset( $GLOBALS['wp_query'] ) && ! empty( $GLOBALS['wp_query']->is_page );
     }
 }
 
@@ -1477,6 +1511,25 @@ if ( ! function_exists( 'locate_template' ) ) {
     function locate_template( $template_names, $load = false, $load_once = true ) {
         global $_test_locate_template_result;
         return $_test_locate_template_result;
+    }
+}
+
+// remove_filter() stub — matches on the exact callback, as WordPress does.
+if ( ! function_exists( 'remove_filter' ) ) {
+    function remove_filter( $hook, $callback, $priority = 10 ) {
+        global $_test_filters;
+        if ( empty( $_test_filters[ $hook ] ) ) {
+            return false;
+        }
+        $removed = false;
+        foreach ( $_test_filters[ $hook ] as $index => $filter ) {
+            if ( $filter['callback'] === $callback ) {
+                unset( $_test_filters[ $hook ][ $index ] );
+                $removed = true;
+            }
+        }
+        $_test_filters[ $hook ] = array_values( $_test_filters[ $hook ] );
+        return $removed;
     }
 }
 

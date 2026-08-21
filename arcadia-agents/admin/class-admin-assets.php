@@ -140,13 +140,31 @@ class Arcadia_Admin_Assets {
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'aa_revision_action' ),
 			'i18n'    => array(
-				'confirm_approve' => __( 'Approve this proposal?', 'arcadia-agents' ),
-				'reject_prompt'   => __( 'Reason for rejection (optional):', 'arcadia-agents' ),
-				'error_generic'   => __( 'Request failed.', 'arcadia-agents' ),
-				'approve'         => __( 'Approve', 'arcadia-agents' ),
-				'reject'          => __( 'Reject', 'arcadia-agents' ),
-				'cancel'          => __( 'Cancel', 'arcadia-agents' ),
-				'working'         => __( 'Working…', 'arcadia-agents' ),
+				'confirm_approve'      => __( 'Approve this proposal?', 'arcadia-agents' ),
+				'reject_prompt'        => __( 'Reason for rejection (optional):', 'arcadia-agents' ),
+				'error_generic'        => __( 'Request failed.', 'arcadia-agents' ),
+				'approve'              => __( 'Approve', 'arcadia-agents' ),
+				'reject'               => __( 'Reject', 'arcadia-agents' ),
+				'cancel'               => __( 'Cancel', 'arcadia-agents' ),
+				'dismiss'              => __( 'Dismiss', 'arcadia-agents' ),
+				'working'              => __( 'Working…', 'arcadia-agents' ),
+				/* translators: %s: number of selected proposals (always 1 here) */
+				'selected_one'         => __( '%s proposal selected', 'arcadia-agents' ),
+				/* translators: %s: number of selected proposals */
+				'selected_many'        => __( '%s proposals selected', 'arcadia-agents' ),
+				'select_all'           => __( 'Select all proposals', 'arcadia-agents' ),
+				'clear_selection'      => __( 'Clear selection', 'arcadia-agents' ),
+				'bulk_confirm_approve_one'  => __( 'Apply this proposal to the live article?', 'arcadia-agents' ),
+				/* translators: %s: number of selected proposals */
+				'bulk_confirm_approve_many' => __( 'Apply %s proposals to the live articles?', 'arcadia-agents' ),
+				'bulk_confirm_reject_one'   => __( 'Reject this proposal?', 'arcadia-agents' ),
+				/* translators: %s: number of selected proposals */
+				'bulk_confirm_reject_many'  => __( 'Reject %s proposals?', 'arcadia-agents' ),
+				'bulk_reject_prompt'   => __( 'Reason, applied to every selected proposal (optional):', 'arcadia-agents' ),
+				/* translators: 1: current item number, 2: total items */
+				'bulk_progress'        => __( 'Processing %1$s of %2$s…', 'arcadia-agents' ),
+				/* translators: 1: number processed, 2: number that failed */
+				'bulk_partial'         => __( '%1$s processed, %2$s failed — the failed proposals are still listed.', 'arcadia-agents' ),
 			),
 		);
 	}

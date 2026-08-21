@@ -139,9 +139,19 @@ function arcadia_agents_dashboard_page() {
 				</div>
 
 				<?php if ( ! empty( $pending_revisions ) ) : ?>
-					<table class="aa-table" id="aa-pending-table">
+					<!-- Bulk action bar: only exists once something is selected
+					     (progressive disclosure). Rendered empty, filled by JS. -->
+					<div class="aa-bulkbar" id="aa-bulkbar" hidden>
+						<span class="aa-bulkbar__count" id="aa-bulkbar-count" aria-live="polite"></span>
+						<div class="aa-bulkbar__actions" id="aa-bulkbar-actions"></div>
+					</div>
+
+					<table class="aa-table aa-table--queue" id="aa-pending-table">
 						<thead>
 							<tr>
+								<th scope="col" class="aa-cell-check">
+									<input type="checkbox" id="aa-select-all" class="aa-check" aria-label="<?php esc_attr_e( 'Select all proposals', 'arcadia-agents' ); ?>" />
+								</th>
 								<th scope="col"><?php esc_html_e( 'Article', 'arcadia-agents' ); ?></th>
 								<th scope="col"><?php esc_html_e( 'Version', 'arcadia-agents' ); ?></th>
 								<th scope="col"><?php esc_html_e( 'Notes', 'arcadia-agents' ); ?></th>
@@ -151,8 +161,32 @@ function arcadia_agents_dashboard_page() {
 						</thead>
 						<tbody>
 							<?php foreach ( $pending_revisions as $rev ) : ?>
+								<?php
+								$rev_title = $rev['parent_title'];
+								// The review view (diff + approve/reject) is the parent
+								// post editor, where the plugin injects its metabox /
+								// sidebar. It is the row's natural destination, so the
+								// title carries it instead of a fourth button.
+								$review_url = get_edit_post_link( $rev['parent_id'] );
+								?>
 								<tr>
-									<td><strong><?php echo esc_html( $rev['parent_title'] ); ?></strong></td>
+									<td class="aa-cell-check">
+										<input
+											type="checkbox"
+											class="aa-check aa-row-check"
+											value="<?php echo (int) $rev['revision_id']; ?>"
+											aria-label="<?php
+												/* translators: %s: article title */
+												echo esc_attr( sprintf( __( 'Select “%s”', 'arcadia-agents' ), $rev_title ) );
+											?>" />
+									</td>
+									<td>
+										<?php if ( $review_url ) : ?>
+											<a class="aa-row-title" href="<?php echo esc_url( $review_url ); ?>"><?php echo esc_html( $rev_title ); ?></a>
+										<?php else : ?>
+											<strong><?php echo esc_html( $rev_title ); ?></strong>
+										<?php endif; ?>
+									</td>
 									<td>v<?php echo (int) $rev['version']; ?></td>
 									<td class="aa-muted">
 										<?php echo $rev['notes'] ? esc_html( wp_trim_words( $rev['notes'], 10 ) ) : '<em>' . esc_html__( 'No notes', 'arcadia-agents' ) . '</em>'; ?>
@@ -160,10 +194,30 @@ function arcadia_agents_dashboard_page() {
 									<td class="aa-muted"><?php echo esc_html( $rev['date'] ); ?></td>
 									<td>
 										<div class="aa-row-actions" data-revision-id="<?php echo (int) $rev['revision_id']; ?>">
-											<a href="<?php echo esc_url( $rev['preview_url'] ); ?>" target="_blank" class="aa-btn aa-btn--ghost aa-btn--small"><?php esc_html_e( 'Preview', 'arcadia-agents' ); ?></a>
-											<button type="button" class="aa-btn aa-btn--primary aa-btn--small aa-dash-approve"><?php esc_html_e( 'Approve', 'arcadia-agents' ); ?></button>
-											<button type="button" class="aa-btn aa-btn--ghost aa-btn--small aa-dash-reject"><?php esc_html_e( 'Reject', 'arcadia-agents' ); ?></button>
-											<a href="<?php echo esc_url( get_edit_post_link( $rev['parent_id'] ) ); ?>" class="aa-btn aa-btn--ghost aa-btn--small"><?php esc_html_e( 'Edit', 'arcadia-agents' ); ?></a>
+											<a
+												href="<?php echo esc_url( $rev['preview_url'] ); ?>"
+												target="_blank"
+												rel="noopener noreferrer"
+												class="aa-btn aa-btn--quiet aa-btn--small aa-row-actions__quiet"
+											><?php echo arcadia_dashboard_icon( 'eye' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG. ?><span><?php esc_html_e( 'Preview', 'arcadia-agents' ); ?></span></a>
+											<button
+												type="button"
+												class="aa-btn aa-btn--primary aa-btn--icon aa-dash-approve"
+												title="<?php esc_attr_e( 'Approve', 'arcadia-agents' ); ?>"
+												aria-label="<?php
+													/* translators: %s: article title */
+													echo esc_attr( sprintf( __( 'Approve “%s”', 'arcadia-agents' ), $rev_title ) );
+												?>"
+											><?php echo arcadia_dashboard_icon( 'check' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG. ?></button>
+											<button
+												type="button"
+												class="aa-btn aa-btn--ghost aa-btn--icon aa-btn--danger-hover aa-dash-reject"
+												title="<?php esc_attr_e( 'Reject', 'arcadia-agents' ); ?>"
+												aria-label="<?php
+													/* translators: %s: article title */
+													echo esc_attr( sprintf( __( 'Reject “%s”', 'arcadia-agents' ), $rev_title ) );
+												?>"
+											><?php echo arcadia_dashboard_icon( 'cross' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG. ?></button>
 										</div>
 									</td>
 								</tr>
@@ -230,6 +284,32 @@ function arcadia_agents_dashboard_page() {
 		</div>
 	</div>
 	<?php
+}
+
+/**
+ * Inline SVG icon for the queue actions.
+ *
+ * Icons are shipped inline (never a font, never a remote file) so that a row
+ * action renders identically whatever the admin theme does with dashicons, and
+ * inherits its colour from the button through currentColor. The markup is
+ * static and self-contained: callers echo it without escaping.
+ *
+ * @param string $name Icon key: eye, check, cross.
+ * @return string SVG markup, or an empty string for an unknown key.
+ */
+function arcadia_dashboard_icon( $name ) {
+	$open  = '<svg class="aa-icon" viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">';
+	$paths = array(
+		'eye'   => '<path d="M1.7 10S4.9 4.6 10 4.6 18.3 10 18.3 10 15.1 15.4 10 15.4 1.7 10 1.7 10Z"/><circle cx="10" cy="10" r="2.4"/>',
+		'check' => '<path d="m4.6 10.4 3.5 3.5 7.3-7.8"/>',
+		'cross' => '<path d="m5.5 5.5 9 9m0-9-9 9"/>',
+	);
+
+	if ( ! isset( $paths[ $name ] ) ) {
+		return '';
+	}
+
+	return $open . $paths[ $name ] . '</svg>';
 }
 
 /**

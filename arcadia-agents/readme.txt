@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.7.0
+Stable tag: 0.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,26 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.9.0 =
+A proposal now previews in the site's real template — the one WordPress itself picks — instead of in a hand-written approximation of it. And when a preview genuinely cannot be rendered, the page says so instead of impersonating the site.
+
+* Fixed: a revision preview came back as a bare wall of text on some post types and rendered perfectly on others. The post handed to the theme's loop was still an `aa_revision`, so any template that branches on it — a `if ( 'expertise_sante' !== get_post_type() ) { return; }` guard on its first line, a taxonomy lookup, a field read on get_the_ID() — returned without printing a byte. Measured on a client preprod: two of ten pending proposals came back bare, and they were exactly the two whose post type has such a template. The loop post now carries the parent's post type, while keeping the revision's ID so the text on screen is still the proposal and never the live page
+* Changed: the preview template is resolved through WordPress's own chain — get_single_template() / get_page_template(), then the `template_include` filter — instead of a copied hierarchy fed to locate_template(). A theme that routes its templates by filter, which is how several agency themes are built, was being short-circuited and the preview included whatever the copy happened to land on
+* New: previews work on block themes. A block theme's templates are not files in the theme directory, so the previous resolution could never reach one and every preview fell through to the fallback page
+* New: the fallback page now says what it is — "Simplified preview: your site's design is not shown here" — and tells the reviewer that the text below is the content that will be published, and that it lands in the site's usual layout once approved. Until now that page impersonated the site, so a reviewer could approve believing they had seen the real thing
+* Unchanged: API contract identical to 0.8.0 — this release only touches preview rendering
+
+= 0.8.0 =
+The review queue is workable at volume: proposals can be decided in batch, and a row now carries three ranked actions on a single line instead of four wrapped over two.
+
+* New: checkbox selection in the review queue, with a bulk bar that only appears once something is selected — approve or reject the whole selection in one confirmation instead of one decision per row
+* New: shift-click extends the selection from the last box clicked, in both directions — picking a run of consecutive proposals is one gesture
+* New: the header checkbox selects everything when nothing is selected and clears the selection otherwise, showing a minus while the selection is partial; Escape backs out of an open confirmation, then out of the selection
+* New: a bulk run reports its outcome honestly — it processes one proposal at a time, removes each row as it succeeds, and on a partial failure says how many failed and leaves those rows in the queue
+* Changed: Approve and Reject are now icon buttons (✓ / ✕), Preview is a quiet icon+label revealed on row hover or keyboard focus, and the article title itself links to the review view — the same four destinations, ranked instead of shouted
+* Changed: the "Edit" button is gone from the queue; the article title carries that link, which is where the diff and the approve/reject controls already live
+* Unchanged: API contract identical to 0.7.0 — this release only touches the plugin's admin screens
 
 = 0.7.0 =
 The admin list UI now covers custom post types — found on the first CPT-built client site, where all agent content lives in a custom `article` type.

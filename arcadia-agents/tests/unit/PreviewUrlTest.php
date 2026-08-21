@@ -384,62 +384,6 @@ class PreviewUrlTest extends TestCase {
 	}
 
 	// =========================================================================
-	// get_preview_template_hierarchy (via reflection)
-	// =========================================================================
-
-	/**
-	 * Test template hierarchy for a CPT post.
-	 */
-	public function test_template_hierarchy_for_cpt(): void {
-		$post = (object) array(
-			'ID'        => 55,
-			'post_type' => 'article',
-			'post_name' => 'my-article-slug',
-		);
-
-		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
-		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
-		$method->setAccessible( true );
-
-		$result = $method->invoke( $this->preview, $post );
-
-		$expected = array(
-			'single-article-my-article-slug.php',
-			'single-article.php',
-			'single.php',
-			'singular.php',
-		);
-
-		$this->assertEquals( $expected, $result );
-	}
-
-	/**
-	 * Test template hierarchy for a standard post.
-	 */
-	public function test_template_hierarchy_for_standard_post(): void {
-		$post = (object) array(
-			'ID'        => 56,
-			'post_type' => 'post',
-			'post_name' => 'hello-world',
-		);
-
-		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
-		$method     = $reflection->getMethod( 'get_preview_template_hierarchy' );
-		$method->setAccessible( true );
-
-		$result = $method->invoke( $this->preview, $post );
-
-		$expected = array(
-			'single-post-hello-world.php',
-			'single-post.php',
-			'single.php',
-			'singular.php',
-		);
-
-		$this->assertEquals( $expected, $result );
-	}
-
-	// =========================================================================
 	// setup_preview_state — state setup for CPT draft
 	// =========================================================================
 

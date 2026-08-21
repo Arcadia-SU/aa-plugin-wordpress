@@ -12,10 +12,15 @@
  * The consequence is not cosmetic — the client approves a revision in a layout
  * that is not the page's. HITL rendered blind.
  *
- * Two more gaps were in the same function: it never read the editor-assigned
- * page template, and it had no `page-*.php` branch at all, so even a plain
- * page preview landed on `single.php` — a template WordPress would never pick
- * for it.
+ * Phase 41.2 fixed that by hand: a copied hierarchy, fed to locate_template().
+ * The copy is gone — resolution now goes through core's own getters, so these
+ * tests assert the two things that are still ours to get right: the queried
+ * object handed to core is the parent, and whatever the theme's
+ * `template_include` returns is what gets included.
+ *
+ * The third gap took longer to find. The queried object was the parent, but the
+ * post *in the loop* stayed an `aa_revision`, and a theme that branches on the
+ * loop post rendered nothing at all. See the post-type section below.
  *
  * @package ArcadiaAgents\Tests
  */
@@ -33,10 +38,18 @@ class PreviewRenderContextTest extends TestCase {
 
 	protected function setUp(): void {
 		global $_test_posts, $_test_post_meta, $_test_page_template_slugs;
+		global $_test_filters, $_test_template_getters, $_test_index_template;
 
 		$_test_posts               = array();
 		$_test_post_meta           = array();
 		$_test_page_template_slugs = array();
+		$_test_filters             = array();
+		$_test_index_template      = '/tmp/index.php';
+		$_test_template_getters    = array(
+			'single'   => '/tmp/single.php',
+			'page'     => '/tmp/page.php',
+			'singular' => '',
+		);
 
 		$reflection = new \ReflectionClass( \Arcadia_Preview::class );
 		$prop       = $reflection->getProperty( 'instance' );
@@ -47,8 +60,9 @@ class PreviewRenderContextTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
-		global $_test_page_template_slugs;
+		global $_test_page_template_slugs, $_test_filters;
 		$_test_page_template_slugs = array();
+		$_test_filters             = array();
 		unset( $GLOBALS['wp_query'] );
 	}
 
@@ -71,10 +85,24 @@ class PreviewRenderContextTest extends TestCase {
 		return $_test_posts[ $id ];
 	}
 
-	private function hierarchy( object $post ): array {
-		$method = ( new \ReflectionClass( \Arcadia_Preview::class ) )->getMethod( 'get_preview_template_hierarchy' );
+	/**
+	 * Put the preview in rendering state, then ask it for its template — the
+	 * order handle_preview() uses, and the one core's getters require.
+	 */
+	private function resolve( object $post, ?object $context = null ): string {
+		$GLOBALS['wp_query'] = new \WP_Query();
+		$this->preview->setup_preview_state( $post, $context );
+
+		$method = ( new \ReflectionClass( \Arcadia_Preview::class ) )->getMethod( 'resolve_template' );
 		$method->setAccessible( true );
-		return $method->invoke( $this->preview, $post );
+
+		return (string) $method->invoke( $this->preview );
+	}
+
+	private function candidates(): array {
+		$prop = ( new \ReflectionClass( \Arcadia_Preview::class ) )->getProperty( 'template_candidates' );
+		$prop->setAccessible( true );
+		return $prop->getValue( $this->preview );
 	}
 
 	private function context( object $post ): object {
@@ -108,7 +136,6 @@ class PreviewRenderContextTest extends TestCase {
 		$revision = $this->seed( 103, 'aa_revision', 'rev-103', 9999 );
 
 		$this->assertSame( $revision, $this->context( $revision ) );
-		$this->assertIsArray( $this->hierarchy( $this->context( $revision ) ) );
 	}
 
 	public function test_parentless_revision_falls_back_to_itself(): void {
@@ -118,116 +145,158 @@ class PreviewRenderContextTest extends TestCase {
 	}
 
 	// ---------------------------------------------------------------------
-	// Template hierarchy — the page branch that did not exist
+	// Template resolution — delegated to WordPress
 	// ---------------------------------------------------------------------
 
-	public function test_page_uses_the_page_branch(): void {
+	public function test_page_context_resolves_through_get_page_template(): void {
 		$page = $this->seed( 110, 'page', 'investir' );
 
-		$this->assertSame(
-			array(
-				'page-investir.php',
-				'page-110.php',
-				'page.php',
-				'singular.php',
-			),
-			$this->hierarchy( $page )
-		);
+		$this->assertSame( '/tmp/page.php', $this->resolve( $page ) );
 	}
 
-	public function test_custom_page_template_wins(): void {
-		global $_test_page_template_slugs;
-		$page                             = $this->seed( 111, 'page', 'investir' );
-		$_test_page_template_slugs[ 111 ] = 'templates/page-investir-rich.php';
+	public function test_cpt_context_resolves_through_get_single_template(): void {
+		$post = $this->seed( 112, 'article', 'mon-article' );
 
-		$this->assertSame(
-			array(
-				'templates/page-investir-rich.php',
-				'page-investir.php',
-				'page-111.php',
-				'page.php',
-				'singular.php',
-			),
-			$this->hierarchy( $page )
-		);
+		$this->assertSame( '/tmp/single.php', $this->resolve( $post ) );
 	}
 
 	/**
-	 * WP ≥ 4.7 allows a page template on any post type, so the branch must not
-	 * be limited to `page`.
+	 * The Phase 41.2 guarantee, restated against core: a revision resolves in
+	 * its parent's branch, never in `single-aa_revision*.php`.
 	 */
-	public function test_custom_template_applies_to_non_page_types(): void {
-		global $_test_page_template_slugs;
-		$post                             = $this->seed( 112, 'article', 'mon-article' );
-		$_test_page_template_slugs[ 112 ] = 'templates/longform.php';
+	public function test_revision_resolves_in_its_parents_branch(): void {
+		$parent   = $this->seed( 120, 'page', 'investir' );
+		$revision = $this->seed( 121, 'aa_revision', 'rev-121', 120 );
 
-		$this->assertSame(
-			array(
-				'templates/longform.php',
-				'single-article-mon-article.php',
-				'single-article.php',
-				'single.php',
-				'singular.php',
-			),
-			$this->hierarchy( $post )
-		);
+		$this->assertSame( '/tmp/page.php', $this->resolve( $revision, $parent ) );
+		$this->assertSame( $parent, $GLOBALS['wp_query']->queried_object );
 	}
 
-	public function test_page_branch_excludes_single_php(): void {
-		$page = $this->seed( 113, 'page', 'investir' );
+	public function test_falls_through_to_singular_when_the_branch_misses(): void {
+		global $_test_template_getters;
+		$_test_template_getters['single']   = '';
+		$_test_template_getters['singular'] = '/tmp/singular.php';
 
-		$this->assertNotContains(
-			'single.php',
-			$this->hierarchy( $page ),
-			'WordPress never falls back to single.php for a page.'
-		);
+		$post = $this->seed( 122, 'article', 'mon-article' );
+
+		$this->assertSame( '/tmp/singular.php', $this->resolve( $post ) );
 	}
 
-	// ---------------------------------------------------------------------
-	// The two combined — the actual iSelection defect
-	// ---------------------------------------------------------------------
+	public function test_falls_through_to_index_when_nothing_else_matches(): void {
+		global $_test_template_getters;
+		$_test_template_getters['single']   = '';
+		$_test_template_getters['singular'] = '';
 
-	public function test_revision_of_a_templated_page_resolves_the_parent_template(): void {
-		global $_test_page_template_slugs;
-		$this->seed( 120, 'page', 'investir' );
-		$_test_page_template_slugs[ 120 ] = 'page-investir-template.php';
-		$revision                         = $this->seed( 121, 'aa_revision', 'rev-121', 120 );
+		$post = $this->seed( 123, 'article', 'mon-article' );
 
-		$templates = $this->hierarchy( $this->context( $revision ) );
+		$this->assertSame( '/tmp/index.php', $this->resolve( $post ) );
+	}
 
-		$this->assertSame(
-			array(
-				'page-investir-template.php',
-				'page-investir.php',
-				'page-120.php',
-				'page.php',
-				'singular.php',
-			),
-			$templates
+	/**
+	 * The second way a preview came back bare: a theme that routes its
+	 * templates by filter. Every request outside the preview goes through
+	 * `template_include`; the preview used to skip it and include the file it
+	 * had picked itself, which for such a theme is a stub that prints nothing.
+	 */
+	public function test_template_include_is_applied(): void {
+		add_filter(
+			'template_include',
+			static function ( $template ) {
+				return '/tmp/routed-by-the-theme.php';
+			}
 		);
 
-		foreach ( $templates as $candidate ) {
-			$this->assertStringNotContainsString(
-				'aa_revision',
-				$candidate,
-				'No candidate may still be derived from the revision itself.'
-			);
+		$post = $this->seed( 124, 'article', 'mon-article' );
+
+		$this->assertSame( '/tmp/routed-by-the-theme.php', $this->resolve( $post ) );
+	}
+
+	public function test_candidates_are_captured_for_the_debug_report(): void {
+		$post = $this->seed( 125, 'article', 'mon-article' );
+		$this->resolve( $post );
+
+		$this->assertSame( array( 'single.php' ), $this->candidates() );
+	}
+
+	/**
+	 * The capture is a closure on four core hooks. Leaving it hooked would make
+	 * it fire again for anything the theme renders after us.
+	 */
+	public function test_the_capture_is_unhooked_after_resolution(): void {
+		global $_test_filters;
+
+		$post = $this->seed( 126, 'article', 'mon-article' );
+		$this->resolve( $post );
+
+		foreach ( array( 'single_template_hierarchy', 'page_template_hierarchy', 'singular_template_hierarchy', 'index_template_hierarchy' ) as $hook ) {
+			$this->assertEmpty( $_test_filters[ $hook ] ?? array(), $hook . ' still holds the capture.' );
 		}
 	}
 
-	public function test_revision_of_an_article_resolves_the_article_hierarchy(): void {
-		$this->seed( 130, 'article', 'mon-article' );
-		$revision = $this->seed( 131, 'aa_revision', 'rev-131', 130 );
+	// ---------------------------------------------------------------------
+	// The post in the loop — the Technologia defect
+	// ---------------------------------------------------------------------
 
-		$this->assertSame(
-			array(
-				'single-article-mon-article.php',
-				'single-article.php',
-				'single.php',
-				'singular.php',
-			),
-			$this->hierarchy( $this->context( $revision ) )
-		);
+	/**
+	 * A theme is entitled to branch on the loop post. Several do it as the very
+	 * first statement of the template:
+	 *
+	 *     if ( 'expertise_sante' !== get_post_type() ) { return; }
+	 *
+	 * With an `aa_revision` in the loop that guard returns before printing a
+	 * byte, and the preview falls through to render_fallback(). Measured on the
+	 * Technologia preprod: two of ten pending revisions came back bare, and
+	 * they were exactly the two whose post type has such a template.
+	 */
+	public function test_revision_wears_the_parents_post_type_in_the_loop(): void {
+		$parent   = $this->seed( 200, 'expertise_sante', 'risque-grave' );
+		$revision = $this->seed( 201, 'aa_revision', 'rev-201', 200 );
+
+		$GLOBALS['wp_query'] = new \WP_Query();
+		$this->preview->setup_preview_state( $revision, $parent );
+
+		$this->assertSame( 'expertise_sante', $revision->post_type );
+		$this->assertSame( 'expertise_sante', $GLOBALS['wp_query']->posts[0]->post_type );
+		$this->assertSame( 'expertise_sante', $GLOBALS['post']->post_type );
+	}
+
+	/**
+	 * Only the type is borrowed. The ID stays the revision's, or every content
+	 * and field read would land on the live post and the preview would show the
+	 * page as it already is.
+	 */
+	public function test_borrowing_the_type_does_not_borrow_the_identity(): void {
+		$parent   = $this->seed( 202, 'expertise_sante', 'risque-grave' );
+		$revision = $this->seed( 203, 'aa_revision', 'rev-203', 202 );
+
+		$GLOBALS['wp_query'] = new \WP_Query();
+		$this->preview->setup_preview_state( $revision, $parent );
+
+		$this->assertSame( 203, $revision->ID );
+		$this->assertSame( array( $revision ), $GLOBALS['wp_query']->posts );
+		$this->assertSame( 202, $GLOBALS['wp_query']->queried_object_id );
+	}
+
+	public function test_an_ordinary_preview_keeps_its_own_type(): void {
+		$post = $this->seed( 204, 'article', 'mon-article' );
+
+		$GLOBALS['wp_query'] = new \WP_Query();
+		$this->preview->setup_preview_state( $post );
+
+		$this->assertSame( 'article', $post->post_type );
+	}
+
+	/**
+	 * An orphan revision is its own context, so there is no type to borrow —
+	 * and nothing must rewrite it to something the site does not have.
+	 */
+	public function test_orphan_revision_keeps_its_own_type(): void {
+		$revision = $this->seed( 205, 'aa_revision', 'rev-205', 9999 );
+
+		$GLOBALS['wp_query'] = new \WP_Query();
+		$this->preview->setup_preview_state( $revision, $this->context( $revision ) );
+
+		$this->assertSame( 'aa_revision', $revision->post_type );
 	}
 
 	// ---------------------------------------------------------------------

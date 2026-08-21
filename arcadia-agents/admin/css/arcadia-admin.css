@@ -659,11 +659,189 @@ a.aa-stat:focus-visible {
 	font-size: 12px;
 }
 
+.aa-btn--icon {
+	padding: 0;
+	width: 30px;
+	height: 30px;
+	flex: 0 0 auto;
+}
+
+/* Tertiary weight: no surface at all. Reads as a link that happens to sit
+   in a row of buttons, which is exactly its rank next to approve/reject. */
+.aa-btn--quiet {
+	background: transparent;
+	color: var(--aa-ink-70);
+	padding: 6px 10px;
+}
+
+.arcadia-admin a.aa-btn--quiet {
+	color: var(--aa-ink-70);
+}
+
+.aa-btn--quiet:hover,
+.arcadia-admin a.aa-btn--quiet:hover {
+	background: var(--aa-field);
+	color: var(--aa-ink);
+}
+
+/* Reject stays neutral at rest — colouring both decisions would flatten the
+   hierarchy — and only turns red on intent. */
+.aa-btn--danger-hover:hover {
+	background: var(--aa-bad);
+	color: #ffffff;
+}
+
+.aa-icon {
+	flex: 0 0 auto;
+}
+
+/* Queue table: actions never wrap, so "one row = one group of actions"
+   survives every column width. */
+.aa-table--queue .aa-row-actions {
+	flex-wrap: nowrap;
+	justify-content: flex-end;
+}
+
+.aa-table--queue td:last-child,
+.aa-table--queue th:last-child {
+	text-align: right;
+	width: 1%;
+	white-space: nowrap;
+}
+
+.aa-row-title {
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.arcadia-admin .aa-row-title {
+	color: var(--aa-ink);
+}
+
+.arcadia-admin .aa-row-title:hover {
+	color: var(--aa-secondary);
+	text-decoration: underline;
+}
+
+/* Checkbox column */
+.aa-cell-check {
+	width: 1%;
+	padding-right: 0 !important;
+}
+
+.arcadia-admin .aa-check {
+	margin: 0;
+	border-radius: 5px;
+	border-color: rgba(42, 35, 96, 0.3);
+}
+
+.arcadia-admin .aa-check:checked,
+.arcadia-admin .aa-check:indeterminate {
+	background: var(--aa-secondary);
+	border-color: var(--aa-secondary);
+}
+
+.arcadia-admin .aa-check:checked::before {
+	filter: brightness(0) invert(1);
+}
+
+/* The minus is the affordance: it says this click clears the selection.
+   Drawn here because WordPress only ships an indeterminate glyph inside its own
+   list tables, and without it a partial selection reads as a blank filled box. */
+.arcadia-admin .aa-check {
+	position: relative;
+}
+
+.arcadia-admin .aa-check:indeterminate::before {
+	content: "";
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	width: 8px;
+	height: 2px;
+	margin: 0;
+	float: none;
+	transform: translate(-50%, -50%);
+	border-radius: 1px;
+	background: #ffffff;
+	filter: none;
+}
+
+/* Bulk action bar — exists only while a selection does. */
+.aa-bulkbar {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 12px;
+	padding: 10px 16px;
+	border-radius: 12px;
+	background: var(--aa-field);
+}
+
+.aa-bulkbar[hidden] {
+	display: none;
+}
+
+.aa-bulkbar__count {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--aa-ink);
+}
+
+.aa-bulkbar__actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.aa-bulkbar__notes {
+	flex: 1 1 240px;
+}
+
+/* The bar is itself painted with --aa-field, which is the ghost button's own
+   surface: without this the secondary action reads as having no button at all. */
+.aa-bulkbar .aa-btn--ghost {
+	background: var(--aa-card);
+}
+
+.aa-bulkbar .aa-btn--ghost:hover {
+	background: var(--aa-elevated);
+}
+
 .aa-row-actions {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	flex-wrap: wrap;
+}
+
+/* Preview is revealed by the row, not shown permanently: 7 rows x 4 labels is
+   a wall to re-read, and only one row is ever being acted on. Opacity (not
+   display) keeps the row height stable and the link tabbable. */
+.aa-row-actions__quiet {
+	opacity: 0;
+	transition: opacity 0.12s ease;
+}
+
+.aa-table--queue tr:hover .aa-row-actions__quiet,
+.aa-table--queue tr:focus-within .aa-row-actions__quiet,
+.aa-row-actions__quiet:focus-visible {
+	opacity: 1;
+}
+
+/* No hover to reveal with: show it outright. */
+@media (hover: none) {
+	.aa-row-actions__quiet {
+		opacity: 1;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.aa-row-actions__quiet {
+		transition: none;
+	}
 }
 
 .aa-row-actions__confirm {

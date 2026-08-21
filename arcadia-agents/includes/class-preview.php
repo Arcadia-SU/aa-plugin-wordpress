@@ -192,17 +192,13 @@ class Arcadia_Preview {
 		// Set up rendering state (headers, post data, wp_query).
 		$this->setup_preview_state( $post, $context );
 
-		// Resolve template via WordPress hierarchy.
-		$templates = $this->get_preview_template_hierarchy( $context );
-		$template  = locate_template( $templates );
-
-		if ( ! $template ) {
-			$template = get_index_template();
-		}
+		// Resolve the template through WordPress's own chain — its hierarchy,
+		// its filters — instead of a copy of it (see resolve_template()).
+		$template = $this->resolve_template();
 
 		// Debug mode: return JSON diagnostic instead of rendering.
 		if ( $this->is_debug_request() ) {
-			$this->send_debug_report( $post, $templates, $template, $context );
+			$this->send_debug_report( $post, $template, $context );
 			// send_debug_report calls exit.
 		}
 
@@ -553,6 +549,24 @@ class Arcadia_Preview {
 	}
 
 	/**
+	 * Post type the previewed post had before it borrowed the context's.
+	 *
+	 * Kept for the debug report only: once the loop post wears the parent's
+	 * type, `$post->post_type` can no longer tell a revision from an ordinary
+	 * preview.
+	 *
+	 * @var string
+	 */
+	private $previewed_post_type = '';
+
+	/**
+	 * Candidate template files WordPress considered, captured for the debug report.
+	 *
+	 * @var string[]
+	 */
+	private $template_candidates = array();
+
+	/**
 	 * Set up the global state for preview rendering.
 	 *
 	 * Separated from handle_preview() so unit tests can verify the state
@@ -578,6 +592,26 @@ class Arcadia_Preview {
 
 		// Force the post to appear published for rendering.
 		$post->post_status = 'publish';
+
+		// ...and, for a revision, to wear the parent's *type* in the loop.
+		//
+		// Phase 41.2 gave the preview the parent's template and Phase 43.3 its
+		// field values, but the post handed to the loop stayed an `aa_revision`.
+		// A theme that branches on the loop post rather than on the queried
+		// object — a `if ( 'expertise_sante' !== get_post_type() ) { return; }`
+		// guard at the top of its template, a taxonomy lookup, a field read on
+		// get_the_ID() — met a type it has no case for and returned without
+		// printing a byte. The preview then fell through to render_fallback().
+		// Measured on the Technologia preprod: of ten pending revisions, the two
+		// that came back bare were exactly the two whose post type has such a
+		// template. The eight others rendered the full theme.
+		//
+		// The ID stays the revision's, so content and field reads keep landing
+		// on the proposal and never on the stale live post.
+		$this->previewed_post_type = $post->post_type;
+		if ( (int) $context->ID !== (int) $post->ID ) {
+			$post->post_type = $context->post_type;
+		}
 
 		// Set up global post data for theme template functions.
 		$GLOBALS['post'] = $post;
@@ -647,12 +681,11 @@ class Arcadia_Preview {
 	 * Captures what the template would render (via ob_start) to report
 	 * the output size without actually sending it to the browser.
 	 *
-	 * @param \WP_Post      $post      The post object.
-	 * @param array         $templates Template candidates that were tried.
-	 * @param string        $template  Resolved template path (empty if none found).
-	 * @param \WP_Post|null $context   Rendering context (the parent, for a revision).
+	 * @param \WP_Post      $post     The post object.
+	 * @param string        $template Resolved template path (empty if none found).
+	 * @param \WP_Post|null $context  Rendering context (the parent, for a revision).
 	 */
-	private function send_debug_report( $post, $templates, $template, $context = null ) {
+	private function send_debug_report( $post, $template, $context = null ) {
 		if ( null === $context ) {
 			$context = $post;
 		}
@@ -697,7 +730,9 @@ class Arcadia_Preview {
 			'aa_preview_debug' => true,
 			'post'             => array(
 				'ID'           => $post->ID,
+				// The type it renders under, then the one it actually has.
 				'post_type'    => $post->post_type,
+				'source_type'  => $this->previewed_post_type,
 				'post_status'  => $post->post_status,
 				'post_name'    => $post->post_name,
 				'post_title'   => $post->post_title,
@@ -706,12 +741,12 @@ class Arcadia_Preview {
 			// Phase 41.2 is unverifiable on a client site: the report would
 			// show the right candidates with no way to tell why.
 			'render_context'   => array(
-				'is_revision'    => 'aa_revision' === $post->post_type,
+				'is_revision'    => 'aa_revision' === $this->previewed_post_type,
 				'context_id'     => $context->ID,
 				'context_type'   => $context->post_type,
 				'context_name'   => $context->post_name,
 				'parent_id'      => (int) $post->post_parent,
-				'parent_missing' => 'aa_revision' === $post->post_type
+				'parent_missing' => 'aa_revision' === $this->previewed_post_type
 					&& ! empty( $post->post_parent )
 					&& $context->ID === $post->ID,
 				'template_slug'  => get_page_template_slug( $context->ID ),
@@ -723,7 +758,7 @@ class Arcadia_Preview {
 				'is_child_theme'   => get_stylesheet() !== get_template(),
 			),
 			'template_resolution' => array(
-				'candidates'       => array_map( array( $this, 'strip_abspath' ), $templates ),
+				'candidates'       => array_map( array( $this, 'strip_abspath' ), $this->template_candidates ),
 				'resolved'         => $template ? $this->strip_abspath( $template ) : null,
 				'resolved_exists'  => $template ? file_exists( $template ) : false,
 			),
@@ -758,6 +793,14 @@ class Arcadia_Preview {
 	 * Uses wp_head()/wp_footer() to load theme styles and scripts,
 	 * and the_content() filter to render blocks/shortcodes properly.
 	 *
+	 * It says so on the page. Without the notice this page impersonates the
+	 * site: the reviewer sees a bare wall of text, reads it as the proposal
+	 * being broken or the design being lost, and either rejects good content or
+	 * approves believing they saw the real thing. The wording is aimed at the
+	 * person doing the approving, not at whoever debugs the theme — it states
+	 * what is missing (the design), what is trustworthy (the text), and what
+	 * happens next (it lands in the normal layout once approved).
+	 *
 	 * @param object $post The post object.
 	 */
 	private function render_fallback( $post ) {
@@ -770,6 +813,14 @@ class Arcadia_Preview {
 </head>
 <body <?php body_class(); ?>>
 <?php wp_body_open(); ?>
+<div role="status" style="margin:0 0 28px;padding:14px 18px;border:1px solid #d5d8de;border-left:4px solid #b54708;background:#fffaf0;color:#1d2939;font:14px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;">
+	<p style="margin:0 0 6px;font-weight:600;">
+		<?php echo esc_html__( 'Simplified preview: your site’s design is not shown here.', 'arcadia-agents' ); ?>
+	</p>
+	<p style="margin:0;">
+		<?php echo esc_html__( 'The text below is the content that will be published. Once you approve it, it appears in your site’s usual layout, with the header, the menu and the styles.', 'arcadia-agents' ); ?>
+	</p>
+</div>
 <main>
 	<article>
 		<h1><?php echo esc_html( $post->post_title ); ?></h1>
@@ -818,50 +869,68 @@ class Arcadia_Preview {
 	}
 
 	/**
-	 * Build the template hierarchy for a preview post.
+	 * Resolve the template through WordPress's own chain.
 	 *
-	 * Constructs the hierarchy from the post object directly, avoiding
-	 * get_queried_object() which may return null when WordPress is in 404 state.
+	 * This used to be a hand-written copy of the template hierarchy fed to a
+	 * bare locate_template(): the preview picked a file itself and included it.
+	 * Two things every other request gets were therefore missing. A theme that
+	 * routes its templates by filter — `template_include`, or a
+	 * `{$type}_template` hook — was short-circuited, and the preview included
+	 * whatever the copied hierarchy happened to land on. And block themes could
+	 * not work at all: their templates are not files in the theme directory,
+	 * and only get_query_template() knows how to reach them.
 	 *
-	 * Mirrors the WordPress template hierarchy rather than approximating it:
-	 * the editor-assigned page template wins (WP ≥ 4.7 allows one on any post
-	 * type), then the `page-*` branch for `page` and the `single-*` branch for
-	 * everything else. Both branches were missing before Phase 41.2 — a preview
-	 * of a plain page fell through to `single.php`, which is not a template
-	 * WordPress would ever pick for it.
+	 * Calling core's own getters costs nothing we had and returns everything we
+	 * were re-deriving, including the two branches Phase 41.2 had to add by
+	 * hand. The candidate list is captured off the `*_template_hierarchy` hooks
+	 * purely so the debug report can still print it — now the real list, theme
+	 * filters included, rather than our guess at it.
 	 *
-	 * Pass the *render context* here, not the previewed post — see
-	 * resolve_render_context().
+	 * Requires setup_preview_state() to have run: these functions read the
+	 * queried object, which is the render context by then — that is what makes
+	 * a revision resolve to its parent's template.
 	 *
-	 * @param object $post The post object providing the rendering context.
-	 * @return array Ordered list of template filenames to try.
+	 * @return string Absolute path of the template to include, '' if none.
 	 */
-	private function get_preview_template_hierarchy( $post ) {
-		$templates = array();
-		$type      = $post->post_type;
+	private function resolve_template() {
+		$this->template_candidates = array();
 
-		$template_slug = get_page_template_slug( $post->ID );
-		if ( is_string( $template_slug ) && '' !== $template_slug ) {
-			$templates[] = $template_slug;
+		$capture = function ( $templates ) {
+			$this->template_candidates = $templates;
+			return $templates;
+		};
+
+		$hooks = array(
+			'single_template_hierarchy',
+			'page_template_hierarchy',
+			'singular_template_hierarchy',
+			'index_template_hierarchy',
+		);
+		foreach ( $hooks as $hook ) {
+			add_filter( $hook, $capture );
 		}
 
-		if ( 'page' === $type ) {
-			if ( ! empty( $post->post_name ) ) {
-				$templates[] = "page-{$post->post_name}.php";
-			}
-			$templates[] = "page-{$post->ID}.php";
-			$templates[] = 'page.php';
-		} else {
-			if ( ! empty( $post->post_name ) ) {
-				$templates[] = "single-{$type}-{$post->post_name}.php";
-			}
-			$templates[] = "single-{$type}.php";
-			$templates[] = 'single.php';
+		// Same order as wp-includes/template-loader.php, minus the branches a
+		// singular preview can never take.
+		$template = '';
+		if ( is_single() ) {
+			$template = get_single_template();
+		} elseif ( is_page() ) {
+			$template = get_page_template();
+		}
+		if ( ! $template ) {
+			$template = get_singular_template();
+		}
+		if ( ! $template ) {
+			$template = get_index_template();
 		}
 
-		$templates[] = 'singular.php';
+		foreach ( $hooks as $hook ) {
+			remove_filter( $hook, $capture );
+		}
 
-		return $templates;
+		/** This filter is documented in wp-includes/template-loader.php */
+		return apply_filters( 'template_include', $template );
 	}
 
 	/**
