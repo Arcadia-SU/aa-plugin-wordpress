@@ -35,6 +35,23 @@ final class Arcadia_Block_Processor {
 	const MAX_BLOCK_DEPTH = 16;
 
 	/**
+	 * Every key under which a block node can carry child blocks.
+	 *
+	 * `children` is the generation model (ADR-013); `inner_blocks` /
+	 * `innerBlocks` are the WP-grammar shape a round-trip payload carries.
+	 * Both validators AND the renderer must walk the same set: Phase 48 was a
+	 * fatal in production caused by exactly that list being written out twice,
+	 * once with the inner_* keys (Arcadia_Blocks) and once without them
+	 * (Arcadia_ACF_Validator). A nested acf/* block was consequently never
+	 * validated, never coerced, and never had its flat repeater expanded — and
+	 * reached the ACF adapter with a repeater counter where an array belonged.
+	 *
+	 * Kept here because this class already owns is_roundtrip_block(), the other
+	 * discriminator both validators share.
+	 */
+	const CHILD_KEYS = array( 'children', 'inner_blocks', 'innerBlocks' );
+
+	/**
 	 * Active block adapter.
 	 *
 	 * @var Arcadia_Block_Adapter

@@ -947,4 +947,161 @@ class RevisionsTest extends TestCase {
 		$_test_options['aa_force_draft'] = false;
 		$this->assertFalse( (bool) get_option( 'aa_force_draft', false ) );
 	}
+
+	// =========================================================================
+	// Phase 49 — the two timestamp defects AA measured on the REST reject
+	// =========================================================================
+
+	/**
+	 * Seed a revision the way WordPress actually stores a pending one.
+	 *
+	 * The zero post_date_gmt is the point: core leaves it at the zero date for
+	 * draft/pending/auto-draft, and that zero is one of the three conditions of
+	 * wp_update_post()'s $clear_date branch. A fixture that omits it cannot
+	 * exhibit the bug, and the test built on it would be vacant.
+	 *
+	 * @param int    $rev_id    Revision post ID.
+	 * @param string $post_date Site-local creation date.
+	 * @return object The seeded revision.
+	 */
+	private function seed_revision_like_wordpress( $rev_id = 1001, $post_date = '2026-08-05 18:22:31' ) {
+		global $_test_posts, $_test_post_meta;
+
+		$_test_posts[ $rev_id ] = (object) array(
+			'ID'             => $rev_id,
+			'post_type'      => 'aa_revision',
+			'post_parent'    => 42,
+			'post_title'     => 'Proposal',
+			'post_status'    => 'pending',
+			'post_content'   => '<p>proposed</p>',
+			'post_excerpt'   => '',
+			'post_date'      => $post_date,
+			'post_date_gmt'  => '0000-00-00 00:00:00',
+			'post_modified'  => $post_date,
+			'post_author'    => 1,
+			'post_name'      => '',
+			'post_mime_type' => '',
+		);
+		$_test_post_meta[ $rev_id ] = array(
+			'_aa_revision_version' => 1,
+			'_aa_revision_meta'    => wp_json_encode( array( 'body' => array( 'title' => 'Proposal' ), 'meta' => array() ) ),
+		);
+
+		return $_test_posts[ $rev_id ];
+	}
+
+	/**
+	 * Test: rejecting a proposal does not rewrite when it was made.
+	 *
+	 * AA rejected residual 92200 by REST on 2026-08-18 and watched created_at go
+	 * from 2026-08-05T16:22:31 to 2026-08-18T15:05:54. The date a proposal was
+	 * made is what lets anyone say when it was made; replacing it with the date
+	 * of the decision erases exactly the question it answers.
+	 */
+	public function test_rejecting_does_not_rewrite_created_at(): void {
+		global $_test_posts;
+
+		$this->seed_revision_like_wordpress();
+		$before = $_test_posts[1001]->post_date;
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$this->assertTrue( $revisions->reject_revision( 1001, 'arcadia-agents-api' ) );
+
+		$this->assertSame( 'rejected', $_test_posts[1001]->post_status );
+		$this->assertSame(
+			$before,
+			$_test_posts[1001]->post_date,
+			'reject_revision() rewrote the creation date to the decision date.'
+		);
+	}
+
+	/**
+	 * Test: approving does not rewrite created_at either.
+	 *
+	 * AA only ever saw this on reject because reject is the only verb they call.
+	 * The defect is in the status write, so it was never specific to it.
+	 */
+	public function test_approving_does_not_rewrite_created_at(): void {
+		global $_test_posts;
+
+		$this->create_test_post( 42 );
+		$this->seed_revision_like_wordpress();
+		$before = $_test_posts[1001]->post_date;
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$result    = $revisions->approve_revision( 1001, 'admin' );
+
+		$this->assertIsArray( $result );
+		$this->assertSame( 'approved', $_test_posts[1001]->post_status );
+		$this->assertSame(
+			$before,
+			$_test_posts[1001]->post_date,
+			'approve_revision() rewrote the creation date to the decision date.'
+		);
+	}
+
+	/**
+	 * Test: being superseded does not rewrite created_at either.
+	 *
+	 * The third transition out of `pending`, and the one nobody watches: a
+	 * superseded proposal is exactly the one whose original date still matters,
+	 * since it is the trace of what the agent proposed and when.
+	 */
+	public function test_being_superseded_does_not_rewrite_created_at(): void {
+		global $_test_posts;
+
+		$this->create_test_post( 42 );
+		$old = $this->seed_revision_like_wordpress( 1001, '2026-08-05 18:22:31' );
+		$before = $old->post_date;
+
+		// get_pending_revision() finds 1001, then get_next_version() returns empty.
+		\WP_Query::set_next_result( array( $old ) );
+		\WP_Query::set_next_result( array() );
+
+		$revisions = \Arcadia_Revisions::get_instance();
+		$revisions->create_revision( 42, array( 'title' => 'Newer', 'children' => array() ), array(), '<p>newer</p>' );
+
+		$this->assertSame( 'superseded', $_test_posts[1001]->post_status );
+		$this->assertSame(
+			$before,
+			$_test_posts[1001]->post_date,
+			'Superseding rewrote the superseded proposal\'s creation date.'
+		);
+	}
+
+	/**
+	 * Test: created_at and decided_at describe the same instant in the same zone.
+	 *
+	 * On AA's reading of the same response: decided_at 13:05:54+00:00 and
+	 * created_at 15:05:54+00:00 — two hours apart for one instant, both claiming
+	 * +00:00. post_date is the SITE's local time and was being read as if it
+	 * were UTC, so the Paris wall-clock went out with a UTC suffix.
+	 *
+	 * The site timezone in the test bootstrap is Europe/Paris, which is what
+	 * makes this assertion able to fail at all.
+	 */
+	public function test_created_at_and_decided_at_agree_on_the_instant(): void {
+		global $_test_posts, $_test_post_meta;
+
+		// One instant, expressed both ways: 16:22:31 Paris = 14:22:31 UTC.
+		$this->seed_revision_like_wordpress( 1001, '2026-08-05 16:22:31' );
+		$_test_post_meta[1001]['_aa_revision_decided_at'] = '2026-08-05T14:22:31+00:00';
+
+		$revisions  = \Arcadia_Revisions::get_instance();
+		$formatted  = $revisions->format_revision( $_test_posts[1001] );
+
+		$created = new \DateTimeImmutable( $formatted['created_at'] );
+		$decided = new \DateTimeImmutable( $formatted['decided_at'] );
+
+		$this->assertSame(
+			$decided->getTimestamp(),
+			$created->getTimestamp(),
+			sprintf(
+				'created_at (%s) and decided_at (%s) describe the same instant but disagree.',
+				$formatted['created_at'],
+				$formatted['decided_at']
+			)
+		);
+		$this->assertSame( '2026-08-05T14:22:31+00:00', $formatted['created_at'] );
+	}
 }

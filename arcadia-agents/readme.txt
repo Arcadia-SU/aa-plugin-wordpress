@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.9.0
+Stable tag: 0.10.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,16 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.10.0 =
+A block is now checked the same way wherever it sits in the page. Until now the checks only ran on the outermost blocks, so a payload the plugin refused at the top level could kill the request one level down — which is where most page-builder content actually lives.
+
+* Fixed: writing a nested block that carried a repeater could end the request with a blank "critical error" page instead of an error message. The block's fields were never checked or normalised, because the ACF validation pass only walked the outermost blocks, so a repeater's row count reached the renderer as a bare number where a list of rows belonged. Reported from a client preproduction where every landing page is built out of nested blocks, and no page could be edited at all
+* Changed: nested blocks now go through exactly the same checks as top-level ones, at any depth — field types, image handling, repeater normalisation, and the "is this block allowed on this post type?" rule. **A nested payload that used to be accepted and stored wrong may now be refused with a 422 naming the field.** That is the point of the change, and it is why this is a minor release rather than a patch
+* New: validation errors say where in the page the offending block is (`children[1].inner_blocks[0]`), not just its index inside its parent — which, nested, could mean three different blocks in one payload
+* Fixed: a proposal's creation date was overwritten with the date it was decided, so it no longer said when the agent had proposed it. Affected approving and rejecting a proposal, and a proposal being replaced by a newer one
+* Fixed: the creation date and the decision date of the same proposal were an offset apart while both claiming UTC — the creation date was the site's local time published as if it were UTC
+* Note: rendering no longer stops on an unexpected field shape. Validation is what reports the problem; the renderer degrades instead of ending the request
 
 = 0.9.0 =
 A proposal now previews in the site's real template — the one WordPress itself picks — instead of in a hand-written approximation of it. And when a preview genuinely cannot be rendered, the page says so instead of impersonating the site.

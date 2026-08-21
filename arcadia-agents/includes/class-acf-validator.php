@@ -122,7 +122,14 @@ class Arcadia_ACF_Validator {
 
 		if ( ! empty( $blocks_json['children'] ) && is_array( $blocks_json['children'] ) ) {
 			foreach ( $blocks_json['children'] as $index => &$block ) {
-				$this->validate_block_recursive( $block, $index, $registry, $errors, $post_type );
+				$this->validate_block_recursive(
+					$block,
+					$index,
+					$registry,
+					$errors,
+					$post_type,
+					sprintf( 'children[%d]', $index )
+				);
 			}
 			unset( $block );
 		}
@@ -144,13 +151,27 @@ class Arcadia_ACF_Validator {
 	/**
 	 * Validate a single block and recurse into children.
 	 *
+	 * Recurses under EVERY child key (Arcadia_Block_Processor::CHILD_KEYS), not
+	 * just `children`. Walking `children` alone is what made a nested ACF block
+	 * skip this whole function in 0.7.0: no flat-repeater expansion, no
+	 * coercion, no type check, and a repeater counter left as an integer all the
+	 * way into the adapter's count() (Phase 48). A block gets the same treatment
+	 * wherever it sits in the tree — a payload refused with 422 at the root is
+	 * refused nested, one accepted at the root is accepted nested.
+	 *
+	 * Recursion is BY REFERENCE throughout. This function's effect on a valid
+	 * payload is a mutation — expanded repeaters, coerced scalars, sideloaded
+	 * image IDs — and it is the mutated tree that process_block() renders
+	 * afterwards. Recursing by copy would close the 422 and leave the fatal.
+	 *
 	 * @param array                  &$block    Block data (mutated for sideloaded images).
 	 * @param int                     $index     Block index in parent's children array.
 	 * @param Arcadia_Block_Registry  $registry  Block registry instance.
 	 * @param array                  &$errors    Collected errors (appended to).
 	 * @param string                  $post_type Target post type for availability check.
+	 * @param string                  $path      Dotted position in the tree, for error reporting.
 	 */
-	private function validate_block_recursive( &$block, $index, $registry, &$errors, $post_type = 'post' ) {
+	private function validate_block_recursive( &$block, $index, $registry, &$errors, $post_type = 'post', $path = '' ) {
 		if ( ! is_array( $block ) || ! isset( $block['type'] ) ) {
 			return;
 		}
@@ -163,6 +184,7 @@ class Arcadia_ACF_Validator {
 			if ( ! $this->is_block_available_for_post_type( $block_type, $post_type ) ) {
 				$errors[] = array(
 					'block_index' => $index,
+					'block_path'  => $path,
 					'block_type'  => $block_type,
 					'field'       => '',
 					'expected'    => sprintf( 'block available for post_type "%s"', $post_type ),
@@ -179,14 +201,24 @@ class Arcadia_ACF_Validator {
 			$schema = $registry->get_block_schema( $block_type );
 
 			if ( is_array( $schema ) && ! empty( $schema ) ) {
-				$this->validate_acf_block( $block, $index, $schema, $errors );
+				$this->validate_acf_block( $block, $index, $schema, $errors, $path );
 			}
 		}
 
-		// Recurse into children.
-		if ( ! empty( $block['children'] ) && is_array( $block['children'] ) ) {
-			foreach ( $block['children'] as $child_index => &$child ) {
-				$this->validate_block_recursive( $child, $child_index, $registry, $errors, $post_type );
+		// Recurse under every child key, by reference — see the docblock.
+		foreach ( Arcadia_Block_Processor::CHILD_KEYS as $key ) {
+			if ( empty( $block[ $key ] ) || ! is_array( $block[ $key ] ) ) {
+				continue;
+			}
+			foreach ( $block[ $key ] as $child_index => &$child ) {
+				$this->validate_block_recursive(
+					$child,
+					$child_index,
+					$registry,
+					$errors,
+					$post_type,
+					sprintf( '%s.%s[%d]', $path, $key, $child_index )
+				);
 			}
 			unset( $child );
 		}
@@ -270,8 +302,9 @@ class Arcadia_ACF_Validator {
 	 * @param int    $index  Block index in parent's children array.
 	 * @param array  $schema ACF field schema from registry.
 	 * @param array &$errors Collected errors (appended to).
+	 * @param string $path   Dotted position in the tree, for error reporting.
 	 */
-	private function validate_acf_block( &$block, $index, $schema, &$errors ) {
+	private function validate_acf_block( &$block, $index, $schema, &$errors, $path = '' ) {
 		$block_type = $block['type'];
 
 		// Expand GET-shape flat-keys repeaters (`<field>: N`, `<field>_<n>_<sub>: ...`) → array
@@ -353,6 +386,7 @@ class Arcadia_ACF_Validator {
 				$got_desc          = is_string( $value ) ? 'string (URL)' : 'object (URL + metadata)';
 				$errors[]          = array(
 					'block_index' => $index,
+					'block_path'  => $path,
 					'block_type'  => $block_type,
 					'field'       => $field_name,
 					'expected'    => 'int (attachment ID)',
@@ -383,6 +417,7 @@ class Arcadia_ACF_Validator {
 			if ( null !== $type_error ) {
 				$errors[] = array(
 					'block_index' => $index,
+					'block_path'  => $path,
 					'block_type'  => $block_type,
 					'field'       => $field_name,
 					'expected'    => $type_error['expected'],
@@ -397,6 +432,7 @@ class Arcadia_ACF_Validator {
 			if ( ! isset( $properties[ $req_field ] ) ) {
 				$errors[] = array(
 					'block_index' => $index,
+					'block_path'  => $path,
 					'block_type'  => $block_type,
 					'field'       => $req_field,
 					'expected'    => 'required',

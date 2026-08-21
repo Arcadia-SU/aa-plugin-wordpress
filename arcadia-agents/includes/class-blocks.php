@@ -259,6 +259,19 @@ class Arcadia_Blocks {
 		// core/* skips the registry — acf/* generation blocks still get validated.
 		$is_namespaced = is_string( $type ) && false !== strpos( $type, '/' );
 		$skip_registry = Arcadia_Block_Registry::is_core_type( $type ) || ( $in_roundtrip && $is_namespaced );
+
+		// ...but the exemption only covers the "is this type known?" question.
+		// A type the registry DOES know is one the renderer will hand to
+		// render_custom_block() (class-block-processor.php, default case), and
+		// what the renderer will run, validation must check — nested or not.
+		// Before Phase 48 a registered acf/* block inside any container skipped
+		// its required-field check purely by position, so the same payload was
+		// refused at the root and accepted one level down. The exemption still
+		// holds for the case it was opened for: an UNREGISTERED third-party leaf
+		// in a round-trip subtree is the site's own content, preserved as native
+		// markup rather than 422'd (review #5, Phase 38).
+		$known_to_registry = ! $skip_registry || $this->registry->is_registered( $type );
+
 		if ( ! $skip_registry ) {
 			// Check if the block type is registered.
 			if ( ! $this->registry->is_registered( $type ) ) {
@@ -277,12 +290,13 @@ class Arcadia_Blocks {
 				);
 			}
 
-			// Validate properties for custom blocks.
-			if ( ! empty( $block['properties'] ) && is_array( $block['properties'] ) ) {
-				$validation = $this->registry->validate_properties( $type, $block['properties'] );
-				if ( is_wp_error( $validation ) ) {
-					return $validation;
-				}
+		}
+
+		// Validate properties for any block the registry knows — see above.
+		if ( $known_to_registry && ! empty( $block['properties'] ) && is_array( $block['properties'] ) ) {
+			$validation = $this->registry->validate_properties( $type, $block['properties'] );
+			if ( is_wp_error( $validation ) ) {
+				return $validation;
 			}
 		}
 
@@ -304,7 +318,7 @@ class Arcadia_Blocks {
 	 * @return true|WP_Error True if all children valid, WP_Error otherwise.
 	 */
 	private function validate_block_children( $block, $in_roundtrip = false ) {
-		foreach ( array( 'children', 'inner_blocks', 'innerBlocks' ) as $key ) {
+		foreach ( Arcadia_Block_Processor::CHILD_KEYS as $key ) {
 			if ( empty( $block[ $key ] ) || ! is_array( $block[ $key ] ) ) {
 				continue;
 			}

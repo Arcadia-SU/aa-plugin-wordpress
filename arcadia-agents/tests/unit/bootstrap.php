@@ -136,9 +136,77 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Site timezone + post dates, modelled on real WordPress (Phase 49).
+//
+// WordPress stores TWO dates per post: post_date in the SITE's timezone and
+// post_date_gmt in UTC. A stub where both are `date('Y-m-d H:i:s')` cannot
+// express the bug Phase 49 fixes — reading post_date as if it were UTC — and
+// any test written against it would be green on code that never runs. The
+// default timezone here is therefore a real one with a non-zero offset, which
+// is the only condition under which the defect is observable at all.
+// ---------------------------------------------------------------------------
+global $_test_timezone_string;
+$_test_timezone_string = 'Europe/Paris';
+
+if ( ! function_exists( 'wp_timezone' ) ) {
+    function wp_timezone() {
+        global $_test_timezone_string;
+        return new DateTimeZone( $_test_timezone_string ?: 'UTC' );
+    }
+}
+
 if ( ! function_exists( 'current_time' ) ) {
     function current_time( $type = 'mysql' ) {
-        return date( 'Y-m-d H:i:s' );
+        $now = new DateTimeImmutable( 'now', wp_timezone() );
+        return 'timestamp' === $type ? $now->getTimestamp() : $now->format( 'Y-m-d H:i:s' );
+    }
+}
+
+if ( ! function_exists( 'get_gmt_from_date' ) ) {
+    // Interpret a site-local datetime string and render it in UTC.
+    function get_gmt_from_date( $date_string, $format = 'Y-m-d H:i:s' ) {
+        try {
+            $local = new DateTimeImmutable( $date_string, wp_timezone() );
+        } catch ( Exception $e ) {
+            return gmdate( $format, 0 );
+        }
+        return $local->setTimezone( new DateTimeZone( 'UTC' ) )->format( $format );
+    }
+}
+
+if ( ! function_exists( 'get_post_datetime' ) ) {
+    /**
+     * Mirrors core: prefers the *_gmt column, falls back to the local column
+     * when it is the zero date — which is exactly the state a pending post is
+     * in, so the fallback is the branch that matters here, not an edge case.
+     */
+    function get_post_datetime( $post, $field = 'date', $source = 'local' ) {
+        if ( ! is_object( $post ) ) {
+            return false;
+        }
+        $local_key = 'post_' . $field;
+        $gmt_key   = $local_key . '_gmt';
+
+        $gmt = $post->$gmt_key ?? '';
+        if ( 'gmt' === $source && ! empty( $gmt ) && '0000-00-00 00:00:00' !== $gmt ) {
+            try {
+                return new DateTimeImmutable( $gmt, new DateTimeZone( 'UTC' ) );
+            } catch ( Exception $e ) {
+                return false;
+            }
+        }
+
+        $local = $post->$local_key ?? '';
+        if ( empty( $local ) || '0000-00-00 00:00:00' === $local ) {
+            return false;
+        }
+        try {
+            $dt = new DateTimeImmutable( $local, wp_timezone() );
+        } catch ( Exception $e ) {
+            return false;
+        }
+        return 'gmt' === $source ? $dt->setTimezone( new DateTimeZone( 'UTC' ) ) : $dt;
     }
 }
 
@@ -1086,14 +1154,43 @@ if ( ! function_exists( 'wp_update_post' ) ) {
 
         $id = isset( $post_data['ID'] ) ? (int) $post_data['ID'] : 0;
         if ( isset( $_test_posts[ $id ] ) ) {
+            $existing = $_test_posts[ $id ];
+
+            // Core's $clear_date branch, reproduced because Phase 49.1 IS this
+            // branch: "Drafts shouldn't be assigned a date unless explicitly
+            // done so by the user." When the post being updated is currently
+            // draft/pending/auto-draft AND its post_date_gmt is the zero date
+            // AND the caller passed no edit_date, WordPress throws the stored
+            // post_date away and stamps now. A revision is inserted as `pending`
+            // — so every transition out of pending hit this and rewrote the
+            // proposal's creation date to the moment of the decision.
+            $clear_date = in_array( $existing->post_status ?? '', array( 'draft', 'pending', 'auto-draft' ), true )
+                && empty( $post_data['edit_date'] )
+                && '0000-00-00 00:00:00' === ( $existing->post_date_gmt ?? '' );
+
+            if ( $clear_date ) {
+                $post_data['post_date']     = current_time( 'mysql' );
+                $post_data['post_date_gmt'] = '';
+            }
+
             // post_parent / menu_order are listed so a test asserting they are
             // NOT written is non-vacant: without them the stub would drop the
             // fields silently and the assertion would pass for the wrong reason.
-            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name', 'post_parent', 'menu_order' );
+            $updatable = array( 'post_title', 'post_content', 'post_status', 'post_excerpt', 'post_name', 'post_parent', 'menu_order', 'post_date' );
             foreach ( $updatable as $field ) {
                 if ( isset( $post_data[ $field ] ) ) {
                     $_test_posts[ $id ]->$field = $post_data[ $field ];
                 }
+            }
+
+            // Once the post leaves the not-yet-public statuses, core derives
+            // post_date_gmt from post_date.
+            $new_status = $_test_posts[ $id ]->post_status ?? '';
+            if (
+                ! in_array( $new_status, array( 'draft', 'pending', 'auto-draft' ), true )
+                && in_array( $_test_posts[ $id ]->post_date_gmt ?? '', array( '', '0000-00-00 00:00:00' ), true )
+            ) {
+                $_test_posts[ $id ]->post_date_gmt = get_gmt_from_date( $_test_posts[ $id ]->post_date );
             }
         }
         return $id;
@@ -1156,8 +1253,18 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
             'post_status'    => isset( $post_data['post_status'] ) ? $post_data['post_status'] : 'draft',
             'post_content'   => isset( $post_data['post_content'] ) ? $post_data['post_content'] : '',
             'post_excerpt'   => isset( $post_data['post_excerpt'] ) ? $post_data['post_excerpt'] : '',
-            'post_date'      => date( 'Y-m-d H:i:s' ),
-            'post_modified'  => date( 'Y-m-d H:i:s' ),
+            'post_date'      => isset( $post_data['post_date'] ) ? $post_data['post_date'] : current_time( 'mysql' ),
+            // Core leaves post_date_gmt at the zero date for a post that is not
+            // yet public — draft, pending, auto-draft. That zero is not cosmetic:
+            // it is one of the three conditions of wp_update_post()'s $clear_date
+            // branch below, which is what rewrote created_at on every revision
+            // decision (Phase 49.1).
+            'post_date_gmt'  => in_array(
+                isset( $post_data['post_status'] ) ? $post_data['post_status'] : 'draft',
+                array( 'draft', 'pending', 'auto-draft' ),
+                true
+            ) ? '0000-00-00 00:00:00' : get_gmt_from_date( isset( $post_data['post_date'] ) ? $post_data['post_date'] : current_time( 'mysql' ) ),
+            'post_modified'  => current_time( 'mysql' ),
             'post_author'    => isset( $post_data['post_author'] ) ? $post_data['post_author'] : 1,
             'post_name'      => isset( $post_data['post_name'] ) ? $post_data['post_name'] : '',
             'post_mime_type' => '',

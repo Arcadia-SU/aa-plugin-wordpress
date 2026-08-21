@@ -127,6 +127,13 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 			return $this->gutenberg->custom_block( $block_name, $properties );
 		}
 
+		// Same reasoning as flatten_repeater()'s guard: the renderer is not the
+		// place a malformed payload should be diagnosed, but it is never the
+		// place one should crash either.
+		if ( ! is_array( $properties ) ) {
+			$properties = array();
+		}
+
 		$data = array();
 
 		// Get field schema from registry to determine types and keys.
@@ -281,6 +288,19 @@ class Arcadia_ACF_Adapter implements Arcadia_Block_Adapter {
 	 * @return array Flattened key-value pairs with field key references.
 	 */
 	private function flatten_repeater( $field_name, $rows, $sub_fields = array() ) {
+		// A repeater that is not an array of rows never reaches here: the ACF
+		// validator expands the flat GET shape (`<field>: N` + `<field>_<n>_<sub>`)
+		// into rows first, and refuses with 422 what it cannot expand. This guard
+		// is for the NEXT gap in that cover, not this one — Phase 48 shipped
+		// because the validator skipped nested blocks entirely and a bare
+		// repeater counter arrived here as an int, where count() is a TypeError
+		// in PHP 8: the REST request died and the caller got an HTML "critical
+		// error" page with no code, no message and no field name. Degrading to an
+		// empty repeater keeps the diagnosis on the validator, where it belongs.
+		if ( ! is_array( $rows ) ) {
+			$rows = array();
+		}
+
 		$result                = array();
 		$result[ $field_name ] = count( $rows );
 

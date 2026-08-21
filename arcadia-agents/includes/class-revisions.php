@@ -138,11 +138,18 @@ class Arcadia_Revisions {
 
 		// Auto-supersede the previous pending revision, referencing its replacement.
 		if ( $existing ) {
+			// edit_date: keep the date this proposal was MADE.
+			// Without it core takes its $clear_date branch — the revision is
+			// still `pending` and its post_date_gmt is the zero date, the two
+			// other conditions — and stamps post_date to now. The creation date
+			// of a proposal would then become the date of its decision, erasing
+			// exactly the question it answers (Phase 49.1).
 			// arcadia:slash-safe — only post ID + status, no slashable content.
 			wp_update_post(
 				array(
 					'ID'          => $existing->ID,
 					'post_status' => 'superseded',
+					'edit_date'   => true,
 				)
 			);
 			update_post_meta(
@@ -336,11 +343,18 @@ class Arcadia_Revisions {
 		$warnings = $finalize['warnings'];
 
 		// Mark revision as approved.
+		// edit_date: keep the date this proposal was MADE.
+		// Without it core takes its $clear_date branch — the revision is
+		// still `pending` and its post_date_gmt is the zero date, the two
+		// other conditions — and stamps post_date to now. The creation date
+		// of a proposal would then become the date of its decision, erasing
+		// exactly the question it answers (Phase 49.1).
 		// arcadia:slash-safe — only post ID + status, no slashable content.
 		wp_update_post(
 			array(
 				'ID'          => $revision_id,
 				'post_status' => 'approved',
+				'edit_date'   => true,
 			)
 		);
 		update_post_meta( $revision_id, '_aa_revision_decided_by', sanitize_text_field( $user_login ) );
@@ -377,11 +391,18 @@ class Arcadia_Revisions {
 			return new WP_Error( 'revision_not_pending', 'Revision is not pending.', array( 'status' => 400 ) );
 		}
 
+		// edit_date: keep the date this proposal was MADE.
+		// Without it core takes its $clear_date branch — the revision is
+		// still `pending` and its post_date_gmt is the zero date, the two
+		// other conditions — and stamps post_date to now. The creation date
+		// of a proposal would then become the date of its decision, erasing
+		// exactly the question it answers (Phase 49.1).
 		// arcadia:slash-safe — only post ID + status, no slashable content.
 		wp_update_post(
 			array(
 				'ID'          => $revision_id,
 				'post_status' => 'rejected',
+				'edit_date'   => true,
 			)
 		);
 		update_post_meta( $revision_id, '_aa_revision_decided_by', sanitize_text_field( $user_login ) );
@@ -494,6 +515,31 @@ class Arcadia_Revisions {
 	 *                                 endpoint is the one caller that opts in.
 	 * @return array Formatted revision data.
 	 */
+	/**
+	 * The instant a revision was created, as an ISO 8601 UTC string.
+	 *
+	 * Mirrors the format of `_aa_revision_decided_at` (a plain `gmdate('c')`),
+	 * so the two timestamps on one response are comparable — which is the whole
+	 * point of Phase 49.2.
+	 *
+	 * @param WP_Post $revision The revision post.
+	 * @return string|null ISO 8601 UTC, or null if the revision carries no date.
+	 */
+	private function created_at_utc( $revision ) {
+		if ( empty( $revision->post_date ) ) {
+			return null;
+		}
+
+		$datetime = get_post_datetime( $revision, 'date', 'gmt' );
+		if ( $datetime instanceof DateTimeInterface ) {
+			return $datetime->format( 'c' );
+		}
+
+		// get_post_datetime() only fails on an unparseable date; converting the
+		// local column by hand is still better than publishing local time as UTC.
+		return gmdate( 'c', strtotime( get_gmt_from_date( $revision->post_date ) ) );
+	}
+
 	public function format_revision( $revision, $include_changes = false ) {
 		$version = (int) get_post_meta( $revision->ID, '_aa_revision_version', true );
 
@@ -512,7 +558,15 @@ class Arcadia_Revisions {
 			'revision_id'      => $revision->ID,
 			'revision_version' => $version,
 			'status'           => $revision->post_status,
-			'created_at'       => ! empty( $revision->post_date ) ? gmdate( 'c', strtotime( $revision->post_date ) ) : null,
+			// post_date is the SITE's local time; decided_at next to it is real
+			// UTC. Reading one through strtotime() and stamping gmdate('c') on
+			// the result published the Paris wall-clock with a `+00:00` suffix,
+			// so two fields describing one instant disagreed by the UTC offset
+			// while both claimed UTC (Phase 49.2). get_post_datetime() does the
+			// conversion WordPress's own way, and falls back to the local column
+			// when post_date_gmt is the zero date — which is the state every
+			// pending revision is in, so that fallback is the normal path here.
+			'created_at'       => $this->created_at_utc( $revision ),
 			'created_by'       => get_post_meta( $revision->ID, '_aa_revision_created_by', true ) ?: null,
 			'decided_at'       => get_post_meta( $revision->ID, '_aa_revision_decided_at', true ) ?: null,
 			'decided_by'       => get_post_meta( $revision->ID, '_aa_revision_decided_by', true ) ?: null,

@@ -1,14 +1,26 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-12 (**v0.6.0 buildée** — Phases 46 + 47 codées, testées,
-relues par Oscar : fix handshake `home_url()` + chantier UI FS-1→4 + tooltips permissions +
-i18n fr_FR + refonte DS Arcadia. 17 checks verts, zip dans `dist/`. Reste : **déploiement**.)
+**Dernière mise à jour :** 2026-08-21 (**v0.10.0** — Phases 48 + 49 + 50 codées, testées,
+9 mutants tués. Le fatal sur bloc ACF imbriqué est fermé. Reste : **déploiement**.)
 
-> **Prochain front de travail :** **déployer v0.6.0** via le rituel [`deploy.md`](deploy.md)
-> (canari préprod → trempage 24h → prod). Reste ouvert par ailleurs : (1) la **vérification de
-> sortie 43.5 sur préprod** (débloquée, préprod en 0.5.2 — la faire pendant le canari 0.6.0),
-> (2) approuver `92277` à la main dans l'admin préprod, (3) attendre le retour AA (répétition
-> e2e du `reject`, bascule connector `/contents`).
+> **Prochain front de travail :** **déployer v0.10.0** via le rituel [`deploy.md`](deploy.md)
+> (canari préprod → trempage 24h → prod). Le canari a un critère de sortie précis cette fois :
+> rejouer le `PUT` d'AA sur le post `76068`, bloc `acf/lp-sticky-menu` dans `acf/lp-group`,
+> propriétés complètes → attendu **201 + révision créée**.
+>
+> ⚠️ **La flotte est très étalée** : 0.5.2 (iselection prod) → 0.8.0 (trottinette). Cinq sites,
+> pas trois — voir Phase 50. La plus vieille version déployée est ce que teste la gate #15.
+>
+> Reste ouvert par ailleurs : (1) la **vérification de sortie 43.5 sur préprod** (préprod en 0.7.0,
+> largement débloquée) ; (2) approuver `92277` à la main dans l'admin préprod (`92200` a été rejeté
+> par AA le 08-18) ; (3) `revisions:write` chez les autres sites — **AA a répondu : pas maintenant**,
+> aucun appelant de `reject` dans leur connector.
+
+> **Note de versions (2026-08-21).** `0.8.0` (19/08, sur trottinette) et `0.9.0` (21/08) ont toutes
+> deux été buildées **sans être commitées** — du code tournait chez un client sans exister dans git.
+> Rattrapé par `30ec777`. `0.9.0` a été coupée pendant la session de planification de 48/49/50, d'où
+> le saut à `0.10.0` : un numéro déjà pris ne se re-coupe pas, et le changelog de `0.9.0` décrit la
+> refonte de la preview, pas ce lot-ci.
 
 > **Archives :** une phase quitte ce fichier quand **toutes** ses cases sont cochées.
 > Phases 0–26 → [`archives/checklist-phases-0-26.md`](archives/checklist-phases-0-26.md) ·
@@ -755,6 +767,172 @@ dans `/Users/oscarsatre/.claude/plans/on-y-va-foamy-russell.md` (décisions act�
       (`auth.md` en annonce 13 sans `revisions:write`, `api-contract.md` dit « 8 permissions » —
       source à jour = `Arcadia_Auth::scope_labels()`, 14) — écrit 2026-08-12
 - [ ] Déploiement : rituel [`deploy.md`](deploy.md) (canari préprod → 24h → prod)
+
+---
+
+## Phase 48 : 🔴 Fatal PHP sur un bloc ACF imbriqué portant un repeater
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-08-21*
+*Mesuré par AA sur preprod-iselection en **0.7.0**, post `76068` (`landing`), bloc
+`acf/lp-sticky-menu` avec repeater `links` encodé à plat (compteur `links: 3` + feuilles
+`links_0_link`…). Bisection complète, 11 `PUT`, chacun sur le chemin révision.*
+
+**Bloquant chez AA** : les blocs imbriqués sont la structure normale d'une `landing` iSelection,
+l'agent ne peut éditer aucune d'entre elles.
+
+### Ce que la bisection d'AA isole
+
+Le **même payload**, aux **mêmes propriétés** : accepté à la racine (révision 93541), **fatal**
+imbriqué dans `acf/lp-group` **et** dans `core/group`. Retirer le seul compteur `links` fait passer
+l'imbrication (93543). Un bloc sans repeater imbriqué dans le même conteneur passe (93544). Ce
+n'est donc ni l'imbrication, ni le conteneur, ni le bloc : **c'est le compteur de repeater sur le
+chemin imbriqué**. À la racine, `links: 3` sans ses feuilles est refusé proprement en **422**
+(`field 'links' — expected array, got integer`) ; imbriqué, la même valeur atteint PHP.
+
+### Root cause — ✅ CORRIGÉE le 2026-08-21
+
+⚠️ **La première version de ce paragraphe, écrite au sync, désignait le mauvais coupable** —
+l'exemption `$in_roundtrip` de `class-blocks.php`. Elle n'expliquait pas pourquoi `links: 3`
+**avec** ses feuilles est accepté à la racine. Le vrai chemin, trouvé en instrumentant le code :
+
+1. **`Arcadia_ACF_Validator::validate_block_recursive()` ne recursait que sur `children`**
+   (`class-acf-validator.php:186`), ignorant `inner_blocks` / `innerBlocks` — exactement les clés
+   du payload round-trip qu'AA repousse après lecture. L'autre validateur,
+   `Arcadia_Blocks::validate_block_children()`, walkait bien les trois : **c'est la divergence
+   entre les deux listes qui est le défaut**, pas l'une ou l'autre prise seule.
+   Conséquence : un `acf/*` imbriqué n'atteignait jamais `validate_acf_block()`, donc aucune des
+   trois opérations du chemin racine ne tournait sur lui — `expand_flat_repeaters()` (l'expansion
+   compteur + feuilles → tableau de lignes), `coerce_properties_to_canonical()`, puis les checks
+   de type.
+2. **`class-adapter-acf.php:285` : `count( $rows )` sur un `int`** → `TypeError` PHP 8 → la
+   requête REST meurt, l'appelant reçoit du HTML sans code ni champ fautif.
+
+**Cette explication rend compte des 11 lignes de la bisection d'AA**, y compris celle qu'un
+diagnostic « la validation ne descend pas » seul n'explique pas : à la racine, le compteur **avec**
+ses feuilles est *normalisé* en tableau avant le check de type, donc accepté (93541) ; **sans**
+elles il n'y a rien à normaliser, il reste entier, et c'est le 422.
+
+### Livré
+
+- [x] **48.1 — Symétrie racine/imbriqué.** `validate_block_recursive()` recurse sous
+      `Arcadia_Block_Processor::CHILD_KEYS`, **par référence** (la récursion mute l'arbre que le
+      renderer parcourt ensuite ; par copie on fermerait le 422 en laissant le fatal). La liste des
+      clés enfants devient une constante partagée par les deux validateurs — la prochaine clé ne
+      pourra plus être ajoutée d'un seul côté. Symétrie **stricte** (décision Oscar) : le check de
+      disponibilité par `post_type` s'applique aussi en imbriqué
+- [x] **48.2 — Aucun rendu ne fatale.** Garde sur `$rows` non-`array` dans `flatten_repeater()`,
+      et sur `$properties` non-`array` dans `custom_block()`. Inatteignable une fois 48.1 en place :
+      la garde est pour le **prochain** trou, pas celui-ci
+- [x] **48.3 — `block_path`** (`children[1].inner_blocks[0]`) à côté de `block_index`, qui pour un
+      bloc imbriqué désigne l'index *dans son parent* — donc `block[0]` pouvait viser trois blocs
+      différents dans un même payload. Additif, `block_index` conservé
+- [x] **48.4 — La même symétrie sur l'autre validateur.** `Arcadia_Blocks` valide les propriétés
+      dès que le type est **enregistré**, quel que soit `$in_roundtrip` — règle calquée sur ce que
+      le renderer fait réellement (`class-block-processor.php:184`). Une feuille tierce **non**
+      enregistrée reste acceptée dans un sous-arbre round-trip : c'est le cas que review #5
+      protégeait
+- [x] **48.5 — Tests** (`NestedAcfValidationTest.php`, 9 tests). La matrice d'AA rejouée sur
+      **5 positions** (racine, `acf/lp-group`, `core/group`, `innerBlocks`, deux niveaux de
+      profondeur) × 3 variantes de propriétés, assertée **contre le verdict racine** plutôt que
+      contre des attentes en dur : ce qui est épinglé est la symétrie elle-même. Plus : la mutation
+      en place vérifiée, le fatal reproduit puis fermé, la non-régression round-trip
+
+**Non-vacuité : 5 mutants, 5 tués.** Récursion ACF remise à `children`-only → 4 rouges ; garde
+`count()` retirée → 1 erreur ; héritage `$in_roundtrip` rétabli → 1 rouge ; récursion par copie
+(sans `&`) → 2 rouges ; `block_path` retiré → 1 rouge.
+
+> **Un mutant a d'abord survécu**, et il a corrigé un test. Ma première version du test 48.4 utilisait
+> un bloc `acf/*` : elle restait verte avec 48.4 annulé, parce que 48.1 fermait déjà le même trou par
+> l'autre validateur. Le test a été réécrit sur un bloc **hors namespace `acf/`** — que
+> `Arcadia_ACF_Validator` ignore par construction, et qui isole donc réellement 48.4. Sans la passe
+> de mutation, 48.4 aurait été livré non couvert.
+
+### Le sous-jacent, signalé par AA pour la suite
+
+L'encodage à plat d'un repeater n'est pas auto-descriptif : le compteur (entier) ressemble à un
+champ ordinaire jusqu'à ce qu'on sache qu'il n'en est pas un — c'est ce qui fait qu'un chemin qui
+l'ignore explose au lieu de refuser. **La même dissymétrie attend les champs ACF post-level**
+(hors blocs), où AA aura besoin d'écrire une seule feuille de repeater sans renvoyer le tableau
+entier. AA revient avec une demande précise ; ne pas la préempter.
+
+---
+
+## Phase 49 : Deux défauts d'horodatage sur les décisions de révision — ✅ FAIT
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-08-21*
+*Constatés par AA le 2026-08-18 en rejetant le résidu `92200` par REST (`200 {"rejected": true}`).*
+
+### 49.1 — La décision réécrivait `created_at` — et sur **trois** transitions, pas une
+
+Cause : `create_revision()` insère en `post_status = 'pending'` sans dates, donc WordPress laisse
+`post_date_gmt` à `0000-00-00 00:00:00`. Au `wp_update_post()` suivant, core entre dans sa branche
+`$clear_date` — *« Drafts shouldn't be assigned a date unless explicitly done so by the user »* —
+dont les trois conditions sont réunies (statut courant `pending`, `post_date_gmt` zéroé, pas
+d'`edit_date`) et **réécrit `post_date` à maintenant**.
+
+- [x] `'edit_date' => true` sur les trois transitions, pas seulement celle qu'AA a vue :
+      `pending → superseded` (`class-revisions.php:142`), `pending → approved` (`:347`),
+      `pending → rejected` (`:395`). AA n'a observé que `reject` parce que c'est le seul verbe
+      qu'ils appellent — le défaut n'a jamais été spécifique à lui
+
+### 49.2 — `created_at` et `decided_at` en désaccord de fuseau
+
+`format_revision()` faisait `gmdate( 'c', strtotime( $revision->post_date ) )`. `post_date` est
+l'heure **locale du site**, `strtotime()` l'interprétait en UTC : l'heure de Paris ressortait
+suffixée `+00:00`, à côté d'un `decided_at` en vrai UTC. D'où les 2h d'écart relevées sur un même
+instant, les deux champs annonçant `+00:00`.
+
+- [x] Nouveau `created_at_utc()` : `get_post_datetime( $revision, 'date', 'gmt' )`, qui fait la
+      conversion à la manière de WordPress **et** retombe sur la colonne locale quand
+      `post_date_gmt` est la date zéro — l'état de toute révision `pending`, donc le chemin normal
+      ici, pas un cas limite
+
+### 49.3 — Tests + non-vacuité
+
+- [x] 4 tests dans `RevisionsTest.php` : rejeter / approuver / superseder ne change pas
+      `created_at` ; `created_at` et `decided_at` d'un même instant sont égaux
+- [x] **Le bootstrap a dû être rapproché du vrai WordPress d'abord** — c'est la leçon de la
+      Phase 43.4, et elle s'appliquait ici à la lettre. Le stub ne modélisait ni `post_date_gmt`,
+      ni la branche `$clear_date`, ni un fuseau de site : un test écrit dessus aurait été **vert
+      sur du code jamais exécuté**. Ajoutés : `wp_timezone()`, `get_gmt_from_date()`,
+      `get_post_datetime()`, un `current_time()` réellement local (défaut `Europe/Paris` — c'est
+      la seule condition sous laquelle 49.2 est observable), et la branche `$clear_date` dans
+      `wp_update_post()`. Les 4 tests ont bien été **rouges d'abord**, en reproduisant le symptôme
+      exact d'AA : `created_at 16:22:31+00:00` contre `decided_at 14:22:31+00:00`
+- [x] **Non-vacuité : 4 mutants, 4 tués** — `edit_date` retiré sur chacune des trois transitions
+      (1 rouge chacune, donc les trois sont couvertes **séparément**) ; retour au
+      `strtotime( post_date )` → 1 rouge
+
+---
+
+## Phase 50 : Flotte — le relevé était faux des deux côtés — ✅ FAIT
+
+*Ref: [backlog.md](/Users/oscarsatre/Documents/ArcadiaAgents/docs/satellites/plugin-wp/backlog.md) — intégré 2026-08-21*
+
+Sondé par `GET /health` le 2026-08-21. **Notre fichier était incomplet, et la sonde d'AA du 18/08
+était fausse sur deux lignes** — dont celle qui leur sert d'argument pour ne pas basculer.
+
+| Site | `deployed-versions.conf` (avant) | AA (18/08) | **`/health` (21/08)** |
+|---|---|---|---|
+| www.iselection.com | 0.5.2 | 0.5.2 | **0.5.2** |
+| www.trottinette-tout-terrain.fr | 0.6.0 | non sondé (Cloudflare) | **0.8.0** |
+| www.caleconpourhomme.fr | absent | **0.1.0, pas de `/contents`** | **0.7.0, `/contents` complet** |
+| technologia (leparking) | absent | 0.7.0 | 401 (basic auth) |
+| preprod-iselection.vertuelle.com | 0.6.2 | 0.7.0 | 401 (basic auth) |
+
+- [x] **50.1 — `deployed-versions.conf` reconstruit** : 5 sites, versions réelles, et la
+      provenance de chaque ligne écrite dans le fichier (sondée / reprise d'AA). La décision que
+      j'avais posée au sync **tombe** : la plus vieille version déployée est `0.5.2`, dont le zip
+      est dans `dist/` — la gate #15 passe sans rien reconstruire
+- [x] **50.2 — Le blocage `/articles` → `/contents` d'AA n'existe pas.** caleconpourhomme.fr sert
+      l'index complet — `/contents`, `/contents/{id}`, `/blocks`, `/revisions`, `/reject` — en
+      0.7.0. Les **cinq** sites de la flotte servent `/contents`. La bascule de leur connector est
+      débloquée aujourd'hui, pas au sunset de 2027-02-01. À leur dire (fait dans
+      `backlog-for-backend.md`)
+- [x] **50.3 — Relever par `/health`, jamais de mémoire.** Les deux sources en présence étaient
+      fausses, chacune à sa façon. Trottinette n'est pas sondable depuis la VM d'AA (Cloudflare
+      `1010`) : c'est **à nous** de le relever. Les deux préprods sont derrière un basic auth,
+      donc à reconfirmer au navigateur au prochain déploiement — c'est noté dans le fichier
 
 ---
 
