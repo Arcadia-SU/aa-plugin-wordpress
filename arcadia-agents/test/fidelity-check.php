@@ -178,6 +178,51 @@ check_same( $evil, $rev_meta['meta']['description'] ?? null, 'revision stored me
 wp_delete_post( $rev_id, true );
 wp_delete_post( $target, true );
 
+// ─── Case 4: a list read back and pushed back keeps its items inside (Phase 52) ─
+fwrite( STDOUT, "\nCase 4 — round-trip container keeps its children inside (trottinette, 19 pages):\n" );
+
+$list_markup = "<!-- wp:list -->\n<ul class=\"wp-block-list\"><!-- wp:list-item -->\n<li>Un</li>\n<!-- /wp:list-item -->\n\n"
+	. "<!-- wp:list-item -->\n<li>Deux</li>\n<!-- /wp:list-item --></ul>\n<!-- /wp:list -->";
+$list_parsed = parse_blocks( $list_markup )[0];
+
+/**
+ * A parsed block as AA pushes it back: type + inner_content + inner_blocks.
+ *
+ * @param array $parsed     A real parse_blocks() node.
+ * @param bool  $keep_nulls True = innerContent with its placeholders (what the
+ *                          read now exposes); false = innerHTML as one chunk
+ *                          (what the read used to expose, the broken case).
+ * @return array
+ */
+function aa_roundtrip_node( $parsed, $keep_nulls ) {
+	$node = array(
+		'type'          => $parsed['blockName'],
+		'inner_content' => $keep_nulls ? $parsed['innerContent'] : array( $parsed['innerHTML'] ),
+	);
+	if ( ! empty( $parsed['innerBlocks'] ) ) {
+		$node['inner_blocks'] = array_map(
+			static fn( $child ) => aa_roundtrip_node( $child, $keep_nulls ),
+			$parsed['innerBlocks']
+		);
+	}
+	return $node;
+}
+
+foreach ( array( 'innerHTML as one chunk' => false, 'innerContent with nulls' => true ) as $shape => $keep_nulls ) {
+	$written = Arcadia_Blocks::get_instance()->json_to_blocks(
+		array( 'children' => array( aa_roundtrip_node( $list_parsed, $keep_nulls ) ) )
+	);
+	if ( is_wp_error( $written ) ) {
+		check_true( false, "[$shape] write accepted (got " . $written->get_error_code() . ')' );
+		continue;
+	}
+	$reparsed = parse_blocks( $written )[0] ?? array();
+	$html     = preg_replace( '/\s+/', '', render_block( $reparsed ) );
+
+	check_same( 2, count( $reparsed['innerBlocks'] ?? array() ), "[$shape] list still holds its 2 items as inner blocks" );
+	check_same( '<ulclass="wp-block-list"><li>Un</li><li>Deux</li></ul>', $html, "[$shape] rendered items sit inside the <ul>" );
+}
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 fwrite( STDOUT, "\n" );
 if ( empty( $failures ) ) {

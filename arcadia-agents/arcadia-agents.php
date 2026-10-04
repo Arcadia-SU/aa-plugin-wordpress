@@ -3,7 +3,7 @@
  * Plugin Name: Arcadia Agents
  * Plugin URI: https://arcadia-agents.com
  * Description: Connect your WordPress site to Arcadia Agents for autonomous SEO content management.
- * Version: 0.10.0
+ * Version: 0.11.0
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Arcadia
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'ARCADIA_AGENTS_VERSION', '0.10.0' );
+define( 'ARCADIA_AGENTS_VERSION', '0.11.0' );
 define( 'ARCADIA_AGENTS_PLUGIN_FILE', __FILE__ );
 define( 'ARCADIA_AGENTS_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'ARCADIA_AGENTS_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -97,6 +97,7 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-auth.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-markdown-parser.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-registry.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-children.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-block-processor.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-blocks.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-acf-coercer.php';

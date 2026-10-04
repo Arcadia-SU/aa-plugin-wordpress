@@ -27,6 +27,7 @@ require_once __DIR__ . '/api/trait-api-redirects.php';
 require_once __DIR__ . '/api/trait-api-preview.php';
 require_once __DIR__ . '/api/trait-api-field-schema.php';
 require_once __DIR__ . '/api/trait-api-revisions.php';
+require_once __DIR__ . '/api/trait-api-connection.php';
 
 /**
  * Class Arcadia_API
@@ -47,6 +48,7 @@ class Arcadia_API {
 	use Arcadia_API_Preview_Handler;
 	use Arcadia_API_Field_Schema_Handler;
 	use Arcadia_API_Revisions_Handler;
+	use Arcadia_API_Connection_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -118,6 +120,7 @@ class Arcadia_API {
 		$this->register_redirect_routes();
 		$this->register_field_schema_routes();
 		$this->register_block_routes();
+		$this->register_connection_routes();
 	}
 
 	// =========================================================================
@@ -561,6 +564,25 @@ class Arcadia_API {
 					'callback'            => array( $this, 'update_field_schema' ),
 					'permission_callback' => fn( $request ) => $this->check_permission( $request, 'settings:write' ),
 				),
+			)
+		);
+	}
+
+	/**
+	 * Connection routes: /disconnect.
+	 *
+	 * The one route outside check_permission(): it requires a valid JWT but no
+	 * scope, and answers without one once the site is already disconnected —
+	 * see check_disconnect_permission().
+	 */
+	private function register_connection_routes() {
+		register_rest_route(
+			$this->namespace,
+			'/disconnect',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'disconnect_site' ),
+				'permission_callback' => array( $this, 'check_disconnect_permission' ),
 			)
 		);
 	}

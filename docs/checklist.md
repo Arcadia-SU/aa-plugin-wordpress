@@ -1,20 +1,27 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-08-21 (**v0.10.0** — Phases 48 + 49 + 50 codées, testées,
-9 mutants tués. Le fatal sur bloc ACF imbriqué est fermé. Reste : **déploiement**.)
+**Dernière mise à jour :** 2026-10-04 (**v0.11.0** — Phases 51 + 52 codées, testées, 12 mutants
+tués, 17 checks de build verts. Contient aussi tout v0.10.0, jamais déployée. Reste : **déploiement**.)
 
-> **Prochain front de travail :** **déployer v0.10.0** via le rituel [`deploy.md`](deploy.md)
-> (canari préprod → trempage 24h → prod). Le canari a un critère de sortie précis cette fois :
-> rejouer le `PUT` d'AA sur le post `76068`, bloc `acf/lp-sticky-menu` dans `acf/lp-group`,
-> propriétés complètes → attendu **201 + révision créée**.
+> **Prochain front de travail :** **déployer v0.11.0** via le rituel [`deploy.md`](deploy.md)
+> (canari préprod → trempage 24h → prod). On saute 0.10.0 : 0.11.0 la contient, et le chemin
+> d'upgrade est testé depuis 0.5.2 (plus vieille version déployée) et 0.10.0. Critères de sortie
+> du canari :
+> 1. rejouer le `PUT` d'AA sur le post `76068`, bloc `acf/lp-sticky-menu` dans `acf/lp-group`,
+>    propriétés complètes → attendu **201 + révision créée** (Phase 48) ;
+> 2. `GET /contents/{id}/blocks` sur une page à liste → les blocs parents portent `innerContent`
+>    avec des `null` (Phase 52) ;
+> 3. `/health` → `0.11.0`, puis signaler la version à AA pour qu'il active l'appel `/disconnect`.
 >
-> ⚠️ **La flotte est très étalée** : 0.5.2 (iselection prod) → 0.8.0 (trottinette). Cinq sites,
-> pas trois — voir Phase 50. La plus vieille version déployée est ce que teste la gate #15.
+> ⚠️ **PHPStan non relancé en local** pour 0.11.0 : la stack AA occupe ~5 Go des 6 Go de la VM
+> Docker, PHPStan est tué par l'OOM même sur les seuls fichiers modifiés. Couvert par la CI au push.
 >
-> Reste ouvert par ailleurs : (1) la **vérification de sortie 43.5 sur préprod** (préprod en 0.7.0,
-> largement débloquée) ; (2) approuver `92277` à la main dans l'admin préprod (`92200` a été rejeté
-> par AA le 08-18) ; (3) `revisions:write` chez les autres sites — **AA a répondu : pas maintenant**,
-> aucun appelant de `reject` dans leur connector.
+> ⚠️ **La flotte est très étalée** (relevé `/health` du 2026-10-04) : iselection 0.5.2,
+> caleconpourhomme 0.7.0, trottinette 0.8.0 ; préprods non sondables en CLI.
+>
+> Reste ouvert par ailleurs : (1) la **vérification de sortie 43.5 sur préprod** ; (2) approuver
+> `92277` à la main dans l'admin préprod ; (3) `revisions:write` chez les autres sites — **AA a
+> répondu : pas maintenant**.
 
 > **Note de versions (2026-08-21).** `0.8.0` (19/08, sur trottinette) et `0.9.0` (21/08) ont toutes
 > deux été buildées **sans être commitées** — du code tournait chez un client sans exister dans git.
@@ -71,6 +78,8 @@
 | 38 | Revue de la revue — durcissement passthrough round-trip | 2026-06 |
 | 39 | Markdown inline dans les cellules de table ACF (`acf/table`) | 2026-07 |
 | 42 | Intégrité d'écriture des champs — 4 défauts absents de v0.2.0 | 2026-08 |
+| 51 | `POST /disconnect` — AA prévient le plugin de la déconnexion (v0.11.0) | 2026-10 |
+| 52 | Enfants round-trip placés dans leur parent + `innerContent` à la lecture (v0.11.0) | 2026-10 |
 | 44 | `reject` par REST (scope `revisions:write`) + 422 sur `body.status` — v0.5.1, déployée en 0.5.2 sur les 3 sites | 2026-08 |
 | 45 | Upgrade-path test (gate #15) : le build teste la mise à jour N-1 → N + archive `dist/` | 2026-08 |
 
@@ -953,6 +962,14 @@ Sondé par `GET /health` le 2026-08-21. **Notre fichier était incomplet, et la 
 
 ### Décisions en attente
 - Rate limiting : reporté post-MVP
+
+### Contrats implicites signalés par AA (ne pas casser au refactor)
+- **2026-08-21 — Écriture ACF post-level clé par clé.** AA renonce à écrire une feuille de repeater
+  seule (`slides_0_texte`) et enverra le tableau entier. Il s'appuie sur deux propriétés :
+  l'approbation rejoue `update_field()` **clé par clé** sur le payload, sans read-modify-write
+  (`trait-api-acf-fields.php:168-177` via `class-revisions.php:317-329`), et `acf_fields` traverse
+  la mise en attente **verbatim** (`class-revisions.php:158-170`). Invariant : « un champ que le
+  body ne mentionne pas n'est jamais écrit », au PUT **et** à l'approbation.
 
 ### Risques identifiés
 - Review WP.org peut prendre du temps

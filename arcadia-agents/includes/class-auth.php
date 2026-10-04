@@ -577,6 +577,18 @@ class Arcadia_Auth {
 	}
 
 	/**
+	 * Whether a connection is in place that a token can be validated against.
+	 *
+	 * Keyed on the public key, not on the `arcadia_agents_connected` flag the
+	 * admin reads: without the key no JWT can be checked, whatever the flag says.
+	 *
+	 * @return bool
+	 */
+	public function is_connected() {
+		return '' !== (string) get_option( 'arcadia_agents_public_key', '' );
+	}
+
+	/**
 	 * Disconnect the plugin (clear stored data).
 	 *
 	 * @return bool True on success.

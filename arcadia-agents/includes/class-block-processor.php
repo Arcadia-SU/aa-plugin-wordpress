@@ -15,6 +15,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-block-children.php';
+
 /**
  * Class Arcadia_Block_Processor
  *
@@ -271,10 +273,11 @@ final class Arcadia_Block_Processor {
 	 * element is either a literal HTML string or a `null` placeholder marking the
 	 * position of the next inner block; when those nulls are present we reconstruct
 	 * faithfully by interleaving children at their placeholder positions (review #4).
-	 * If the reader stripped the nulls (legacy), we fall back to wrapping all
-	 * children between the first chunk (open) and the rest (close) — correct for the
-	 * single-wrapper containers AA round-trips (core/group, core/columns, core/cover)
-	 * and always lossless (no chunk is dropped). Recurses for nested containers.
+	 * Without nulls (a container read back from the site is a single chunk), the
+	 * children are placed at the slot read from the markup — see
+	 * Arcadia_Block_Children::split_at_slot(); always lossless (no chunk is
+	 * dropped). A node whose nulls disagree with its children in number is refused
+	 * upstream by the validation pass (422). Recurses for nested containers.
 	 *
 	 * Security: although this is the site's own content being re-pushed, the plugin
 	 * cannot distinguish a genuine round-trip from a forged payload, so the literal
@@ -329,18 +332,24 @@ final class Arcadia_Block_Processor {
 				$inner .= $child_markups[ $ci ];
 			}
 		} else {
-			// Legacy fallback: nulls stripped, positions unknown. Wrap children
-			// between the first chunk (open) and the remaining chunks (close).
-			$string_chunks   = array_values( array_filter( $chunks, 'is_string' ) );
+			// No placeholder: positions are read back from the markup (Phase 52).
+			// The chunks are joined first — a single chunk is the whole envelope
+			// (`<ul>\n\n</ul>`, what the read returns), several are the same
+			// envelope with its nulls stripped — then cut at the slot WordPress
+			// left where the children were. Taking the first chunk as the opening
+			// put every child after a single-chunk parent's closing tag.
+			$markup          = implode( '', array_filter( $chunks, 'is_string' ) );
+			$wrapper         = trim( $markup );
 			$children_markup = implode( '', $child_markups );
-			if ( empty( $string_chunks ) ) {
+			if ( '' === $wrapper ) {
+				// No markup of its own (ACF layout, core/columns without a
+				// wrapper): the children nest in the block comment.
 				$inner = $children_markup;
 			} elseif ( '' === $children_markup ) {
-				$inner = wp_kses_post( implode( '', $string_chunks ) );
+				$inner = wp_kses_post( $markup );
 			} else {
-				$open  = wp_kses_post( (string) array_shift( $string_chunks ) );
-				$close = wp_kses_post( implode( '', $string_chunks ) );
-				$inner = $open . $children_markup . $close;
+				list( $open, $close ) = Arcadia_Block_Children::split_at_slot( $wrapper );
+				$inner                = wp_kses_post( $open ) . $children_markup . wp_kses_post( $close );
 			}
 		}
 

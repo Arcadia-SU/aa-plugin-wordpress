@@ -208,6 +208,105 @@ class ArticleBlocksTest extends TestCase {
     }
 
     /**
+     * Phase 52: a parent exposes innerContent WITH its null placeholders, so the
+     * children's positions travel to AA instead of being rebuilt from the markup
+     * (innerHTML alone is `<ul>\n\n</ul>` — the positions are gone).
+     */
+    public function test_format_parsed_blocks_exposes_child_positions_on_parents(): void {
+        $parsed = array(
+            array(
+                'blockName'    => 'core/list',
+                'attrs'        => array(),
+                'innerBlocks'  => array(
+                    array(
+                        'blockName'    => 'core/list-item',
+                        'attrs'        => array(),
+                        'innerBlocks'  => array(),
+                        'innerHTML'    => '<li>a</li>',
+                        'innerContent' => array( '<li>a</li>' ),
+                    ),
+                    array(
+                        'blockName'    => 'core/list-item',
+                        'attrs'        => array(),
+                        'innerBlocks'  => array(),
+                        'innerHTML'    => '<li>b</li>',
+                        'innerContent' => array( '<li>b</li>' ),
+                    ),
+                ),
+                'innerHTML'    => "\n<ul class=\"wp-block-list\">\n\n</ul>\n",
+                'innerContent' => array( "\n<ul class=\"wp-block-list\">", null, "\n\n", null, "</ul>\n" ),
+            ),
+        );
+
+        $blocks = $this->helper->test_format_parsed_blocks( $parsed );
+
+        $this->assertSame(
+            array( "\n<ul class=\"wp-block-list\">", null, "\n\n", null, "</ul>\n" ),
+            $blocks[0]['innerContent']
+        );
+        // innerHTML is still served, unchanged, for existing readers.
+        $this->assertSame( "\n<ul class=\"wp-block-list\">\n\n</ul>\n", $blocks[0]['innerHTML'] );
+        // Survives JSON encoding with its nulls (the wire format AA reads).
+        $this->assertStringContainsString( ',null,', wp_json_encode( $blocks[0]['innerContent'] ) );
+    }
+
+    /**
+     * A leaf's innerContent is its innerHTML — not repeated.
+     */
+    public function test_format_parsed_blocks_leaf_has_no_inner_content(): void {
+        $parsed = array(
+            array(
+                'blockName'    => 'core/paragraph',
+                'attrs'        => array(),
+                'innerBlocks'  => array(),
+                'innerHTML'    => '<p>x</p>',
+                'innerContent' => array( '<p>x</p>' ),
+            ),
+        );
+
+        $blocks = $this->helper->test_format_parsed_blocks( $parsed );
+
+        $this->assertArrayNotHasKey( 'innerContent', $blocks[0] );
+    }
+
+    /**
+     * If a child is skipped (null blockName), the placeholders no longer match
+     * the children served: positions would point at the wrong child, so
+     * innerContent is withheld and the caller falls back to innerHTML.
+     */
+    public function test_format_parsed_blocks_withholds_positions_that_no_longer_match(): void {
+        $parsed = array(
+            array(
+                'blockName'    => 'core/group',
+                'attrs'        => array(),
+                'innerBlocks'  => array(
+                    array(
+                        'blockName'    => null,
+                        'attrs'        => array(),
+                        'innerBlocks'  => array(),
+                        'innerHTML'    => "\n",
+                        'innerContent' => array( "\n" ),
+                    ),
+                    array(
+                        'blockName'    => 'core/paragraph',
+                        'attrs'        => array(),
+                        'innerBlocks'  => array(),
+                        'innerHTML'    => '<p>x</p>',
+                        'innerContent' => array( '<p>x</p>' ),
+                    ),
+                ),
+                'innerHTML'    => '<div></div>',
+                'innerContent' => array( '<div>', null, null, '</div>' ),
+            ),
+        );
+
+        $blocks = $this->helper->test_format_parsed_blocks( $parsed );
+
+        $this->assertCount( 1, $blocks[0]['innerBlocks'] );
+        $this->assertArrayNotHasKey( 'innerContent', $blocks[0] );
+    }
+
+    /**
      * Test null blockName blocks are skipped.
      */
     public function test_format_parsed_blocks_skips_null_blockname(): void {

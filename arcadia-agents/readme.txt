@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.10.0
+Stable tag: 0.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,14 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.11.0 =
+Disconnecting from Arcadia now disconnects WordPress too. Container blocks that Arcadia sends back keep their children inside them.
+
+* New: `POST /disconnect`. When the owner removes the WordPress connection from Arcadia's settings, Arcadia calls this route and the plugin goes back to "not connected", with the key field editable again. Until now the plugin kept showing "Connected" and kept the key field read-only, so to reconnect the owner had to guess they should click "Disconnect" in WordPress first. The route needs a token valid for this connection but no permission checkbox. It answers `200 {"success": true}` even if the site is already disconnected, and in that case it changes nothing
+* Fixed: a list, group, cover or other container block that Arcadia read and then sent back could come out with its children after its closing tag. The page then showed `<ul class="wp-block-list"></ul>` with the list items outside it. Seen on 19 pages of a client site. When a container's markup arrives as a single piece, the children now go where WordPress removed them from: the element left empty, the inner container of a group or cover, before a quote's citation. This follows the rule Arcadia applies on its side
+* New: `GET /contents/{id}/blocks` now also returns `innerContent` on every block that has children, with its `null` placeholders. These mark where each child sits, which `innerHTML` does not, so a container sent back unchanged is rebuilt exactly instead of guessed. `innerHTML` is still returned as before
+* Changed: a block whose `inner_content` has `null` placeholders that do not match its number of children is refused with **422 `child_position_mismatch`**. Before, the extra children were added at the end, after the parent's closing tag, which broke the page without any error
 
 = 0.10.0 =
 A block is now checked the same way wherever it sits in the page. Until now the checks only ran on the outermost blocks, so a payload the plugin refused at the top level could kill the request one level down — which is where most page-builder content actually lives.

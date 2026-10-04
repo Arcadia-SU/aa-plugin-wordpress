@@ -22,6 +22,7 @@ require_once __DIR__ . '/class-url-guard.php';
 require_once __DIR__ . '/adapters/interface-block-adapter.php';
 require_once __DIR__ . '/adapters/class-adapter-gutenberg.php';
 require_once __DIR__ . '/adapters/class-adapter-acf.php';
+require_once __DIR__ . '/class-block-children.php';
 require_once __DIR__ . '/class-block-processor.php';
 
 /**
@@ -239,6 +240,29 @@ class Arcadia_Blocks {
 		// error instead of vanishing silently at render (review #5). Same
 		// discriminator the renderer uses, so validation and rendering agree.
 		if ( Arcadia_Block_Processor::is_roundtrip_block( $block ) ) {
+			// Placeholders that disagree with the children in number cannot be
+			// read: no position says which child is extra or missing, and the
+			// renderer's guess would put one after the parent's closing tag — a
+			// page broken in silence. Refuse instead (Phase 52).
+			$mismatch = Arcadia_Block_Children::placeholder_mismatch( $block );
+			if ( null !== $mismatch ) {
+				return new WP_Error(
+					'child_position_mismatch',
+					sprintf(
+						/* translators: 1: block type, 2: number of child blocks, 3: number of null placeholders */
+						__( "Block '%1\$s' has %2\$d child blocks but its inner_content marks %3\$d positions for them.", 'arcadia-agents' ),
+						$block['type'],
+						$mismatch['children'],
+						$mismatch['positions']
+					),
+					array(
+						'status'     => 422,
+						'block_type' => $block['type'],
+						'children'   => $mismatch['children'],
+						'positions'  => $mismatch['positions'],
+					)
+				);
+			}
 			return $this->validate_block_children( $block, true );
 		}
 

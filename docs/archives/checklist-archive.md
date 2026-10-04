@@ -690,3 +690,83 @@ Ni « laisser tel quel » ni « appliquer à l'approbation » : **refuser explic
       partout, scope actif, le résidu `92200` est rejetable par AA elle-même via REST
 
 ---
+
+## Phase 51 : Route `POST /disconnect` — AA prévient le plugin quand le propriétaire déconnecte
+
+*Source : backlog AA du 2026-10-03, intégré le 2026-10-04.*
+
+Un propriétaire peut retirer la connexion WP depuis les réglages Arcadia (connexion, clé, paire
+RS256 supprimées côté AA). Le plugin continue d'afficher « Connecté » et le champ de clé reste en
+lecture seule : l'utilisateur doit deviner qu'il faut cliquer « Déconnecter » dans WP.
+
+**Contrat demandé :**
+- `POST /wp-json/arcadia/v1/disconnect`, JWT RS256 validé par `validate_jwt` / `validate_claims`
+  (`sub` = `site_id` épinglé, `iss` épinglé). **Aucun scope requis.**
+- Effet : `Arcadia_Auth::disconnect()` (`class-auth.php:584`) → état « non connecté », champ éditable.
+- `200 {"success": true}`. **Idempotente** : si déjà déconnecté (plus de clé publique), `200` sans
+  valider — l'appel ne peut rien casser.
+- Côté AA : best-effort juste avant suppression de la paire ; `404`/`401`/timeout journalisés et
+  ignorés. Rien ne casse avant déploiement. **AA attend la version qui porte la route.**
+
+- [x] 51.1 — Route + `permission_callback` dédié (JWT valide sans scope ; `200` direct si non connecté)
+- [x] 51.2 — Tests : JWT valide → déconnecté ; JWT d'un autre `site_id`/`iss` → `401` et **toujours
+      connecté** ; déjà déconnecté → `200` ; JWT expiré → `401`. Passe de mutation.
+- [x] 51.3 — `api-contract.md` : ajouter l'endpoint (via `backlog-for-backend.md`, pas d'écriture directe)
+- [x] 51.4 — Release **MINOR** (nouvel endpoint) + annoncer la version dans `backlog-for-backend.md`
+
+### Livré — v0.11.0 (2026-10-04)
+
+- Route dans `class-api.php` (`register_connection_routes()`), handler + gate dans
+  `includes/api/trait-api-connection.php`. Seule route hors `check_permission()` : JWT exigé, aucun scope.
+- **« Connecté » = clé publique stockée** (`Arcadia_Auth::is_connected()`), pas le drapeau d'affichage
+  `arcadia_agents_connected` : sans clé, aucun JWT n'est vérifiable.
+- Hors connexion : `200` sans valider **et rien n'est touché** — la requête est alors non authentifiée,
+  elle ne doit pas pouvoir effacer une `connection_key` en cours de saisie dans l'admin.
+- `DisconnectEndpointTest` (13 tests) contre le **vrai** `Arcadia_Auth`, paire RSA réelle, jetons signés
+  par `firebase/php-jwt` : autre clé, autre `sub`, autre `iss`, expiré, sans jeton → 401 **et toujours
+  connecté** ; aucun scope coché → passe ; header `X-AA-Token` → passe ; déjà déconnecté → 200, état
+  identique à l'octet. Mutants tués : gate toujours vraie, scope exigé, disconnect inconditionnel,
+  `is_connected` sur le drapeau.
+
+---
+
+## Phase 52 : Repli `passthrough_block()` sans `null` — enfants après la balise fermante
+
+*Source : backlog AA du 2026-09-15, intégré le 2026-10-04. Non urgent : AA a corrigé de son côté
+(PR #350), quelle que soit la version du plugin. Ferme le trou à la source.*
+
+**Symptôme en ligne** : trottinette-tout-terrain.fr, 19 pages avec `<ul class="wp-block-list"></ul>`
+suivi des `<li>` hors liste.
+
+**Cause plugin** : le repli legacy de `passthrough_block()` (`class-block-processor.php:331-344`)
+prend le premier morceau comme ouverture. Avec un seul morceau (cas de tout conteneur lu par
+`format_parsed_blocks()`), l'ouverture est l'enveloppe entière `<ul>\n\n</ul>` → enfants collés après.
+
+- [x] 52.1 — Repli : couper à l'élément vide (ou ne contenant que des blancs) laissé par WP à
+      l'emplacement des enfants (`<ul>\n\n</ul>`, `<div>` intérieur d'un groupe / `uagb/container`,
+      conteneur intérieur d'un cover) — règle AA : `app/domain/seo/value_objects/block_children.py`.
+      Si aucune coupure sûre : **refuser le bloc (422)** plutôt que casser la page en silence.
+- [x] 52.2 — Lecture (`trait-api-posts.php:703-705`) : exposer aussi `innerContent` **avec ses `null`**,
+      pour que les positions réelles voyagent. Le chemin null-aware de l'écriture existe déjà
+      (forward-compat Phase 37). AA devra garder les `null` (`_wordpress_parsers.py:176`) → annoncer.
+- [x] 52.3 — Tests sur enveloppes réelles (list, group, uagb/container, cover) + mutants
+- [x] 52.4 — Release (52.1 = PATCH ; 52.2 ajoute un champ de réponse → MINOR) + annonce AA
+
+### Livré — v0.11.0 (2026-10-04)
+
+- `includes/class-block-children.php` : port ligne à ligne de `block_children.py` (emplacement vide le
+  plus large, dernier en cas d'égalité, éléments void exclus ; sinon avant la fermante, `<cite>` /
+  `<figcaption>` finale gardée dernière). Les chunks sont **joints puis coupés** : un mono-morceau et un
+  multi-morceaux dé-nullé atterrissent pareil.
+- **Pas de refus quand aucune coupure n'existe** (contrairement à ce que 52.1 envisageait) : la règle
+  tombe toujours à l'intérieur du parent dès que l'enveloppe est un élément ; sans élément du tout, les
+  enfants suivent le texte, sans perte. Le refus est réservé au seul cas illisible — placeholders en
+  nombre ≠ enfants → **422 `child_position_mismatch`**, comme côté AA.
+- Lecture : `innerContent` sur les parents seulement, retenu si un enfant ignoré décalerait les positions.
+- Tests : `ChildPlacementTest` (24, fixtures AA), 3 dans `ArticleBlocksTest`, et **Case 4 de la gate
+  réelle `fidelity-check.php`** (vrai `parse_blocks` → écriture → re-parse → `render_block`). Rejouée
+  contre l'ancien repli, la Case 4 **reproduit le bug de trottinette** ; verte avec le nouveau.
+  Mutants tués : égalité → premier, légende ignorée, repli fermante retiré, ancien repli, refus retiré,
+  `innerContent` toujours / jamais / aussi sur les feuilles.
+
+---

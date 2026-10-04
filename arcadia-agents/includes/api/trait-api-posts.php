@@ -707,6 +707,20 @@ trait Arcadia_API_Posts_Handler {
 			// Recurse into innerBlocks.
 			if ( ! empty( $block['innerBlocks'] ) ) {
 				$formatted['innerBlocks'] = $this->format_parsed_blocks( $block['innerBlocks'] );
+
+				// innerHTML drops the children's positions (`<ul>\n\n</ul>`);
+				// innerContent keeps them as null placeholders, so a parent
+				// pushed back verbatim is rebuilt exactly rather than from a
+				// slot read in the markup (Phase 52). Only on parents: a leaf's
+				// innerContent is its innerHTML. Omitted if a skipped child
+				// would shift the positions — the caller falls back to innerHTML.
+				$inner_content = $block['innerContent'] ?? null;
+				if (
+					is_array( $inner_content )
+					&& Arcadia_Block_Children::count_placeholders( $inner_content ) === count( $formatted['innerBlocks'] )
+				) {
+					$formatted['innerContent'] = $inner_content;
+				}
 			}
 
 			$blocks[] = $formatted;
