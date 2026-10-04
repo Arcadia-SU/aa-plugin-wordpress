@@ -13,8 +13,8 @@ tués, 17 checks de build verts. Contient aussi tout v0.10.0, jamais déployée.
 >    avec des `null` (Phase 52) ;
 > 3. `/health` → `0.11.0`, puis signaler la version à AA pour qu'il active l'appel `/disconnect`.
 >
-> ⚠️ **PHPStan non relancé en local** pour 0.11.0 : la stack AA occupe ~5 Go des 6 Go de la VM
-> Docker, PHPStan est tué par l'OOM même sur les seuls fichiers modifiés. Couvert par la CI au push.
+> PHPStan : non lançable en local ce jour-là (stack AA ≈ 5 Go sur les 6 Go de la VM Docker, OOM même
+> sur les seuls fichiers modifiés) — **vert en CI** sur `91d4155` (run 37195302069).
 >
 > ⚠️ **La flotte est très étalée** (relevé `/health` du 2026-10-04) : iselection 0.5.2,
 > caleconpourhomme 0.7.0, trottinette 0.8.0 ; préprods non sondables en CLI.
