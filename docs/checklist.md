@@ -1,14 +1,14 @@
 # Plugin WordPress - Checklist de développement
 
-**Dernière mise à jour :** 2026-10-04 (**v0.11.0 déployée** sur trottinette et caleconpourhomme —
-préprod sautée. iselection reste en 0.5.2.)
+**Dernière mise à jour :** 2026-10-05 (**v0.11.0 déployée sur les 3 sites prod** — trottinette et
+caleconpourhomme le 04/10, iselection le 05/10. Préprod sautée.)
 
-> **Prochain front de travail :** **iselection → 0.11.0** (même zip `dist/arcadia-agents-0.11.0.zip`,
-> puis relever `/health`). Puis attendre le merge AA de `wp-plugin-0-11` (garde les `null` de
+> **Prochain front de travail :** AA rejoue le `PUT` sur le post `76068` d'iselection (Phase 48),
+> le dernier critère jamais vérifié en prod. Puis attendre le merge AA de `wp-plugin-0-11` (garde les `null` de
 > `innerContent` à la lecture, supprime `update_page()`, contrat à jour).
 >
 > **Vérifié en prod le 2026-10-04 :**
-> - `/health` en 0.11.0 sur les deux sites. Sur caleconpourhomme, il faut le relever par
+> - `/health` en 0.11.0 sur les trois sites (iselection relevé le 2026-10-05, `/disconnect` → 401). Sur caleconpourhomme, il faut le relever par
 >   `?rest_route=/arcadia/v1/health` : `/wp-json` est mis en cache par o2switch PowerBoost, et
 >   répondait encore 0.7.0 juste après l'upgrade.
 > - `POST /disconnect` sans jeton → `401 missing_authorization` sur les deux sites. La route existe
@@ -19,15 +19,15 @@ préprod sautée. iselection reste en 0.5.2.)
 >   par sa règle de slot (PR #350). Le repli **sans `null`** n'est couvert que par
 >   `test/fidelity-check.php` (Case 4, vrai WordPress) et `ChildPlacementTest`.
 >
-> **Pas vérifié :** le `PUT` sur le post `76068` (Phase 48) n'a pas été rejoué. Il est sur
-> iselection : à faire après son upgrade. Le cache de caleconpourhomme sur les GET authentifiés
+> **Pas vérifié :** le `PUT` sur le post `76068` (Phase 48) n'a pas été rejoué. iselection est
+> maintenant en 0.11.0 : demandé à AA le 2026-10-05. Le cache de caleconpourhomme sur les GET authentifiés
 > n'est pas prouvé non plus ; à tester seulement si une page semble revenir à son ancien contenu.
 >
 > PHPStan : non lançable en local ce jour-là (stack AA ≈ 5 Go sur les 6 Go de la VM Docker, OOM même
 > sur les seuls fichiers modifiés) — **vert en CI** sur `91d4155` (run 37195302069).
 >
-> **Flotte** (`test/upgrade/deployed-versions.conf`) : trottinette 0.11.0, caleconpourhomme 0.11.0,
-> iselection 0.5.2. Préprods non sondables en CLI.
+> **Flotte** (`test/upgrade/deployed-versions.conf`) : trottinette, caleconpourhomme et iselection
+> en 0.11.0. Préprods non sondables en CLI.
 >
 > Reste ouvert par ailleurs : (1) la **vérification de sortie 43.5 sur préprod** ; (2) approuver
 > `92277` à la main dans l'admin préprod ; (3) `revisions:write` chez les autres sites — **AA a
