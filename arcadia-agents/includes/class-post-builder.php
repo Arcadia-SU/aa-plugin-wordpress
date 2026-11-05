@@ -92,7 +92,9 @@ final class Arcadia_Post_Builder {
 	 * @param WP_Post|null $existing  Existing post for update mode, or null for create.
 	 * @param bool         $dry_run   If true, content rendering skips image sideload so
 	 *                                no side-effects occur (used by the dry_run write path).
-	 * @return array{post_data:array, rendered_content:string, force_draft_applied:bool}|WP_Error
+	 * @return array{post_data:array, rendered_content:string, force_draft_applied:bool, warnings:array<int,string>}|WP_Error
+	 *         `warnings`: one message per block `stored` that was not accepted
+	 *         (see Arcadia_Blocks::json_to_blocks()), for the caller's response.
 	 */
 	public function build_post_data( array $body, array &$meta, $post_type, $existing = null, $dry_run = false ) {
 		$structural_error = $this->reject_structural_fields( $body, $meta );
@@ -181,8 +183,15 @@ final class Arcadia_Post_Builder {
 		}
 
 		$rendered_content = '';
+		$warnings         = array();
 		if ( ! empty( $content_data['h1'] ) || ! empty( $content_data['sections'] ) || ! empty( $content_data['children'] ) ) {
-			$content = $this->blocks->json_to_blocks( $content_data, $post_type, $dry_run );
+			$content = $this->blocks->json_to_blocks(
+				$content_data,
+				$post_type,
+				$dry_run,
+				$is_create ? null : (string) $existing->post_content,
+				$warnings
+			);
 			if ( is_wp_error( $content ) ) {
 				return $content;
 			}
@@ -197,6 +206,7 @@ final class Arcadia_Post_Builder {
 			'post_data'           => $post_data,
 			'rendered_content'    => $rendered_content,
 			'force_draft_applied' => $force_draft_applied,
+			'warnings'            => $warnings,
 		);
 	}
 

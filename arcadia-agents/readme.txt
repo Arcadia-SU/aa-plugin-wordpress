@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.11.0
+Stable tag: 0.12.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -73,6 +73,13 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 1. Settings page with connection status and permissions
 
 == Changelog ==
+
+= 0.12.0 =
+A block that Arcadia sends back unchanged now comes out exactly as the site stored it. Until now every block in a push was rebuilt from its fields, so a push that changed one block could rewrite the formatting of blocks a person had written by hand.
+
+* New: `GET /contents/{id}/blocks` returns `stored` on every top-level block: its exact slice of the post content, the block plus whatever follows it up to the next block (the first one also carries what precedes it). Put end to end, the slices are the post content byte for byte. If the post cannot be cut reliably, no block gets `stored`
+* New: a top-level block sent with `stored` on `PUT /contents/{id}` (and its dry-run, and a write held as a pending revision) is written as those exact bytes, with no rendering, no filtering and no field validation, as long as that text already appears in the post. This is what stops a push from rewriting untouched ACF blocks: before, a wysiwyg field went through the markdown parser again, which turned `\r\n` into `\n`, wrapped bare text in `<p>` and put an `acf/title` inside a `<p>`. Seen on a client post where a push that changed a figure in 2 blocks rewrote 6 others
+* Changed: a `stored` that does not appear in the post (or is empty, not a string, or sent when creating a post) is ignored. The block is rendered from its other keys as before, and the response lists it in `warnings`
 
 = 0.11.0 =
 Disconnecting from Arcadia now disconnects WordPress too. Container blocks that Arcadia sends back keep their children inside them.

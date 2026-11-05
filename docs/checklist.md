@@ -955,6 +955,47 @@ Sondé par `GET /health` le 2026-08-21. **Notre fichier était incomplet, et la 
 
 ---
 
+## Phase 53 : 🔴 Un bloc renvoyé inchangé repart tel que le site le stocke (`stored`)
+
+*Ref: backlog.md de la branche AA `fix/push-block-fidelity` (worktree
+`~/Developer/worktrees.noindex/ArcadiaAgents-push-fidelity`), bead backend `aa-ywq8c`, P1 —
+demandé et validé par Oscar le 2026-11-05.*
+
+**Incident (iSelection, post `114236`).** Un `PUT` qui ne changeait qu'un chiffre dans 2 blocs a
+réécrit 6 autres blocs `acf/*` écrits par la cliente. `Arcadia_ACF_Adapter::custom_block()` passe
+chaque wysiwyg dans `parse_rich()` : `\r\n` → `\n`, texte nu entouré de `<p>`, saut de ligne simple
+→ espace, `acf/title` dans un `<p>`. `passthrough_block()` ne rattrape pas un bloc ACF : il n'a pas
+d'`innerHTML`.
+
+- [x] **53.1 — Lecture** : `GET /contents/{id}/blocks` donne à chaque bloc **de premier niveau**
+      `stored`, sa tranche exacte de `post_content` (le bloc + ce qui le suit jusqu'au bloc suivant ;
+      le premier porte aussi ce qui le précède). Mises bout à bout, les tranches redonnent le post à
+      l'octet. Découpe par la regex du parseur de WordPress (`Arcadia_Block_Slicer`), **tout ou
+      rien** : si les noms ne s'alignent pas sur `parse_blocks()`, aucun bloc n'a `stored`
+- [x] **53.2 — Écriture** (`PUT`, son dry-run, et le chemin révision Force Draft) : un bloc de
+      premier niveau dont le `stored` figure dans le `post_content` actuel (`strpos`) est écrit
+      **tel quel** — ni rendu, ni kses, ni validation ACF, ni `"\n\n"` ajouté. Sinon (création,
+      vide, pas une chaîne, absent du post) : `stored` ignoré, bloc rendu comme avant, et un
+      message dans `warnings`. Pas de 422 : c'est la spec du backlog AA (le message de la session
+      « Retours iSelection » disait « refuser » — signalé à AA)
+- [x] **53.3 — Tests** : `StoredBlocksTest` (13 tests, dont la reproduction de l'incident par
+      l'adaptateur ACF) + **Case 5 de `test/fidelity-check.php`** sur vrai WordPress, par les vrais
+      handlers REST : lecture → `PUT` inchangé → post identique à l'octet, en admin **et** en auteur
+      sans `unfiltered_html` (kses actif, cas multisite) ; un bloc modifié ne change que lui ;
+      Force Draft : la révision contient le post à l'octet. Fixture = le post 114236 d'avant
+      l'incident (`tests/fixtures/iselection-114236.html`, copiée du backend)
+- [ ] **53.4 — Release `0.12.0`** (minor : nouvelle clé de lecture, nouveau comportement
+      d'écriture) puis rituel `docs/deploy.md` — **pas de déploiement client sans l'accord
+      d'Oscar**. Les deux côtés sortent ensemble : le backend n'envoie `stored` que s'il l'a lu
+- [ ] **53.5 — Vérif prod** : sur iSelection, rejouer un push d'un seul bloc sur `114236` et
+      comparer `post_content` avant/après hors du bloc touché
+
+> **Limite connue :** le dev WordPress n'a pas ACF Pro. Sans `stored`, les blocs `acf/*` y sont
+> refusés (`unknown_block_type`) au lieu d'être re-rendus. L'incident lui-même n'est donc reproduit
+> qu'en unitaire, avec l'ACF simulé. Le vrai re-rendu ACF n'est vérifié qu'en 53.5.
+
+---
+
 ## Phase 7 : Publication WP.org
 
 *Note : Attendre le passage en prod de l'agent SEO*

@@ -312,15 +312,17 @@ trait Arcadia_API_Posts_Handler {
 			$blocks = $this->format_parsed_blocks( parse_blocks( $built['rendered_content'] ) );
 		}
 
-		return new WP_REST_Response(
-			array(
-				'dry_run'             => true,
-				'valid'               => true,
-				'force_draft_applied' => $built['force_draft_applied'],
-				'blocks'              => $blocks,
-			),
-			200
+		$response_data = array(
+			'dry_run'             => true,
+			'valid'               => true,
+			'force_draft_applied' => $built['force_draft_applied'],
+			'blocks'              => $blocks,
 		);
+		if ( ! empty( $built['warnings'] ) ) {
+			$response_data['warnings'] = $built['warnings'];
+		}
+
+		return new WP_REST_Response( $response_data, 200 );
 	}
 
 	/**
@@ -417,8 +419,9 @@ trait Arcadia_API_Posts_Handler {
 			$response_data['force_draft_applied'] = true;
 		}
 
-		if ( ! empty( $finalize['warnings'] ) ) {
-			$response_data['warnings'] = $finalize['warnings'];
+		$warnings = array_merge( $built['warnings'], $finalize['warnings'] );
+		if ( ! empty( $warnings ) ) {
+			$response_data['warnings'] = $warnings;
 		}
 
 		return new WP_REST_Response( $response_data, 201 );
@@ -507,9 +510,16 @@ trait Arcadia_API_Posts_Handler {
 			}
 
 			// Render content for revision storage.
-			$revision_content = null;
+			$revision_content  = null;
+			$revision_warnings = array();
 			if ( ! empty( $body['h1'] ) || ! empty( $body['sections'] ) || ! empty( $body['children'] ) ) {
-				$revision_content = $this->blocks->json_to_blocks( $body, $post->post_type );
+				$revision_content = $this->blocks->json_to_blocks(
+					$body,
+					$post->post_type,
+					false,
+					(string) $post->post_content,
+					$revision_warnings
+				);
 				if ( is_wp_error( $revision_content ) ) {
 					return $revision_content;
 				}
@@ -531,17 +541,19 @@ trait Arcadia_API_Posts_Handler {
 				return $rev_result;
 			}
 
-			return new WP_REST_Response(
-				array(
-					'revision_created'     => true,
-					'revision_id'          => $rev_result['revision_id'],
-					'revision_version'     => $rev_result['revision_version'],
-					'preview_url'          => $rev_result['preview_url'],
-					'original_post_status' => $post->post_status,
-					'message'              => 'Revision stored. Live post unchanged.',
-				),
-				201
+			$response_data = array(
+				'revision_created'     => true,
+				'revision_id'          => $rev_result['revision_id'],
+				'revision_version'     => $rev_result['revision_version'],
+				'preview_url'          => $rev_result['preview_url'],
+				'original_post_status' => $post->post_status,
+				'message'              => 'Revision stored. Live post unchanged.',
 			);
+			if ( ! empty( $revision_warnings ) ) {
+				$response_data['warnings'] = $revision_warnings;
+			}
+
+			return new WP_REST_Response( $response_data, 201 );
 		}
 
 		// Build post_data (status validation, title/slug/excerpt, content rendering).
@@ -599,8 +611,9 @@ trait Arcadia_API_Posts_Handler {
 			$response_data['force_draft_applied'] = true;
 		}
 
-		if ( ! empty( $finalize['warnings'] ) ) {
-			$response_data['warnings'] = $finalize['warnings'];
+		$warnings = array_merge( $built['warnings'], $finalize['warnings'] );
+		if ( ! empty( $warnings ) ) {
+			$response_data['warnings'] = $warnings;
 		}
 
 		return new WP_REST_Response( $response_data, 200 );
@@ -646,7 +659,13 @@ trait Arcadia_API_Posts_Handler {
 		}
 
 		$parsed = parse_blocks( $post->post_content );
-		$blocks = $this->format_parsed_blocks( $parsed );
+		// Each top-level block also carries `stored`, its exact slice of
+		// post_content: sent back with an unchanged block, the write copies it
+		// as-is instead of re-rendering it (Arcadia_Block_Slicer).
+		$blocks = Arcadia_Block_Slicer::attach_stored(
+			$this->format_parsed_blocks( $parsed ),
+			$post->post_content
+		);
 
 		return new WP_REST_Response(
 			array(

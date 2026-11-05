@@ -24,6 +24,7 @@ require_once __DIR__ . '/adapters/class-adapter-gutenberg.php';
 require_once __DIR__ . '/adapters/class-adapter-acf.php';
 require_once __DIR__ . '/class-block-children.php';
 require_once __DIR__ . '/class-block-processor.php';
+require_once __DIR__ . '/class-block-slicer.php';
 
 /**
  * Class Arcadia_Blocks
@@ -160,13 +161,57 @@ class Arcadia_Blocks {
 	 * Validates all blocks before rendering. Returns WP_Error (422)
 	 * if an unknown block type or missing required field is detected.
 	 *
-	 * @param array  $json      The JSON content structure from the agent.
-	 * @param string $post_type Target post type (passed to ACF validator).
-	 * @param bool   $dry_run   If true, skip image sideload (no side-effects) so the
-	 *                          render reflects what would be stored without persisting.
+	 * Stored blocks (backend backlog 2026-11-05, P1). A top-level block that
+	 * carries `stored` — its slice of post_content, as GET /contents/{id}/blocks
+	 * returned it — is written as those exact bytes: no render, no kses, no ACF
+	 * validation or coercion, no "\n\n" appended. That is the only way to give
+	 * back unchanged a block the renderer cannot reproduce (an ACF wysiwyg with
+	 * `\r\n`, bare text, a title without `<p>`). The slice is accepted only if
+	 * it occurs in $existing_content, so it can only be what the site already
+	 * holds: nothing new enters through this path. Any other `stored` (create
+	 * mode, empty, not a string, no longer in the post) is dropped, the block is
+	 * rendered from its other keys as before, and $warnings says so.
+	 *
+	 * @param array       $json             The JSON content structure from the agent.
+	 * @param string      $post_type        Target post type (passed to ACF validator).
+	 * @param bool        $dry_run          If true, skip image sideload (no side-effects) so the
+	 *                                      render reflects what would be stored without persisting.
+	 * @param string|null $existing_content Current post_content of the post being written (update
+	 *                                      and its dry-run), or null on create: no `stored` accepted.
+	 * @param array|null  $warnings         Out: one message per `stored` that was not accepted.
 	 * @return string|WP_Error Block content for post_content, or WP_Error on validation failure.
 	 */
-	public function json_to_blocks( $json, $post_type = 'post', $dry_run = false ) {
+	public function json_to_blocks( $json, $post_type = 'post', $dry_run = false, $existing_content = null, &$warnings = null ) {
+		$warnings = array();
+
+		// Take verified stored blocks out of the tree BEFORE validation: they are
+		// the site's own bytes, not generation to check or coerce. unset() keeps
+		// the other keys, so validation errors still name `children[<original
+		// index>]` and the render below can put everything back in order.
+		$verbatim = array();
+		if ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) {
+			foreach ( $json['children'] as $index => $block ) {
+				if ( ! is_array( $block ) || ! array_key_exists( 'stored', $block ) ) {
+					continue;
+				}
+				$stored = $block['stored'];
+				if ( self::is_known_stored( $stored, $existing_content ) ) {
+					$verbatim[ $index ] = $stored;
+					unset( $json['children'][ $index ] );
+					continue;
+				}
+				unset( $json['children'][ $index ]['stored'] );
+				$warnings[] = sprintf(
+					'children[%d] (%s): `stored` %s — block rendered from its properties instead.',
+					$index,
+					is_string( $block['type'] ?? null ) ? $block['type'] : '?',
+					null === $existing_content
+						? 'is ignored when creating a post'
+						: 'does not match the current content of the post'
+				);
+			}
+		}
+
 		// Validate all blocks before rendering (fail fast).
 		$validation = $this->validate_blocks( $json );
 		if ( is_wp_error( $validation ) ) {
@@ -190,14 +235,35 @@ class Arcadia_Blocks {
 			$content .= $this->adapter->heading( $json['h1'], 1 );
 		}
 
-		// Process children (ADR-013 unified block model).
-		if ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) {
-			foreach ( $json['children'] as $block ) {
-				$content .= $this->processor->process_block( $block );
-			}
+		// Process children (ADR-013 unified block model), stored blocks back in
+		// their original position.
+		$rendered = ( ! empty( $json['children'] ) && is_array( $json['children'] ) ) ? $json['children'] : array();
+		$indexes  = array_merge( array_keys( $rendered ), array_keys( $verbatim ) );
+		sort( $indexes );
+		foreach ( $indexes as $index ) {
+			$content .= isset( $verbatim[ $index ] )
+				? $verbatim[ $index ]
+				: $this->processor->process_block( $rendered[ $index ] );
 		}
 
 		return $content;
+	}
+
+	/**
+	 * Whether a `stored` value is bytes the post already holds.
+	 *
+	 * The whole safety of the stored path rests here: a non-empty string that
+	 * occurs in the current post_content cannot add anything to the post.
+	 *
+	 * @param mixed       $stored           Value of the block's `stored` key.
+	 * @param string|null $existing_content Current post_content, null on create.
+	 * @return bool
+	 */
+	private static function is_known_stored( $stored, $existing_content ) {
+		return is_string( $stored )
+			&& '' !== $stored
+			&& is_string( $existing_content )
+			&& false !== strpos( $existing_content, $stored );
 	}
 
 	/**

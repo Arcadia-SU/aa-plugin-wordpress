@@ -223,6 +223,151 @@ foreach ( array( 'innerHTML as one chunk' => false, 'innerContent with nulls' =>
 	check_same( '<ulclass="wp-block-list"><li>Un</li><li>Deux</li></ul>', $html, "[$shape] rendered items sit inside the <ul>" );
 }
 
+// ─── Case 5: an unchanged block goes back byte for byte (`stored`, iSelection 114236) ─
+fwrite( STDOUT, "\nCase 5 — read then push back unchanged: post_content identical (iSelection 114236):\n" );
+
+require_once ABSPATH . 'wp-admin/includes/user.php';
+
+$fixture = file_get_contents( dirname( __DIR__ ) . '/tests/fixtures/iselection-114236.html' );
+$api     = Arcadia_API::get_instance();
+
+// Two authors: an administrator (unfiltered_html, the single-site case) and an
+// author without it — where kses filters every write, as for every non super
+// admin on a multisite. write_post() writes as the post's author.
+$no_unfiltered = wp_insert_user(
+	array(
+		'user_login' => 'aa_fidelity_author_' . wp_generate_password( 6, false ),
+		'user_pass'  => wp_generate_password(),
+		'role'       => 'author',
+	)
+);
+check_true( ! user_can( $no_unfiltered, 'unfiltered_html' ), 'the second author really lacks unfiltered_html' );
+
+/**
+ * GET /contents/{id}/blocks → the PUT children AA sends for unchanged blocks.
+ *
+ * @param int $post_id Post ID.
+ * @return array
+ */
+function aa_unchanged_children( $post_id ) {
+	$request = new WP_REST_Request( 'GET' );
+	$request->set_param( 'id', $post_id );
+	$read = Arcadia_API::get_instance()->get_article_blocks( $request )->get_data();
+
+	return array_map(
+		static fn( $block ) => array(
+			'type'       => $block['blockName'],
+			'properties' => $block['attrs']['data'] ?? array(),
+			'stored'     => $block['stored'] ?? null,
+		),
+		$read['blocks']
+	);
+}
+
+/**
+ * PUT /contents/{id} with a children body.
+ *
+ * @param int   $post_id  Post ID.
+ * @param array $children Children.
+ * @param bool  $dry_run  Dry-run flag.
+ * @return array Response data.
+ */
+function aa_put_children( $post_id, $children, $dry_run = false ) {
+	$request = new WP_REST_Request( 'PUT' );
+	$request->set_param( 'id', $post_id );
+	$request->set_header( 'content-type', 'application/json' );
+	$request->set_body( wp_json_encode( array( 'children' => $children, 'dry_run' => $dry_run ) ) );
+	$response = Arcadia_API::get_instance()->update_post( $request );
+	return is_wp_error( $response ) ? array( 'error' => $response->get_error_code() ) : $response->get_data();
+}
+
+$force_draft_before = get_option( 'aa_force_draft', false );
+update_option( 'aa_force_draft', false );
+
+foreach ( array( 'administrator' => 1, 'author without unfiltered_html' => $no_unfiltered ) as $who => $author ) {
+	wp_set_current_user( 1 ); // Seed as admin: the stored state the client's editor produced.
+	$post_id = wp_insert_post(
+		wp_slash(
+			array(
+				'post_type'    => 'post',
+				'post_status'  => 'publish',
+				'post_title'   => 'AA stored fidelity',
+				'post_author'  => $author,
+				'post_content' => $fixture,
+			)
+		),
+		true
+	);
+	check_same( $fixture, get_post( $post_id )->post_content, "[$who] fixture seeded intact" );
+
+	$children = aa_unchanged_children( $post_id );
+	check_same( 28, count( array_filter( array_column( $children, 'stored' ), 'is_string' ) ), "[$who] read hands all 28 top-level blocks their `stored`" );
+
+	$dry = aa_put_children( $post_id, $children, true );
+	check_true( empty( $dry['warnings'] ) && ! empty( $dry['valid'] ), "[$who] dry-run: valid, no warning" );
+
+	$put = aa_put_children( $post_id, $children );
+	check_true( ! empty( $put['success'] ) && empty( $put['warnings'] ), "[$who] PUT accepted without warning" );
+	check_same( $fixture, get_post( $post_id )->post_content, "[$who] post_content identical byte for byte after the push" );
+
+	// Control: the same push without `stored` is the incident — the bytes change.
+	// Without this, an always-identical result would pass the check above.
+	if ( 1 === $author ) {
+		$bare = array_map(
+			static function ( $child ) {
+				unset( $child['stored'] );
+				return $child;
+			},
+			$children
+		);
+		// Without ACF Pro (this dev stack) the acf/* blocks are unregistered and
+		// the push is refused; on a client site they are re-rendered, which is
+		// the incident. Either way, no successful push leaves the post intact.
+		// StoredBlocksTest::test_acf_rerender_is_the_incident reproduces the
+		// re-render itself through the ACF adapter.
+		$control = aa_put_children( $post_id, $bare );
+		check_true(
+			isset( $control['error'] ) || $fixture !== get_post( $post_id )->post_content,
+			"[$who] control: without `stored` the same push is refused or rewrites the post"
+		);
+		wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $fixture ) ) );
+		check_same( $fixture, get_post( $post_id )->post_content, "[$who] control: fixture restored" );
+	}
+
+	// One block changed: only it differs.
+	$changed      = $children;
+	$changed[3]   = array( 'type' => 'core/paragraph', 'content' => 'Chiffre mis à jour : 42 %' );
+	$put          = aa_put_children( $post_id, $changed );
+	$after        = get_post( $post_id )->post_content;
+	$slices       = array_column( Arcadia_Block_Slicer::top_level_slices( $fixture ), 'markup' );
+	$prefix       = implode( '', array_slice( $slices, 0, 3 ) );
+	$suffix       = implode( '', array_slice( $slices, 4 ) );
+	check_true(
+		0 === strpos( $after, $prefix ) && str_ends_with( $after, $suffix ) && false !== strpos( $after, 'Chiffre mis à jour : 42 %' ),
+		"[$who] one block modified: the 27 others are untouched"
+	);
+
+	// Force Draft: the unchanged push becomes a pending revision whose content —
+	// what approval writes to the live post — is the post itself.
+	if ( 1 === $author ) {
+		wp_update_post( wp_slash( array( 'ID' => $post_id, 'post_content' => $fixture ) ) );
+		update_option( 'aa_force_draft', true );
+		$rev = aa_put_children( $post_id, $children );
+		update_option( 'aa_force_draft', false );
+		check_true( ! empty( $rev['revision_created'] ) && empty( $rev['warnings'] ), "[$who] Force Draft: revision created without warning" );
+		if ( ! empty( $rev['revision_id'] ) ) {
+			check_same( $fixture, get_post( $rev['revision_id'] )->post_content, "[$who] Force Draft: the revision holds the post byte for byte" );
+			wp_delete_post( $rev['revision_id'], true );
+		}
+	}
+
+	wp_delete_post( $post_id, true );
+}
+
+wp_set_current_user( 1 );
+wp_delete_user( $no_unfiltered );
+update_option( 'aa_force_draft', $force_draft_before );
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 fwrite( STDOUT, "\n" );
 if ( empty( $failures ) ) {
