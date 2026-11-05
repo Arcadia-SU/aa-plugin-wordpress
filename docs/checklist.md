@@ -976,8 +976,9 @@ d'`innerHTML`.
       premier niveau dont le `stored` figure dans le `post_content` actuel (`strpos`) est écrit
       **tel quel** — ni rendu, ni kses, ni validation ACF, ni `"\n\n"` ajouté. Sinon (création,
       vide, pas une chaîne, absent du post) : `stored` ignoré, bloc rendu comme avant, et un
-      message dans `warnings`. Pas de 422 : c'est la spec du backlog AA (le message de la session
-      « Retours iSelection » disait « refuser » — signalé à AA)
+      message dans `warnings`. Pas de 422 : c'est la spec du backlog AA, **confirmée par AA le
+      2026-11-05** (un 422 bloquerait tout le push ; le cas « site modifié » est couvert par leur
+      garde d'écriture CMS, et ils remontent nos `warnings` à l'agent)
 - [x] **53.3 — Tests** : `StoredBlocksTest` (13 tests, dont la reproduction de l'incident par
       l'adaptateur ACF) + **Case 5 de `test/fidelity-check.php`** sur vrai WordPress, par les vrais
       handlers REST : lecture → `PUT` inchangé → post identique à l'octet, en admin **et** en auteur
