@@ -115,7 +115,19 @@ gh release create "$TAG" "${STAGE}/${ASSET_NAME}" \
 git fetch --quiet --tags origin
 pass "https://github.com/${REPO}/releases/tag/${TAG}"
 
-check "Stable download URL"
-curl -fsSIL --max-time 30 -o /dev/null "https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}" ||
-	fail "releases/latest/download/${ASSET_NAME} does not resolve"
-pass "https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
+# Two checks, not one download of the public URL: from the Mac mini every
+# github.com/…/releases/download/ asset answers 504 (any repo, GitHub status
+# green) while it downloads fine from a browser — a final curl there would fail
+# a release that is actually fine. So: the stable URL must redirect to this
+# tag's asset, and the asset itself (fetched through the API) must be the zip.
+check "Stable download URL points to ${TAG}"
+STABLE="https://github.com/${REPO}/releases/latest/download/${ASSET_NAME}"
+EXPECTED="https://github.com/${REPO}/releases/download/${TAG}/${ASSET_NAME}"
+target=$(curl -sS --max-time 30 -o /dev/null -w '%{redirect_url}' "$STABLE")
+[ "$target" = "$EXPECTED" ] || fail "${STABLE} redirects to '${target:-nothing}', expected ${EXPECTED}"
+pass "${STABLE} → ${TAG}"
+
+check "Published asset = ${ZIP}"
+gh release download "$TAG" --repo "$REPO" --pattern "$ASSET_NAME" --dir "${STAGE}/check"
+cmp -s "${STAGE}/check/${ASSET_NAME}" "$ZIP" || fail "the published ${ASSET_NAME} differs from ${ZIP}"
+pass "identical, byte for byte"
