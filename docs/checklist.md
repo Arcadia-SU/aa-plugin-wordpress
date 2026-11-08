@@ -995,6 +995,15 @@ d'`innerHTML`.
         « [TEST AA 0.12.0] copie du 114236 », seedé avec la fixture, relu identique à l'octet.
         Push d'un seul bloc à lancer par la session AA « Retours iSelection » après son déploiement
         groupé (branche `fix/push-block-fidelity`), puis comparer à la fixture bloc par bloc
+      - ✅ **Push préprod vert (2026-11-08, backend `e3ff17e4a`)** : `PUT /contents/115286`
+        → 200, aucun warning ; seul le bloc 27 (`acf/text`, +11 car.) a changé, les 27 autres
+        `stored` identiques à l'octet ; push d'annulation → `post_content` relu dans WordPress
+        identique à la fixture (37 415 o). Force Draft sur un brouillon = statut seulement,
+        le PUT a bien écrit dans `post_content`. Reste : la même vérif en prod après 24 h
+      - Vu au passage (pas un défaut 0.12.0) : la calibration de la préprod mappe le champ ACF
+        `title` ← `h1`, donc chaque PUT avec `title` l'écrit (à vérifier sur www avant la prod) ;
+        l'« extrait auto » du résumé AA est la description Yoast générée du contenu — le type
+        `article` n'a pas d'extrait, le plugin renvoie `post_excerpt` vide
 
 > **Limite connue :** le dev WordPress n'a pas ACF Pro. Sans `stored`, les blocs `acf/*` y sont
 > refusés (`unknown_block_type`) au lieu d'être re-rendus. L'incident lui-même n'est donc reproduit
