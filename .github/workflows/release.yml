@@ -4,9 +4,15 @@ on:
   release:
     types: [published]
 
+# GitHub Releases are published by ./publish-release.sh after every prod deploy
+# (they are the app's "latest version" download). The plugin is not on
+# WordPress.org yet (planned for 1.0.0) and the repo holds no SVN secrets, so
+# the job is skipped — visibly — until the repo variable WPORG_DEPLOY is set
+# to 'true' (Settings → Secrets and variables → Actions → Variables).
 jobs:
   deploy:
     name: Deploy to WordPress.org
+    if: vars.WPORG_DEPLOY == 'true'
     runs-on: ubuntu-latest
 
     steps:

@@ -15,6 +15,7 @@ Cocher les cases au fur et à mesure de l'avancement.
   la table « Phases archivées » de `checklist.md`)
 - `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
 - `docs/deploy.md` - **Rituel de déploiement** (canari preprod → trempage 24h → prod → relevés `/health`) — seul chemin autorisé vers un site client
+- `publish-release.sh` - **Dernière étape du rituel** : publie la release GitHub `vX.Y.Z` (zip de `dist/`, asset `arcadia-agents.zip`), que la page workspace de l'app propose au téléchargement via `…/releases/latest/download/arcadia-agents.zip`. Refuse tant qu'un hôte `prod` de `deployed-versions.conf` ne répond pas la version sur `/health`. `DRY_RUN=1` = tous les checks, rien de publié
 
 ### Source de vérité des specs
 

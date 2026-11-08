@@ -36,8 +36,14 @@ encaissé la preprod d'abord.
 
 ## 3. Après coup (le jour même)
 
-- [ ] Mettre à jour `test/upgrade/deployed-versions.conf` (hôte + version) —
+- [ ] Mettre à jour `test/upgrade/deployed-versions.conf` (hôte + version + env) —
       c'est ce qui dit au prochain build quels sauts d'upgrade tester
+- [ ] `./publish-release.sh` — publie la **release GitHub** `vX.Y.Z` avec le zip
+      de `dist/` (asset `arcadia-agents.zip`, notes = entrée de changelog).
+      C'est la « dernière version » que l'app propose au téléchargement
+      (`…/releases/latest/download/arcadia-agents.zip`) : le script refuse tant
+      qu'un hôte `prod` de `deployed-versions.conf` ne répond pas la version sur
+      `/health`, donc **après** la conf, jamais avant la prod
 - [ ] Annoncer la release dans `backlog-for-backend.md` (protocole inter-repo)
 - [ ] J+1 : `curl -s https://<site>/wp-json/arcadia/v1/health` sur les sites prod
 
