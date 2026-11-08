@@ -21,18 +21,20 @@ encaissé la preprod d'abord.
 
 - [ ] Uploader le zip (admin WP → Extensions → Ajouter → Téléverser →
       « Remplacer l'actuelle par la version téléversée »)
-- [ ] `/wp-json/arcadia/v1/health` répond `ok` sur la **nouvelle version**
-      (navigateur — la preprod est derrière un basic auth)
+- [ ] Mettre la version dans `test/upgrade/deployed-versions.conf`, puis
+      `./check-sites.sh preprod-iselection.vertuelle.com` : `/health` sur la **nouvelle
+      version**, connexion `arcadia-check` OK, blocs ACF enregistrés (accès :
+      `~/Developer/secrets/wp-sites/<hôte>.env` sur le mini)
 - [ ] Passe ACF rapide : `docs/checklist-test-site-client.md`
 - [ ] **Trempage 24 h.** Pas de prod le même jour, sauf hotfix d'un site cassé
       (auquel cas le rollback est déjà pire que le risque).
 
 ## 2. Production — www.iselection.com puis www.trottinette-tout-terrain.fr
 
-- [ ] J+1 : re-vérifier `/health` preprod (toujours `ok`, toujours la bonne version)
+- [ ] J+1 : `./check-sites.sh preprod-iselection.vertuelle.com` (toujours vert)
 - [ ] Uploader le zip sur chaque site, **un site à la fois**
-- [ ] Immédiatement après chaque upload :
-      `curl -s https://<site>/wp-json/arcadia/v1/health`
+- [ ] Immédiatement après chaque upload : mettre la conf à jour, puis
+      `./check-sites.sh <site>`
 
 ## 3. Après coup (le jour même)
 
@@ -45,7 +47,7 @@ encaissé la preprod d'abord.
       qu'un hôte `prod` de `deployed-versions.conf` ne répond pas la version sur
       `/health`, donc **après** la conf, jamais avant la prod
 - [ ] Annoncer la release dans `backlog-for-backend.md` (protocole inter-repo)
-- [ ] J+1 : `curl -s https://<site>/wp-json/arcadia/v1/health` sur les sites prod
+- [ ] J+1 : `./check-sites.sh` (tous les sites ; un ✗ = la conf ou un site a dérivé)
 
 ## Rollback
 

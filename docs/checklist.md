@@ -990,10 +990,36 @@ d'`innerHTML`.
       d'Oscar**. Les deux côtés sortent ensemble : le backend n'envoie `stored` que s'il l'a lu
 - [ ] **53.5 — Vérif prod** : sur iSelection, rejouer un push d'un seul bloc sur `114236` et
       comparer `post_content` avant/après hors du bloc touché
+      - Canari préprod (2026-11-08) : 0.12.0 relevée, ACF Pro actif (51 blocs `acf/*`).
+        Le 114236 n'existe pas sur la préprod (copie plus ancienne) → brouillon **115286**
+        « [TEST AA 0.12.0] copie du 114236 », seedé avec la fixture, relu identique à l'octet.
+        Push d'un seul bloc à lancer par la session AA « Retours iSelection » après son déploiement
+        groupé (branche `fix/push-block-fidelity`), puis comparer à la fixture bloc par bloc
 
 > **Limite connue :** le dev WordPress n'a pas ACF Pro. Sans `stored`, les blocs `acf/*` y sont
 > refusés (`unknown_block_type`) au lieu d'être re-rendus. L'incident lui-même n'est donc reproduit
 > qu'en unitaire, avec l'ACF simulé. Le vrai re-rendu ACF n'est vérifié qu'en 53.5.
+
+---
+
+## Phase 54 : Lire le contenu brut d'un article en prod, sans compte WordPress
+
+> Décision Oscar (2026-11-08, avec la session Arcadia du Air) : en prod, pas de compte
+> WordPress pour les sessions de vérification. Le plugin expose une route **en lecture seule**
+> qui rend le `post_content` brut d'un article, pour comparer avant/après un push d'AA
+> (cf. 53.5). Authentification : un **secret dédié, révocable, par site** — pas la clé JWT
+> d'Arcadia (qui donne l'écriture). Le compte `arcadia-check` (Éditeur) reste réservé aux préprods.
+
+- [ ] **54.1 — Contrat** : route (`GET /verify/contents/{id}/raw` ?), forme de la réponse
+      (`post_content` + `modified_gmt` + hash), en-tête du secret. Ne pas utiliser
+      `Authorization` (pris par le basic auth des préprods). Annoncer dans `backlog-for-backend.md`
+- [ ] **54.2 — Secret** : généré dans l'admin du plugin (affiché une fois, stocké haché),
+      bouton « Révoquer ». Comparaison à temps constant. Rien d'autre n'est lisible avec
+- [ ] **54.3 — Tests** : unitaires + `test/fidelity-check.php` (lecture à l'octet, secret
+      faux / révoqué / absent → 401, aucune écriture possible). Uninstall nettoie l'option
+- [ ] **54.4 — Release** (minor) + rituel `docs/deploy.md`, puis clé `READ_TOKEN` dans
+      `~/Developer/secrets/wp-sites/<hôte>.env` de chaque prod, et `check-sites.sh` la
+      vérifie (aujourd'hui : simple avertissement « pas de fichier d'accès »)
 
 ---
 

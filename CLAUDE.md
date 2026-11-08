@@ -16,6 +16,7 @@ Cocher les cases au fur et à mesure de l'avancement.
 - `docs/checklist-test-site-client.md` - Checklist test manuel site client (ACF Pro)
 - `docs/deploy.md` - **Rituel de déploiement** (canari preprod → trempage 24h → prod → relevés `/health`) — seul chemin autorisé vers un site client
 - `publish-release.sh` - **Dernière étape du rituel** : publie la release GitHub `vX.Y.Z` (zip de `dist/`, asset `arcadia-agents.zip`), que la page workspace de l'app propose au téléchargement via `…/releases/latest/download/arcadia-agents.zip`. Refuse tant qu'un hôte `prod` de `deployed-versions.conf` ne répond pas la version sur `/health`. `DRY_RUN=1` = tous les checks, rien de publié
+- `check-sites.sh [hôte]` - **Relevé de la flotte** : pour chaque site de `deployed-versions.conf` (la seule liste), version live sur `/health` vs conf, et accès présents. Accès d'un site = `~/Developer/secrets/wp-sites/<hôte>.env` sur le mini (chmod 600, hors dépôt), écrit par Oscar depuis l'Air avec `scripts/secret.sh <CLÉ> mini:secrets/wp-sites/<hôte>.env` (monorepo Arcadia) — **jamais un secret dans la conversation**. Clés préprod : `BASIC_AUTH_USER`, `BASIC_AUTH_PASS`, `WP_USER`, `WP_PASS` (compte Éditeur `arcadia-check`, mot de passe de connexion : un mot de passe d'application ne passe pas le basic auth, même en-tête `Authorization`). Prod : pas de compte WordPress (Phase 54)
 
 ### Source de vérité des specs
 
