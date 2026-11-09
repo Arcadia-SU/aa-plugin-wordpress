@@ -41,9 +41,17 @@ objet relu), jamais sur la demande.
 | Supprimer (`DELETE`) | pas à la corbeille (avec ou sans `force`) | **corbeille**, quel que soit le type (C63) — `force` n'efface que ce qui est déjà à la corbeille | **garder** (action `content.delete`) |
 | | déjà à la corbeille, sans `force` | rien à faire : `200`, `trashed: true`, `already_trashed: true` | idem |
 | | déjà à la corbeille, `force: true` | suppression définitive | **garder** (action `content.delete`, `force: true`) |
-| Toute écriture | une action `content.delete` est en attente | — | **refuser** `409 pending_action_exists` (lien vers l'attente) |
+| Mettre à jour, image mise en avant | une action `content.delete` est en attente | **refuser** `409 pending_action_exists` | **refuser** `409 pending_action_exists` (`data.pending_action_id`, `data.review_url`) |
 
 Une mise à jour à la corbeille (statut `trash`) est refusée : `409 post_trashed`, dans les deux cas.
+
+Précisions (2026-11-09, à l'implémentation, sans changement de case) :
+- Une nouvelle suppression d'un article dont la suppression attend n'est pas refusée : c'est la
+  même action sur le même objet, elle remplace la précédente (`superseded`, §3).
+- Le refus `pending_action_exists` vaut aussi brouillon forcé désactivé : une suppression gardée
+  avant qu'on désactive le réglage reste en attente, et rien ne doit passer à côté.
+- Un `dry_run` donne le même verdict que l'écriture réelle : refus identique, et `held: true` +
+  `action` dans la réponse quand l'écriture réelle serait gardée.
 
 ### 2.2 Catégories et étiquettes (`/categories`, `/tags`)
 
@@ -103,9 +111,12 @@ plus les champs communs.
 - `object.kind` : `content` | `term` | `media` | `redirect`. `object.type` : type de publication,
   taxonomie (`category`, `post_tag`) ou `attachment` ; `redirect` pour une redirection. Pour
   `redirect.create`, `object.id` vaut `null`.
-- `base_version` : la version de l'objet sur laquelle la proposition a été calculée —
-  `post_modified_gmt` pour un article ou un média ; pour un terme ou une redirection, un hash de
-  ses champs. `null` pour `redirect.create`.
+- `base_version` : la version de l'objet sur laquelle la proposition a été calculée. **Valeur
+  opaque** : le serveur la garde et la compare, il ne la décode pas. Article : `post_modified_gmt`
+  suivi du statut (`2026-11-09 10:42:17|publish`) — passer à la corbeille ou dépublier change ce
+  sur quoi tomberait la validation. Média : un hash du titre, de la légende, du texte alternatif et
+  du statut — le texte alternatif est une méta, il ne fait pas bouger la date. Terme ou redirection :
+  un hash de leurs champs. `null` pour `redirect.create`, et pour une révision créée avant 0.13.0.
 - `content.update` garde aussi `revision_created`, `revision_id` (= `pending_action_id`),
   `revision_version`, `preview_url`, `original_post_status`.
 - Une nouvelle proposition de la **même action sur le même objet** remplace la précédente,
@@ -134,6 +145,8 @@ Suppression appliquée d'un article : ses actions en attente passent en `stale`.
 - `GET /pending-actions?status=<statut>&object_kind=<kind>&object_id=<id>` (filtres facultatifs) :
   liste, la plus récente d'abord. Chaque entrée : les champs de la réponse « gardé » +
   `status`, `created_gmt`, `decided_gmt`, `decided_by` (identifiant WordPress), `decision_notes`.
+- La liste contient aussi les révisions d'article (`action: content.update`, `pending_action_id`
+  = `revision_id`, `review_url` = l'éditeur de l'article).
 - Les routes actuelles `…/{id}/revisions` restent, et ne listent que `content.update`.
 - `POST /pending-actions/{id}/withdraw` : `200` → `withdrawn` ; `409 action_not_pending` si
   l'action n'est plus en attente.
