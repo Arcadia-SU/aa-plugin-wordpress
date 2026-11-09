@@ -1044,22 +1044,33 @@ d'`innerHTML`.
 > la session webflow est écartée.) Autre décision : le clic d'un membre ne contourne pas le
 > brouillon forcé.
 
-- [ ] **55.1 — Table unique** action × état de l'objet × brouillon forcé × statut demandé →
+- [x] **55.1 — Table unique** action × état de l'objet × brouillon forcé × statut demandé →
       appliquer / garder / refuser. Lue par tous les chemins d'écriture (création, mise à jour,
       révision, suppression, taxonomies). Un test par case. Réponses calculées sur le résultat
       observé, jamais sur la demande
-- [ ] **55.2 — C61** : le brouillon forcé ne baisse jamais le statut actuel quand le body n'en
+- [x] **55.2 — C61** : le brouillon forcé ne baisse jamais le statut actuel quand le body n'en
       envoie pas ; `future` est traité comme `publish` (gardé en révision). Tests future/private/pending
-- [ ] **55.3 — C03 (part plugin)** : un `status` égal au statut actuel = rien à changer (plus de
+- [x] **55.3 — C03 (part plugin)** : un `status` égal au statut actuel = rien à changer (plus de
       422) ; un vrai changement reste 422, message à revoir
-- [ ] **55.4 — C04** : la révision stocke le `post_modified_gmt` de l'article ; l'approbation
+- [x] **55.4 — C04** : la révision stocke le `post_modified_gmt` de l'article ; l'approbation
       (écran, approbation groupée) est refusée si l'article a changé, la révision est marquée périmée
-- [ ] **55.5 — C63** : suppression = corbeille pour tout type (`wp_trash_post`), `trashed` lu
+- [x] **55.5 — C63** : suppression = corbeille pour tout type (`wp_trash_post`), `trashed` lu
       après l'appel ; les révisions en attente de l'article supprimé sont fermées
-- [ ] **55.6 — C62** : file d'attente générique (suppression, catégories créer/renommer/supprimer)
+- [x] **55.6 — C62** : file d'attente générique (suppression, catégories créer/renommer/supprimer)
       + écran de validation WordPress + réponse « gardé » ; périmètre exact de « catégories » à figer
 - [ ] **55.7 — Contrat figé** → session webflow (double partagé du serveur) + `backlog-for-backend.md`
-- [ ] **55.8 — Textes** (réglage, messages d'erreur, écran) dans une liste à valider par Oscar
+      — contrat figé et envoyé à la session webflow le 2026-11-09 (commit 5ec4486) ; précisions
+        d'implémentation ajoutées (base_version opaque, refus `pending_action_exists` aussi réglage
+        désactivé, dry_run, liste) **à lui renvoyer**. Reste : l'annonce dans `backlog-for-backend.md`
+        à la release
+- [x] **55.8 — Textes** (réglage, messages d'erreur, écran) dans une liste à valider par Oscar
+      — fait (branche `feat/ch03-write-table`, 2026-11-09) : `includes/class-write-table.php`
+        (`WriteTableTest`, un test par case), file `aa_pending_action`
+        (`includes/class-pending-actions.php`, `PendingActionsTest`), écran `admin/pending.php`,
+        `GET /pending-actions`, `POST /pending-actions/{id}/withdraw`, `held_actions` dans
+        `/site-info`, check build #4b (parité code ↔ contrat), `fidelity-check` Case 6 (WP réel),
+        textes dans `docs/textes-0.13.0.md`, fr_FR à 100 %. Au passage : les statuts
+        `approved`/`rejected`/`superseded` n'étaient pas enregistrés (WP_Query ignorait le filtre)
 - [ ] **55.9 — Release 0.13.0** (minor) + rituel `docs/deploy.md`
 
 ---
