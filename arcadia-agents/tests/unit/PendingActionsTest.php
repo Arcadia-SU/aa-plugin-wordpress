@@ -476,6 +476,70 @@ class PendingActionsTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $explicit );
 	}
 
+	public function test_ids_finds_an_action_beyond_the_listing_limit() {
+		global $_test_posts;
+		$this->seed_post( 42 );
+		$held = $this->assert_held( $this->helper->delete_post( $this->request( 42 ) ), 'content.delete' );
+		$id   = $held['pending_action_id'];
+		// LIST_LIMIT newer rows push the action out of the capped listing.
+		for ( $i = 1; $i <= \Arcadia_Pending_Actions::LIST_LIMIT; $i++ ) {
+			$copy                = clone $_test_posts[ $id ];
+			$copy->ID            = 900000 + $i;
+			$copy->post_date     = '2099-01-01 00:00:00';
+			$_test_posts[ $copy->ID ] = $copy;
+		}
+
+		$full = $this->helper->list_pending_actions( $this->request( 0 ) )->get_data();
+		$this->assertTrue( $full['truncated'] );
+		$this->assertNotContains( $id, array_column( $full['pending_actions'], 'pending_action_id' ) );
+		$this->assertArrayNotHasKey( 'not_found', $full );
+
+		$by_id = $this->helper->list_pending_actions( $this->request( 0, array(), array( 'ids' => $id . ',777777' ) ) )->get_data();
+		$this->assertSame( array( $id ), array_column( $by_id['pending_actions'], 'pending_action_id' ) );
+		$this->assertSame( array( 777777 ), $by_id['not_found'] );
+		$this->assertFalse( $by_id['truncated'] );
+	}
+
+	public function test_ids_finds_decided_actions_and_combines_with_status() {
+		$this->seed_post( 42 );
+		$held = $this->assert_held( $this->helper->delete_post( $this->request( 42 ) ), 'content.delete' );
+		$id   = $held['pending_action_id'];
+		$this->helper->withdraw_pending_action( $this->request( $id ) );
+
+		$any = $this->helper->list_pending_actions( $this->request( 0, array(), array( 'ids' => (string) $id ) ) )->get_data();
+		$this->assertSame( 'withdrawn', $any['pending_actions'][0]['status'] );
+
+		// Filtered out by status, but it exists: not in not_found.
+		$pending = $this->helper->list_pending_actions( $this->request( 0, array(), array( 'ids' => (string) $id, 'status' => 'pending' ) ) )->get_data();
+		$this->assertSame( array(), $pending['pending_actions'] );
+		$this->assertSame( array(), $pending['not_found'] );
+	}
+
+	public function test_full_listing_is_not_truncated_below_the_limit() {
+		$this->seed_post( 42 );
+		$this->helper->delete_post( $this->request( 42 ) );
+		$this->assertFalse( $this->helper->list_pending_actions( $this->request( 0 ) )->get_data()['truncated'] );
+	}
+
+	/**
+	 * @dataProvider invalid_ids
+	 */
+	public function test_invalid_ids_are_refused( $ids ) {
+		$result = $this->helper->list_pending_actions( $this->request( 0, array(), array( 'ids' => $ids ) ) );
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 'invalid_ids', $result->get_error_code() );
+	}
+
+	public static function invalid_ids() {
+		return array(
+			'not a number' => array( '12,abc' ),
+			'zero'         => array( '0' ),
+			'negative'     => array( '-4' ),
+			'empty item'   => array( '12,,13' ),
+			'too many'     => array( implode( ',', range( 1, \Arcadia_Pending_Actions::IDS_MAX + 1 ) ) ),
+		);
+	}
+
 	public function test_withdraw_needs_the_write_scope_of_the_kind() {
 		$this->seed_post( 42 );
 		$delete               = $this->assert_held( $this->helper->delete_post( $this->request( 42 ) ), 'content.delete' );

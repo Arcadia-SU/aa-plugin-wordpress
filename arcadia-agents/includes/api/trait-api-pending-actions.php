@@ -60,17 +60,65 @@ trait Arcadia_API_Pending_Actions_Handler {
 			$kinds[] = $candidate;
 		}
 
+		$ids = $this->parse_pending_action_ids( $request->get_param( 'ids' ) );
+		if ( is_wp_error( $ids ) ) {
+			return $ids;
+		}
+
 		$status = $request->get_param( 'status' );
-		$entries = Arcadia_Pending_Actions::get_instance()->list_entries(
+		$result = Arcadia_Pending_Actions::get_instance()->list_entries(
 			array(
 				'status'      => null === $status ? null : sanitize_key( (string) $status ),
 				'object_kind' => $kind,
 				'object_id'   => $request->get_param( 'object_id' ) ? (int) $request->get_param( 'object_id' ) : null,
+				'ids'         => $ids,
 				'kinds'       => $kinds,
 			)
 		);
 
-		return new WP_REST_Response( array( 'pending_actions' => $entries ), 200 );
+		$body = array(
+			'pending_actions' => $result['entries'],
+			'truncated'       => $result['truncated'],
+		);
+		if ( $ids ) {
+			$body['not_found'] = $result['not_found'];
+		}
+		return new WP_REST_Response( $body, 200 );
+	}
+
+	/**
+	 * `ids` query parameter: "812,813" (or an array), 1 to IDS_MAX positive ids.
+	 *
+	 * @param mixed $raw Raw parameter.
+	 * @return int[]|WP_Error Empty array when absent.
+	 */
+	private function parse_pending_action_ids( $raw ) {
+		if ( null === $raw || '' === $raw ) {
+			return array();
+		}
+		$parts = is_array( $raw ) ? $raw : explode( ',', (string) $raw );
+		$ids   = array();
+		foreach ( $parts as $part ) {
+			$part = trim( (string) $part );
+			if ( ! ctype_digit( $part ) || 0 === (int) $part ) {
+				$ids = null;
+				break;
+			}
+			$ids[] = (int) $part;
+		}
+		$ids = null === $ids ? null : array_values( array_unique( $ids ) );
+		if ( null === $ids || count( $ids ) > Arcadia_Pending_Actions::IDS_MAX ) {
+			return new WP_Error(
+				'invalid_ids',
+				sprintf(
+					/* translators: %s: maximum number of ids */
+					__( 'ids must be a comma-separated list of 1 to %s positive IDs.', 'arcadia-agents' ),
+					Arcadia_Pending_Actions::IDS_MAX
+				),
+				array( 'status' => 400 )
+			);
+		}
+		return $ids;
 	}
 
 	/**

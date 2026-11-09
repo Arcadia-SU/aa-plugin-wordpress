@@ -1,6 +1,7 @@
 # Contrat — table des écritures (plugin 0.13.0, Phase 55 / CH03)
 
-> **Statut : figé le 2026-11-09** (périmètre décidé par Oscar le 2026-11-09). Toute
+> **Statut : figé le 2026-11-09** (périmètre décidé par Oscar le 2026-11-09). Ajout le
+> 2026-11-09, à la demande du serveur : limite de la liste et filtre `ids` (§4). Toute
 > modification passe par ce fichier **et** par `includes/class-write-table.php`, dans le même
 > commit : un test vérifie que les deux disent la même chose.
 >
@@ -142,9 +143,29 @@ Suppression appliquée d'un article : ses actions en attente passent en `stale`.
 
 ### Lecture par Arcadia
 
-- `GET /pending-actions?status=<statut>&object_kind=<kind>&object_id=<id>` (filtres facultatifs) :
-  liste, la plus récente d'abord. Chaque entrée : les champs de la réponse « gardé » +
-  `status`, `created_gmt`, `decided_gmt`, `decided_by` (identifiant WordPress), `decision_notes`.
+- `GET /pending-actions?status=<statut>&object_kind=<kind>&object_id=<id>&ids=<id,id,…>` (filtres
+  facultatifs, combinables) : liste, la plus récente d'abord. Chaque entrée : les champs de la
+  réponse « gardé » + `status`, `created_gmt`, `decided_gmt`, `decided_by` (identifiant WordPress),
+  `decision_notes`.
+- **Limite de la liste complète (sans `ids`).** Le plugin lit les **200** actions les plus récentes
+  et les **200** révisions les plus récentes, **puis** applique les filtres. Une action plus ancienne
+  peut donc manquer, même avec `object_id`. `truncated: true` dit qu'au moins une des deux lectures
+  a atteint 200 : une absence n'y prouve rien.
+- **Recherche par identifiant (`ids`).** `ids=812,813` (1 à 100 identifiants `pending_action_id`,
+  actions et révisions mélangées) lit exactement ces lignes, **sans limite**, quel que soit leur
+  statut ; les autres filtres s'appliquent ensuite. La réponse ajoute `not_found` : les identifiants
+  qui ne sont ni une action ni une révision sur ce site (supprimés ou jamais créés). Un identifiant
+  écarté par un filtre (`status`…) ou par les scopes n'est **pas** dans `not_found`. Un identifiant
+  absent de la liste **et** de `not_found` existe donc, mais ne passe pas les filtres.
+  `ids` invalide (pas un entier positif, vide, plus de 100) : `400 invalid_ids`.
+
+  ```json
+  { "pending_actions": [ { "pending_action_id": 812, "status": "approved", "…": "…" } ],
+    "truncated": false,
+    "not_found": [813] }
+  ```
+  `not_found` n'apparaît que si `ids` est envoyé ; `truncated` est toujours présent (`false` avec
+  `ids`).
 - La liste contient aussi les révisions d'article (`action: content.update`, `pending_action_id`
   = `revision_id`, `review_url` = l'éditeur de l'article).
 - Les routes actuelles `…/{id}/revisions` restent, et ne listent que `content.update`.
@@ -175,6 +196,7 @@ Liste vide quand le brouillon forcé est désactivé. Ce champ s'ajoute à `forc
 | `post_trashed` | 409 | mise à jour d'un article à la corbeille |
 | `action_not_pending` | 409 | retrait d'une action qui n'est plus `pending` |
 | `pending_action_not_found` | 404 | identifiant inconnu |
+| `invalid_ids` | 400 | `GET /pending-actions` : `ids` n'est pas une liste de 1 à 100 entiers positifs |
 
 ## 7. Ce que le double partagé du serveur doit reproduire
 

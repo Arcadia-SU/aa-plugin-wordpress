@@ -1041,7 +1041,7 @@ if ( ! function_exists( 'wp_delete_post' ) ) {
 }
 
 // get_posts() stub — supports the subset of args the plugin uses (post_type,
-// post_parent, post_status, orderby=date, order, offset, numberposts/per_page,
+// include, post_parent, post_status, orderby=date, order, offset, numberposts/per_page,
 // fields=ids). Backed by the in-memory $_test_posts store.
 if ( ! function_exists( 'get_posts' ) ) {
     function get_posts( $args = array() ) {
@@ -1051,6 +1051,10 @@ if ( ! function_exists( 'get_posts' ) ) {
         if ( ! empty( $args['post_type'] ) ) {
             $types = (array) $args['post_type'];
             $posts = array_filter( $posts, fn( $p ) => in_array( $p->post_type ?? '', $types, true ) );
+        }
+        if ( ! empty( $args['include'] ) ) {
+            $include = array_map( 'intval', (array) $args['include'] );
+            $posts   = array_filter( $posts, fn( $p ) => in_array( (int) $p->ID, $include, true ) );
         }
         if ( isset( $args['post_parent'] ) ) {
             $parent = (int) $args['post_parent'];

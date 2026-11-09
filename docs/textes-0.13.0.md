@@ -70,6 +70,7 @@ Le serveur Arcadia les relaie au membre et à l'agent. Ils disent ce qui s'est p
 | `pending_action_stale` | 409 | — (nouveau) | This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told. |
 | `action_not_pending` | 409 | — (nouveau) | This proposal is no longer waiting for approval. |
 | `pending_action_not_found` | 404 | — (nouveau) | No proposal with this ID. |
+| `invalid_ids` | 400 | — (nouveau) | ids must be a comma-separated list of 1 to %s positive IDs. (FR : ids doit être une liste de 1 à %s identifiants positifs, séparés par des virgules.) |
 
 `pending_action_stale` est aussi le message que voit la personne qui valide dans WordPress : sur la
 ligne de l'écran, dans la validation groupée et dans l'éditeur d'article. Avant : « Arcadia will propose again from the current version ». Changé le 2026-11-09 :
@@ -101,7 +102,7 @@ qu'un client lira le plus souvent :
 | Rename %1$s “%2$s” to “%3$s” | Renommer %1$s « %2$s » en « %3$s » (la catégorie / l’étiquette) |
 | Delete the media “%s” — it disappears from every page that shows it | Supprimer le média « %s » — il disparaît de toutes les pages qui l’affichent |
 | Redirect visitors from %1$s to %2$s | Rediriger les visiteurs de %1$s vers %2$s |
-| This proposal is out of date: … | Cette proposition est périmée : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia refera une proposition à partir de la version actuelle. |
+| This proposal is out of date: … | Cette proposition n’est plus valable : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu. |
 
 **Réglage, version française :**
 > Activé, rien de ce que fait Arcadia ne change ce que voient les visiteurs avant votre validation. Les

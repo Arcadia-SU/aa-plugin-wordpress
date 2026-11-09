@@ -1416,3 +1416,7 @@ msgstr "Aucune proposition avec cet identifiant."
 #: includes/class-write-table.php:114
 msgid "This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told."
 msgstr "Cette proposition n’est plus valable : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu."
+
+#. translators: %s: maximum number of ids
+msgid "ids must be a comma-separated list of 1 to %s positive IDs."
+msgstr "ids doit être une liste de 1 à %s identifiants positifs, séparés par des virgules."

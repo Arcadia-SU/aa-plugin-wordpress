@@ -37,6 +37,16 @@ final class Arcadia_Pending_Actions {
 	const POST_TYPE = 'aa_pending_action';
 
 	/**
+	 * Rows read per store by a listing without `ids` (contract §4).
+	 */
+	const LIST_LIMIT = 200;
+
+	/**
+	 * Max ids per `ids` lookup (contract §4).
+	 */
+	const IDS_MAX = 100;
+
+	/**
 	 * Every status a pending action (or a revision) can be in — §4.
 	 */
 	const STATUSES = array( 'pending', 'approved', 'rejected', 'stale', 'superseded', 'withdrawn' );
@@ -568,32 +578,60 @@ final class Arcadia_Pending_Actions {
 	/**
 	 * List pending actions and revisions, newest first (§4).
 	 *
-	 * @param array $filters status, object_kind, object_id (all optional), kinds (allowed kinds).
-	 * @return array<int, array>
+	 * Without `ids`, each store is read up to LIST_LIMIT rows (newest first)
+	 * BEFORE the other filters, so an old action can be missing: `truncated`
+	 * says when a store hit the limit. With `ids`, exactly those rows are read,
+	 * with no limit, and `not_found` lists the ids that are no proposal here.
+	 *
+	 * @param array $filters status, object_kind, object_id, ids (all optional), kinds (allowed kinds).
+	 * @return array{entries: array<int, array>, truncated: bool, not_found: int[]}
 	 */
 	public function list_entries( array $filters ) {
 		$status = isset( $filters['status'] ) && in_array( $filters['status'], self::STATUSES, true ) ? $filters['status'] : null;
 		$kinds  = $filters['kinds'] ?? array_keys( self::KIND_SCOPES );
+		$ids    = array_values( array_unique( array_map( 'intval', (array) ( $filters['ids'] ?? array() ) ) ) );
 
-		$posts = $this->query( array( 'status' => $status ) );
-		if ( in_array( 'content', $kinds, true ) ) {
-			$revisions = get_posts(
+		$truncated = false;
+		$not_found = array();
+		if ( $ids ) {
+			// Every status: a decided action is still found by its id, and
+			// `status` filters below like on the full listing.
+			$posts     = get_posts(
 				array(
-					'post_type'        => 'aa_revision',
-					'post_status'      => null === $status ? self::STATUSES : $status,
-					'numberposts'      => 200,
-					'orderby'          => 'date',
-					'order'            => 'DESC',
+					'post_type'        => array( self::POST_TYPE, 'aa_revision' ),
+					'post_status'      => self::STATUSES,
+					'include'          => $ids,
+					'numberposts'      => count( $ids ),
 					'suppress_filters' => true,
 				)
 			);
-			$posts     = array_merge( $posts, $revisions );
+			$not_found = array_values( array_diff( $ids, array_map( fn( $p ) => (int) $p->ID, $posts ) ) );
+		} else {
+			$posts     = $this->query( array( 'status' => $status ) );
+			$truncated = count( $posts ) >= self::LIST_LIMIT;
+			if ( in_array( 'content', $kinds, true ) ) {
+				$revisions = get_posts(
+					array(
+						'post_type'        => 'aa_revision',
+						'post_status'      => null === $status ? self::STATUSES : $status,
+						'numberposts'      => self::LIST_LIMIT,
+						'orderby'          => 'date',
+						'order'            => 'DESC',
+						'suppress_filters' => true,
+					)
+				);
+				$truncated = $truncated || count( $revisions ) >= self::LIST_LIMIT;
+				$posts     = array_merge( $posts, $revisions );
+			}
 		}
 
 		$entries = array();
 		foreach ( $posts as $post ) {
 			$entry = $this->format_entry( $post );
 			if ( ! in_array( $entry['object']['kind'], $kinds, true ) ) {
+				continue;
+			}
+			if ( null !== $status && $entry['status'] !== $status ) {
 				continue;
 			}
 			if ( ! empty( $filters['object_kind'] ) && $entry['object']['kind'] !== $filters['object_kind'] ) {
@@ -610,7 +648,11 @@ final class Arcadia_Pending_Actions {
 			fn( $a, $b ) => strcmp( (string) $b['created_gmt'], (string) $a['created_gmt'] ) ?: ( $b['pending_action_id'] <=> $a['pending_action_id'] )
 		);
 
-		return $entries;
+		return array(
+			'entries'   => $entries,
+			'truncated' => $truncated,
+			'not_found' => $not_found,
+		);
 	}
 
 	/**
@@ -746,7 +788,7 @@ final class Arcadia_Pending_Actions {
 			array(
 				'post_type'        => self::POST_TYPE,
 				'post_status'      => empty( $args['status'] ) ? self::STATUSES : $args['status'],
-				'numberposts'      => 200,
+				'numberposts'      => self::LIST_LIMIT,
 				'orderby'          => 'date',
 				'order'            => 'DESC',
 				'suppress_filters' => true,
