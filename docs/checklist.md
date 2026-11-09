@@ -1032,6 +1032,38 @@ d'`innerHTML`.
 
 ---
 
+## Phase 55 : CH03 — le plugin fait ce qu'il annonce (repasse des écritures, 0.13.0)
+
+> Repasse des écritures du 2026-11-08 (session « webflow », brief `CH03.md`). Partage : le plugin
+> ici, le serveur dans la session « webflow ». Défauts re-vérifiés sur main 0.12.0 le 2026-11-09 :
+> tous présents. Sort **après** la 0.12.0 en prod, avec son propre canari.
+>
+> **Décision Oscar (2026-11-09, posée directement) — C62 :** avec le brouillon forcé actif, les
+> suppressions et les changements de catégories sont **eux aussi bloqués, avec un écran de
+> validation** dans WordPress, comme les révisions d'articles. (La proposition « texte seul » de
+> la session webflow est écartée.) Autre décision : le clic d'un membre ne contourne pas le
+> brouillon forcé.
+
+- [ ] **55.1 — Table unique** action × état de l'objet × brouillon forcé × statut demandé →
+      appliquer / garder / refuser. Lue par tous les chemins d'écriture (création, mise à jour,
+      révision, suppression, taxonomies). Un test par case. Réponses calculées sur le résultat
+      observé, jamais sur la demande
+- [ ] **55.2 — C61** : le brouillon forcé ne baisse jamais le statut actuel quand le body n'en
+      envoie pas ; `future` est traité comme `publish` (gardé en révision). Tests future/private/pending
+- [ ] **55.3 — C03 (part plugin)** : un `status` égal au statut actuel = rien à changer (plus de
+      422) ; un vrai changement reste 422, message à revoir
+- [ ] **55.4 — C04** : la révision stocke le `post_modified_gmt` de l'article ; l'approbation
+      (écran, approbation groupée) est refusée si l'article a changé, la révision est marquée périmée
+- [ ] **55.5 — C63** : suppression = corbeille pour tout type (`wp_trash_post`), `trashed` lu
+      après l'appel ; les révisions en attente de l'article supprimé sont fermées
+- [ ] **55.6 — C62** : file d'attente générique (suppression, catégories créer/renommer/supprimer)
+      + écran de validation WordPress + réponse « gardé » ; périmètre exact de « catégories » à figer
+- [ ] **55.7 — Contrat figé** → session webflow (double partagé du serveur) + `backlog-for-backend.md`
+- [ ] **55.8 — Textes** (réglage, messages d'erreur, écran) dans une liste à valider par Oscar
+- [ ] **55.9 — Release 0.13.0** (minor) + rituel `docs/deploy.md`
+
+---
+
 ## Phase 7 : Publication WP.org
 
 *Note : Attendre le passage en prod de l'agent SEO*
