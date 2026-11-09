@@ -402,6 +402,10 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
             return $this->status;
         }
 
+        public function set_data( $data ) {
+            $this->data = $data;
+        }
+
         /**
          * Set a header. $replace = false appends, matching WP_HTTP_Response —
          * Link headers are concatenated, not overwritten.
@@ -1182,6 +1186,7 @@ if ( ! function_exists( 'wp_update_post' ) ) {
                     $_test_posts[ $id ]->$field = $post_data[ $field ];
                 }
             }
+            $_test_posts[ $id ]->post_modified_gmt = _test_next_modified_gmt();
 
             // Once the post leaves the not-yet-public statuses, core derives
             // post_date_gmt from post_date.
@@ -1265,6 +1270,10 @@ if ( ! function_exists( 'wp_insert_post' ) ) {
                 true
             ) ? '0000-00-00 00:00:00' : get_gmt_from_date( isset( $post_data['post_date'] ) ? $post_data['post_date'] : current_time( 'mysql' ) ),
             'post_modified'  => current_time( 'mysql' ),
+            // Distinct on every write (see _test_next_modified_gmt()): the
+            // staleness rule of Phase 55 compares it, and a clock that does not
+            // move within one test would hide a changed article.
+            'post_modified_gmt' => _test_next_modified_gmt(),
             'post_author'    => isset( $post_data['post_author'] ) ? $post_data['post_author'] : 1,
             'post_name'      => isset( $post_data['post_name'] ) ? $post_data['post_name'] : '',
             'post_mime_type' => '',
@@ -1874,3 +1883,36 @@ require_once dirname( __DIR__, 2 ) . '/includes/class-revision-diff.php';
 
 // Load post builder (used by trait-api-posts).
 require_once dirname( __DIR__, 2 ) . '/includes/class-post-builder.php';
+
+// A post_modified_gmt that moves by one second on every write, so two writes in
+// the same test never share a version (Phase 55: approval refuses when the
+// article changed since the proposal).
+if ( ! function_exists( '_test_next_modified_gmt' ) ) {
+    function _test_next_modified_gmt() {
+        global $_test_modified_clock;
+        $_test_modified_clock = ( $_test_modified_clock ?? 0 ) + 1;
+        return gmdate( 'Y-m-d H:i:s', 1767225600 + $_test_modified_clock );
+    }
+}
+
+// wp_trash_post() stub: moves the post to the trash, like core with
+// EMPTY_TRASH_DAYS > 0 — for every post type (C63).
+if ( ! function_exists( 'wp_trash_post' ) ) {
+    function wp_trash_post( $post_id = 0 ) {
+        global $_test_posts;
+        if ( ! isset( $_test_posts[ $post_id ] ) || 'trash' === ( $_test_posts[ $post_id ]->post_status ?? '' ) ) {
+            return false;
+        }
+        $_test_posts[ $post_id ]->post_status       = 'trash';
+        $_test_posts[ $post_id ]->post_modified_gmt = _test_next_modified_gmt();
+        return $_test_posts[ $post_id ];
+    }
+}
+
+if ( ! function_exists( 'register_post_status' ) ) {
+    function register_post_status( $post_status, $args = array() ) {
+        global $_test_registered_statuses;
+        $_test_registered_statuses[ $post_status ] = $args;
+        return (object) array( 'name' => $post_status );
+    }
+}

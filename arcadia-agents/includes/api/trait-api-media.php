@@ -13,6 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-pending-actions.php';
+
 // Shared SSRF guard (single source of truth for remote-URL validation).
 require_once __DIR__ . '/../class-url-guard.php';
 
@@ -117,6 +119,13 @@ trait Arcadia_API_Media_Handler {
 			);
 		}
 
+		// A deletion of this article waits for approval: no other write
+		// goes through until it is decided (write table §2.1).
+		$blocked = Arcadia_Pending_Actions::get_instance()->pending_delete_refusal( $post_id );
+		if ( $blocked ) {
+			return $blocked;
+		}
+
 		$body = $request->get_json_params();
 
 		// Accept either attachment_id or url.
@@ -145,6 +154,32 @@ trait Arcadia_API_Media_Handler {
 			);
 		}
 
+		// Write table §2.1: on a live article under Force Draft the change waits
+		// for approval. A URL was already sideloaded above — an unused file in
+		// the library is not visible, so the upload itself is not held.
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::featured_image( $post->post_status, Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'content.featured_image',
+				array(
+					'kind' => 'content',
+					'type' => $post->post_type,
+					'id'   => $post_id,
+				),
+				array( 'attachment_id' => (int) $attachment_id )
+			);
+		}
+
+		return $this->apply_featured_image( $post_id, (int) $attachment_id );
+	}
+
+	/**
+	 * Set the featured image — the direct write, also run by an approval.
+	 *
+	 * @param int $post_id       Article ID.
+	 * @param int $attachment_id Attachment ID.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_featured_image( $post_id, $attachment_id ) {
 		$result = set_post_thumbnail( $post_id, $attachment_id );
 
 		if ( ! $result ) {
@@ -357,30 +392,20 @@ trait Arcadia_API_Media_Handler {
 			);
 		}
 
-		$body      = $request->get_json_params();
-		$post_data = array( 'ID' => $attachment_id );
-		$updated   = false;
+		$body   = $request->get_json_params();
+		$fields = array();
 
 		if ( isset( $body['title'] ) ) {
-			$post_data['post_title'] = sanitize_text_field( $body['title'] );
-			$updated = true;
+			$fields['title'] = sanitize_text_field( $body['title'] );
 		}
-
 		if ( isset( $body['caption'] ) ) {
-			$post_data['post_excerpt'] = sanitize_textarea_field( $body['caption'] );
-			$updated = true;
+			$fields['caption'] = sanitize_textarea_field( $body['caption'] );
 		}
-
-		if ( $updated ) {
-			wp_update_post( wp_slash( $post_data ) );
-		}
-
 		if ( isset( $body['alt_text'] ) ) {
-			update_post_meta( $attachment_id, '_wp_attachment_image_alt', sanitize_text_field( $body['alt_text'] ) );
-			$updated = true;
+			$fields['alt_text'] = sanitize_text_field( $body['alt_text'] );
 		}
 
-		if ( ! $updated ) {
+		if ( empty( $fields ) ) {
 			return new WP_Error(
 				'nothing_to_update',
 				__( 'No updateable fields provided. Allowed: title, caption, alt_text.', 'arcadia-agents' ),
@@ -388,7 +413,48 @@ trait Arcadia_API_Media_Handler {
 			);
 		}
 
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::simple( 'media.update', Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'media.update',
+				array(
+					'kind' => 'media',
+					'type' => 'attachment',
+					'id'   => $attachment_id,
+				),
+				array( 'fields' => $fields )
+			);
+		}
+
+		return $this->apply_media_update( $attachment_id, $fields );
+	}
+
+	/**
+	 * Edit media fields — the direct write, also run by an approval.
+	 *
+	 * @param int   $attachment_id Attachment ID.
+	 * @param array $fields        title, caption, alt_text (already sanitized).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_media_update( $attachment_id, array $fields ) {
+		$post_data = array( 'ID' => $attachment_id );
+		if ( isset( $fields['title'] ) ) {
+			$post_data['post_title'] = $fields['title'];
+		}
+		if ( isset( $fields['caption'] ) ) {
+			$post_data['post_excerpt'] = $fields['caption'];
+		}
+		if ( count( $post_data ) > 1 ) {
+			wp_update_post( wp_slash( $post_data ) );
+		}
+
+		if ( isset( $fields['alt_text'] ) ) {
+			update_post_meta( $attachment_id, '_wp_attachment_image_alt', $fields['alt_text'] );
+		}
+
 		$attachment = get_post( $attachment_id );
+		if ( ! $attachment ) {
+			return new WP_Error( 'media_not_found', __( 'Media not found.', 'arcadia-agents' ), array( 'status' => 404 ) );
+		}
 
 		return new WP_REST_Response(
 			array(
@@ -424,6 +490,29 @@ trait Arcadia_API_Media_Handler {
 		$body  = $request->get_json_params();
 		$force = ! empty( $body['force'] );
 
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::simple( 'media.delete', Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'media.delete',
+				array(
+					'kind' => 'media',
+					'type' => 'attachment',
+					'id'   => $attachment_id,
+				),
+				array( 'force' => $force )
+			);
+		}
+
+		return $this->apply_media_delete( $attachment_id, $force );
+	}
+
+	/**
+	 * Delete media — the direct write, also run by an approval.
+	 *
+	 * @param int  $attachment_id Attachment ID.
+	 * @param bool $force         Skip the trash.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_media_delete( $attachment_id, $force ) {
 		$result = wp_delete_attachment( $attachment_id, $force );
 
 		if ( ! $result ) {

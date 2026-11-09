@@ -13,6 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-pending-actions.php';
+
 /**
  * Trait Arcadia_API_Site_Handler
  *
@@ -57,6 +59,11 @@ trait Arcadia_API_Site_Handler {
 					// Deprecated: pending-revision behavior is now driven by force_draft.
 					// Mirrors force_draft for backward-compat; AA should read force_draft.
 					'pending_revisions'  => (bool) get_option( 'aa_force_draft', false ),
+					// The write table itself (contract §5): the actions this site
+					// holds for approval right now, empty when Force Draft is off.
+					// The server reads it to say BEFORE the click that an action
+					// will wait, instead of guessing it from force_draft.
+					'held_actions'       => Arcadia_Write_Table::held_actions( Arcadia_Write_Table::force_draft_on() ),
 					'enabled_scopes'     => $this->auth->get_enabled_scopes(),
 				),
 				'acf_available'    => Arcadia_Blocks::is_acf_available(),

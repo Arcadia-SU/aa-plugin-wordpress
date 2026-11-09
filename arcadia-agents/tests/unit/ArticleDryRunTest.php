@@ -332,8 +332,12 @@ class ArticleDryRunTest extends TestCase {
 		$data = $result->get_data();
 		$this->assertTrue( $data['dry_run'] );
 		$this->assertArrayNotHasKey( 'revision_created', $data );
-		// force_draft is enabled → preview surfaces that the real write would draft.
-		$this->assertTrue( $data['force_draft_applied'] );
+		// force_draft is enabled on a live post → the real write would be held
+		// as a revision (write table §2.1), and the preview says so. It would
+		// NOT draft the post: that was the C61 defect.
+		$this->assertTrue( $data['held'] );
+		$this->assertSame( 'content.update', $data['action'] );
+		$this->assertFalse( $data['force_draft_applied'] );
 
 		// Live post unchanged; no revision CPT added (only the original post remains).
 		$this->assertEquals( 'Original Title', $_test_posts[42]->post_title );

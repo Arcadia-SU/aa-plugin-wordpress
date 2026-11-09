@@ -13,6 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-pending-actions.php';
+
 /**
  * Trait Arcadia_API_Taxonomies_Handler
  *
@@ -277,21 +279,7 @@ trait Arcadia_API_Taxonomies_Handler {
 			);
 		}
 
-		$result = wp_update_term( $term_id, 'category', $args );
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		$updated_term = get_term( $term_id, 'category' );
-
-		return new WP_REST_Response(
-			array(
-				'success'  => true,
-				'category' => $this->format_term( $updated_term ),
-			),
-			200
-		);
+		return $this->hold_or_apply_term( 'term.update', 'category', $term_id, array( 'args' => $args ) );
 	}
 
 	/**
@@ -339,21 +327,7 @@ trait Arcadia_API_Taxonomies_Handler {
 			);
 		}
 
-		$result = wp_update_term( $term_id, 'post_tag', $args );
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		$updated_term = get_term( $term_id, 'post_tag' );
-
-		return new WP_REST_Response(
-			array(
-				'success' => true,
-				'tag'     => $this->format_term( $updated_term ),
-			),
-			200
-		);
+		return $this->hold_or_apply_term( 'term.update', 'post_tag', $term_id, array( 'args' => $args ) );
 	}
 
 	/**
@@ -378,19 +352,7 @@ trait Arcadia_API_Taxonomies_Handler {
 			);
 		}
 
-		$result = wp_delete_term( $term_id, 'category' );
-
-		if ( is_wp_error( $result ) ) {
-			return $result;
-		}
-
-		return new WP_REST_Response(
-			array(
-				'success' => true,
-				'deleted' => $term_id,
-			),
-			200
-		);
+		return $this->hold_or_apply_term( 'term.delete', 'category', $term_id, array() );
 	}
 
 	/**
@@ -415,7 +377,69 @@ trait Arcadia_API_Taxonomies_Handler {
 			);
 		}
 
-		$result = wp_delete_term( $term_id, 'post_tag' );
+		return $this->hold_or_apply_term( 'term.delete', 'post_tag', $term_id, array() );
+	}
+
+	/**
+	 * Hold a term rename/deletion for approval, or apply it (write table §2.2).
+	 *
+	 * @param string $action   'term.update' or 'term.delete'.
+	 * @param string $taxonomy 'category' or 'post_tag'.
+	 * @param int    $term_id  Term ID (already checked to exist).
+	 * @param array  $payload  {args} for an update.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	private function hold_or_apply_term( $action, $taxonomy, $term_id, array $payload ) {
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::simple( $action, Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				$action,
+				array(
+					'kind' => 'term',
+					'type' => $taxonomy,
+					'id'   => (int) $term_id,
+				),
+				$payload
+			);
+		}
+
+		return 'term.delete' === $action
+			? $this->apply_term_delete( $taxonomy, $term_id )
+			: $this->apply_term_update( $taxonomy, $term_id, (array) ( $payload['args'] ?? array() ) );
+	}
+
+	/**
+	 * Rename/edit a term — the direct write, also run by an approval.
+	 *
+	 * @param string $taxonomy 'category' or 'post_tag'.
+	 * @param int    $term_id  Term ID.
+	 * @param array  $args     wp_update_term() args (already sanitized).
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_term_update( $taxonomy, $term_id, array $args ) {
+		$result = wp_update_term( $term_id, $taxonomy, $args );
+
+		if ( is_wp_error( $result ) ) {
+			return $result;
+		}
+
+		return new WP_REST_Response(
+			array(
+				'success'                                     => true,
+				( 'post_tag' === $taxonomy ? 'tag' : 'category' ) => $this->format_term( get_term( $term_id, $taxonomy ) ),
+			),
+			200
+		);
+	}
+
+	/**
+	 * Delete a term — the direct write, also run by an approval.
+	 *
+	 * @param string $taxonomy 'category' or 'post_tag'.
+	 * @param int    $term_id  Term ID.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_term_delete( $taxonomy, $term_id ) {
+		$result = wp_delete_term( $term_id, $taxonomy );
 
 		if ( is_wp_error( $result ) ) {
 			return $result;
@@ -424,7 +448,7 @@ trait Arcadia_API_Taxonomies_Handler {
 		return new WP_REST_Response(
 			array(
 				'success' => true,
-				'deleted' => $term_id,
+				'deleted' => (int) $term_id,
 			),
 			200
 		);

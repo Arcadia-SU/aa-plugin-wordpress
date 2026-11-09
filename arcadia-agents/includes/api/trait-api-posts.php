@@ -13,6 +13,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-pending-actions.php';
+
 /**
  * Trait Arcadia_API_Posts_Handler
  *
@@ -462,53 +464,49 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
+		// The write table decides (docs/contracts/write-table.md §2.1): apply,
+		// hold as a revision, or refuse. Asked BEFORE the dry run, so a dry run
+		// gives the same verdict as the real write.
+		$requested = ( new Arcadia_Post_Builder( $this->blocks ) )->requested_status( $body );
+		if ( is_wp_error( $requested ) ) {
+			return $requested;
+		}
+		$cell = Arcadia_Write_Table::content_update( $post->post_status, Arcadia_Write_Table::force_draft_on(), $requested );
+		if ( Arcadia_Write_Table::REFUSE === $cell['decision'] ) {
+			// status_not_supported_for_revision: an approval cannot change a
+			// status (approve_revision() builds its post_data without one), so
+			// a status change on a held article is refused, never dropped. A
+			// status EQUAL to the current one asks for nothing and is held like
+			// the rest (C03 — "Update" on a live iSelection article used to end
+			// on this 422 every time).
+			return Arcadia_Write_Table::refusal( $cell['error'] );
+		}
+
+		// A deletion of this article waits for approval: nothing else goes
+		// through until it is decided.
+		$blocked = Arcadia_Pending_Actions::get_instance()->pending_delete_refusal( $post_id );
+		if ( $blocked ) {
+			return $blocked;
+		}
+
 		// Dry-run short-circuits before the revision / live-write paths: simulate
 		// the update through the full pipeline and return the would-be-stored
 		// blocks without creating a revision or touching the live post.
 		if ( $this->is_dry_run( $request ) ) {
-			return $this->dry_run_build( $body, $meta, $post->post_type, $post );
+			$preview = $this->dry_run_build( $body, $meta, $post->post_type, $post );
+			if ( $preview instanceof WP_REST_Response && Arcadia_Write_Table::HOLD === $cell['decision'] ) {
+				// Say what the real write would do: wait for approval.
+				$preview->set_data( array_merge( $preview->get_data(), array( 'held' => true, 'action' => 'content.update' ) ) );
+			}
+			return $preview;
 		}
 
-		// Force Draft on a published post: hold the edit as a pending revision
-		// instead of touching the live article. This is what stops Force Draft
-		// from unpublishing live content — the live post stays up, and a human
-		// approves the change from the editor. New posts and non-published posts
-		// fall through to the normal update path below.
+		// Held: the edit is stored as a pending revision and the live article
+		// is not touched — a human approves it from the editor. This is what
+		// stops Force Draft from taking live content offline: a published or
+		// scheduled post stays as it is.
 		// The legacy `pending_revision` body flag is deprecated: accepted, ignored.
-		if ( get_option( 'aa_force_draft', false )
-			&& 'publish' === $post->post_status
-		) {
-			// body.status cannot travel through a revision, so say so instead of
-			// accepting it.
-			//
-			// approve_revision() builds its $post_data without post_status: a PUT
-			// proposing `status: draft` on a published post created a revision, the
-			// caller got a 200, and approving it unpublished nothing. Silent, and
-			// therefore unfindable from the caller's side.
-			//
-			// The fix is a 422, not "apply it at approval". Making approval able to
-			// unpublish would turn the HITL screen from "this changes some text"
-			// into "this can take a business page offline" — a different blast
-			// radius, needing its own warning row in the diff and its own decision
-			// about how aa_force_draft interacts. Refusing here states the truth
-			// that already holds: with Force Draft on, the agent does not control
-			// status. Same reasoning as FORBIDDEN_STRUCTURAL_FIELDS — a field that
-			// cannot take effect must be rejected, never quietly dropped.
-			//
-			// Scoped to this branch on purpose: without Force Draft, or on a post
-			// that is not published, the write goes straight through and
-			// build_post_data() honours body.status normally.
-			if ( isset( $body['status'] ) ) {
-				return new WP_Error(
-					'status_not_supported_for_revision',
-					__( "This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly.", 'arcadia-agents' ),
-					array(
-						'status' => 422,
-						'field'  => 'status',
-					)
-				);
-			}
-
+		if ( Arcadia_Write_Table::HOLD === $cell['decision'] ) {
 			// Render content for revision storage.
 			$revision_content  = null;
 			$revision_warnings = array();
@@ -541,13 +539,18 @@ trait Arcadia_API_Posts_Handler {
 				return $rev_result;
 			}
 
-			$response_data = array(
-				'revision_created'     => true,
-				'revision_id'          => $rev_result['revision_id'],
-				'revision_version'     => $rev_result['revision_version'],
-				'preview_url'          => $rev_result['preview_url'],
-				'original_post_status' => $post->post_status,
-				'message'              => 'Revision stored. Live post unchanged.',
+			// The common fields of every held write (contract §3) first, then
+			// the revision's own fields, kept for compatibility.
+			$response_data = array_merge(
+				Arcadia_Pending_Actions::get_instance()->held_fields( get_post( $rev_result['revision_id'] ) ),
+				array(
+					'revision_created'     => true,
+					'revision_id'          => $rev_result['revision_id'],
+					'revision_version'     => $rev_result['revision_version'],
+					'preview_url'          => $rev_result['preview_url'],
+					'original_post_status' => $post->post_status,
+					'message'              => 'Revision stored. Live post unchanged.',
+				)
 			);
 			if ( ! empty( $revision_warnings ) ) {
 				$response_data['warnings'] = $revision_warnings;
@@ -770,10 +773,57 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
-		// Move to trash by default, force delete if specified.
+		// Write table §2.1. Without Force Draft a deletion always goes to the
+		// trash, whatever the post type: wp_delete_post() trashes only 'post'
+		// and 'page' and deleted a custom type for good, while the response
+		// said `trashed: true` (C63). `force` only empties what is already in
+		// the trash.
 		$force = $request->get_param( 'force' ) === true;
+		$cell  = Arcadia_Write_Table::content_delete( $post->post_status, Arcadia_Write_Table::force_draft_on(), $force );
 
-		$result = wp_delete_post( $post_id, $force );
+		if ( Arcadia_Write_Table::NOOP === $cell['decision'] ) {
+			return new WP_REST_Response(
+				array(
+					'success'         => true,
+					'deleted'         => $post_id,
+					'trashed'         => true,
+					'already_trashed' => true,
+				),
+				200
+			);
+		}
+
+		if ( Arcadia_Write_Table::HOLD === $cell['decision'] ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'content.delete',
+				array(
+					'kind' => 'content',
+					'type' => $post->post_type,
+					'id'   => $post_id,
+				),
+				array( 'mode' => $cell['mode'] )
+			);
+		}
+
+		return $this->apply_content_delete( $post_id, $cell['mode'] );
+	}
+
+	/**
+	 * Delete an article — the direct write, also run by an approval.
+	 *
+	 * The answer is read from the site after the call, never from the
+	 * request: `trashed` is true only if the post is now in the trash (a site
+	 * with EMPTY_TRASH_DAYS = 0 deletes instead of trashing).
+	 *
+	 * Pending proposals on the article become stale: approving one would
+	 * write into a post that is gone.
+	 *
+	 * @param int    $post_id Article ID.
+	 * @param string $mode    'trash' or 'delete'.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_content_delete( $post_id, $mode ) {
+		$result = 'delete' === $mode ? wp_delete_post( $post_id, true ) : wp_trash_post( $post_id );
 
 		if ( ! $result ) {
 			return new WP_Error(
@@ -787,11 +837,15 @@ trait Arcadia_API_Posts_Handler {
 			);
 		}
 
+		Arcadia_Pending_Actions::get_instance()->mark_content_stale( $post_id );
+
+		$after = get_post( $post_id );
+
 		return new WP_REST_Response(
 			array(
 				'success' => true,
 				'deleted' => $post_id,
-				'trashed' => ! $force,
+				'trashed' => $after && 'trash' === $after->post_status,
 			),
 			200
 		);

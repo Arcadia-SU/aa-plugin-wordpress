@@ -26,6 +26,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-pending-actions.php';
+
 /**
  * Class Arcadia_Post_Builder
  *
@@ -76,10 +78,11 @@ final class Arcadia_Post_Builder {
 	 *
 	 * Behavior matrix:
 	 *   - $existing === null  → create mode. post_data carries post_type +
-	 *     post_status (validated, defaults 'draft', honors aa_force_draft).
+	 *     post_status, as Arcadia_Write_Table::content_create() decides.
 	 *     Caller adds post_author after this returns.
 	 *   - $existing !== null  → update mode. post_data carries ID; post_status
-	 *     only set if body.status present (and aa_force_draft is honored).
+	 *     only set when Arcadia_Write_Table::content_update() names one —
+	 *     otherwise the post keeps its status. A refusal comes back as WP_Error.
 	 *
 	 * Side effect: $meta is mutated in create mode when body.content is an
 	 * array and meta is empty — nested-content shape promotes nested.meta
@@ -106,36 +109,35 @@ final class Arcadia_Post_Builder {
 		$force_draft_applied = false;
 		$is_create           = ( null === $existing );
 
-		// Status + post_type vs ID.
-		if ( $is_create ) {
-			$status_or_error = $this->resolve_status( $body, 'draft' );
-			if ( is_wp_error( $status_or_error ) ) {
-				return $status_or_error;
-			}
-			$status = $status_or_error;
+		// Status: decided by the write table (docs/contracts/write-table.md §2.1),
+		// never here. Before 0.13.0 this branch forced 'draft' on every update
+		// under Force Draft, body.status or not — a scheduled post lost its
+		// date and went back to draft without anyone knowing (C61).
+		$requested = $this->requested_status( $body );
+		if ( is_wp_error( $requested ) ) {
+			return $requested;
+		}
+		$force_draft = Arcadia_Write_Table::force_draft_on();
 
-			if ( get_option( 'aa_force_draft', false ) ) {
-				$status              = 'draft';
-				$force_draft_applied = true;
-			}
+		if ( $is_create ) {
+			$cell = Arcadia_Write_Table::content_create( $force_draft, $requested );
 
 			$post_data['post_type']   = $post_type;
-			$post_data['post_status'] = $status;
+			$post_data['post_status'] = $cell['status'];
+			$force_draft_applied      = $cell['capped'];
 		} else {
 			$post_data['ID'] = (int) $existing->ID;
 
-			if ( ! empty( $body['status'] ) ) {
-				$status_or_error = $this->resolve_status( $body, null );
-				if ( is_wp_error( $status_or_error ) ) {
-					return $status_or_error;
-				}
-				$post_data['post_status'] = $status_or_error;
+			$cell = Arcadia_Write_Table::content_update( $existing->post_status, $force_draft, $requested );
+			if ( Arcadia_Write_Table::REFUSE === $cell['decision'] ) {
+				return Arcadia_Write_Table::refusal( $cell['error'] );
 			}
-
-			if ( get_option( 'aa_force_draft', false ) ) {
-				$post_data['post_status'] = 'draft';
-				$force_draft_applied      = true;
+			// HOLD only reaches here in a dry run (the real write stores a
+			// revision before calling this): the status is left as it is.
+			if ( null !== $cell['status'] ) {
+				$post_data['post_status'] = $cell['status'];
 			}
+			$force_draft_applied = $cell['capped'];
 		}
 
 		// Title — body.title (the visible H1) and NOTHING else.
@@ -424,19 +426,20 @@ final class Arcadia_Post_Builder {
 	}
 
 	/**
-	 * Validate body.status against the allowed list.
+	 * The status the body asks for, validated against the allowed list.
 	 *
-	 * @param array       $body    Request body.
-	 * @param string|null $default Default when body.status is absent.
-	 * @return string|WP_Error Validated status, or WP_Error on invalid input.
+	 * What happens to it is the write table's decision, not this method's.
+	 *
+	 * @param array $body Request body.
+	 * @return string|null|WP_Error Validated status, null when absent or empty,
+	 *                              WP_Error on an unknown status.
 	 */
-	private function resolve_status( array $body, $default ) {
+	public function requested_status( array $body ) {
 		$allowed = array( 'publish', 'draft', 'pending', 'private' );
-		$status  = isset( $body['status'] ) ? sanitize_text_field( $body['status'] ) : $default;
-
-		if ( null === $status ) {
-			return ''; // No status to set.
+		if ( empty( $body['status'] ) ) {
+			return null; // No status asked for.
 		}
+		$status = sanitize_text_field( $body['status'] );
 
 		if ( ! in_array( $status, $allowed, true ) ) {
 			return new WP_Error(

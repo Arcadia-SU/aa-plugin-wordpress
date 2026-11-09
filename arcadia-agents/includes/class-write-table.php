@@ -67,6 +67,69 @@ final class Arcadia_Write_Table {
 	const LIVE_STATUSES = array( 'publish', 'future' );
 
 	/**
+	 * Whether Force Draft is on — the one switch that makes the table hold.
+	 *
+	 * Read here rather than through Arcadia_Guard_Status: that class is only
+	 * loaded in wp-admin, and the write paths run in REST requests.
+	 *
+	 * @return bool
+	 */
+	public static function force_draft_on() {
+		return (bool) get_option( 'aa_force_draft', false );
+	}
+
+	/**
+	 * The WP_Error for a refusal the table decided.
+	 *
+	 * One place for the codes, statuses and messages of §6 of the contract, so
+	 * every write path refuses with the same words.
+	 *
+	 * @param string $code  Refusal code.
+	 * @param array  $extra Extra error data (merged into the error's data).
+	 * @return WP_Error
+	 */
+	public static function refusal( $code, array $extra = array() ) {
+		$messages = array(
+			'status_not_supported_for_revision' => array(
+				422,
+				__( "This article is live and the site holds edits for approval: an approval cannot change the article's status. Send the edit without 'status', or with the article's current status.", 'arcadia-agents' ),
+			),
+			'post_trashed'                      => array(
+				409,
+				__( 'This article is in the trash. Restore it in WordPress before editing it.', 'arcadia-agents' ),
+			),
+			'pending_action_exists'             => array(
+				409,
+				__( 'A deletion of this article is waiting for approval in WordPress. Nothing was changed. Withdraw the deletion, or wait for the decision.', 'arcadia-agents' ),
+			),
+			'action_not_pending'                => array(
+				409,
+				__( 'This proposal is no longer waiting for approval.', 'arcadia-agents' ),
+			),
+			'pending_action_not_found'          => array(
+				404,
+				__( 'No proposal with this ID.', 'arcadia-agents' ),
+			),
+			'pending_action_stale'              => array(
+				409,
+				__( 'This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia will propose again from the current version.', 'arcadia-agents' ),
+			),
+		);
+
+		if ( ! isset( $messages[ $code ] ) ) {
+			throw new InvalidArgumentException( 'Unknown refusal code: ' . $code );
+		}
+
+		list( $status, $message ) = $messages[ $code ];
+		$data                     = array_merge( array( 'status' => $status ), $extra );
+		if ( 'status_not_supported_for_revision' === $code && ! isset( $data['field'] ) ) {
+			$data['field'] = 'status';
+		}
+
+		return new WP_Error( $code, $message, $data );
+	}
+
+	/**
 	 * The actions this site holds right now.
 	 *
 	 * @param bool $force_draft Whether Force Draft is on.

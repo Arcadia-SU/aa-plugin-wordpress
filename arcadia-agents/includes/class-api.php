@@ -28,6 +28,7 @@ require_once __DIR__ . '/api/trait-api-preview.php';
 require_once __DIR__ . '/api/trait-api-field-schema.php';
 require_once __DIR__ . '/api/trait-api-revisions.php';
 require_once __DIR__ . '/api/trait-api-connection.php';
+require_once __DIR__ . '/api/trait-api-pending-actions.php';
 
 /**
  * Class Arcadia_API
@@ -49,6 +50,7 @@ class Arcadia_API {
 	use Arcadia_API_Field_Schema_Handler;
 	use Arcadia_API_Revisions_Handler;
 	use Arcadia_API_Connection_Handler;
+	use Arcadia_API_Pending_Actions_Handler;
 
 	/**
 	 * Single instance of the class.
@@ -121,6 +123,7 @@ class Arcadia_API {
 		$this->register_field_schema_routes();
 		$this->register_block_routes();
 		$this->register_connection_routes();
+		$this->register_pending_action_routes();
 	}
 
 	// =========================================================================
@@ -134,7 +137,8 @@ class Arcadia_API {
 	 * Returns true on success or the underlying WP_Error from auth.
 	 *
 	 * @param WP_REST_Request $request The REST request.
-	 * @param string          $scope   Required scope, e.g. 'articles:read'.
+	 * @param string|null     $scope   Required scope, e.g. 'articles:read'; null = identity only
+	 *                                 (the handler checks a scope that depends on the object).
 	 * @return bool|WP_Error
 	 */
 	private function check_permission( $request, $scope ) {
@@ -583,6 +587,35 @@ class Arcadia_API {
 				'methods'             => 'POST',
 				'callback'            => array( $this, 'disconnect_site' ),
 				'permission_callback' => array( $this, 'check_disconnect_permission' ),
+			)
+		);
+	}
+
+	/**
+	 * Pending action routes: /pending-actions, /pending-actions/{id}/withdraw.
+	 *
+	 * The scope depends on the object each action targets (contract §4), so
+	 * the gate here only proves identity; the handlers check the read scope
+	 * of each listed kind, and the write scope of the withdrawn action's kind.
+	 */
+	private function register_pending_action_routes() {
+		register_rest_route(
+			$this->namespace,
+			'/pending-actions',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array( $this, 'list_pending_actions' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, null ),
+			)
+		);
+
+		register_rest_route(
+			$this->namespace,
+			'/pending-actions/(?P<id>\d+)/withdraw',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'withdraw_pending_action' ),
+				'permission_callback' => fn( $request ) => $this->check_permission( $request, null ),
 			)
 		);
 	}

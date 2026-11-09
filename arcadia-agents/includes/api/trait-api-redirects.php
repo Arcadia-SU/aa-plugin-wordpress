@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once dirname( __DIR__ ) . '/class-pending-actions.php';
+
 /**
  * Trait Arcadia_API_Redirects_Handler
  *
@@ -99,6 +101,36 @@ trait Arcadia_API_Redirects_Handler {
 		// Normalize source path (ensure leading slash, no trailing slash).
 		$source = '/' . trim( $source, '/' );
 
+		// Write table §2.4: a redirect can send visitors of a live page
+		// elsewhere, so under Force Draft it waits for approval.
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::simple( 'redirect.create', Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'redirect.create',
+				array(
+					'kind' => 'redirect',
+					'type' => 'redirect',
+					'id'   => null,
+				),
+				array(
+					'source' => $source,
+					'target' => $target,
+					'type'   => $type,
+				)
+			);
+		}
+
+		return $this->apply_redirect_create( $source, $target, $type );
+	}
+
+	/**
+	 * Create a redirect — the direct write, also run by an approval.
+	 *
+	 * @param string $source Normalized source path.
+	 * @param string $target Target URL (sanitized).
+	 * @param int    $type   301 or 302.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_redirect_create( $source, $target, $type ) {
 		$post_id = wp_insert_post(
 			wp_slash(
 				array(
@@ -152,6 +184,28 @@ trait Arcadia_API_Redirects_Handler {
 			);
 		}
 
+		if ( Arcadia_Write_Table::HOLD === Arcadia_Write_Table::simple( 'redirect.delete', Arcadia_Write_Table::force_draft_on() ) ) {
+			return Arcadia_Pending_Actions::get_instance()->hold(
+				'redirect.delete',
+				array(
+					'kind' => 'redirect',
+					'type' => 'redirect',
+					'id'   => $id,
+				),
+				array()
+			);
+		}
+
+		return $this->apply_redirect_delete( $id );
+	}
+
+	/**
+	 * Delete a redirect — the direct write, also run by an approval.
+	 *
+	 * @param int $id Redirect ID.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function apply_redirect_delete( $id ) {
 		wp_delete_post( $id, true );
 
 		// Invalidate cache.

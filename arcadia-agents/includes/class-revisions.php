@@ -14,6 +14,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-pending-actions.php';
+
 /**
  * Class Arcadia_Revisions
  *
@@ -168,6 +170,20 @@ class Arcadia_Revisions {
 			'skip_markdown' => (bool) $skip_markdown,
 		);
 		update_post_meta( $revision_id, '_aa_revision_version', $version );
+		// The version of the article this proposal was computed from (C04):
+		// approve_revision() refuses when the article changed since.
+		$parent_post = get_post( $post_id );
+		update_post_meta(
+			$revision_id,
+			'_aa_revision_base_version',
+			(string) Arcadia_Pending_Actions::current_version(
+				array(
+					'kind' => 'content',
+					'type' => $parent_post ? $parent_post->post_type : null,
+					'id'   => (int) $post_id,
+				)
+			)
+		);
 		// wp_slash() is mandatory for the same reason as post_content above:
 		// update_post_meta() runs wp_unslash() internally, and this is a JSON
 		// blob from wp_json_encode() (backslash escapes \" \n). Without slashing,
@@ -221,7 +237,7 @@ class Arcadia_Revisions {
 			array(
 				'post_type'        => 'aa_revision',
 				'post_parent'      => $post_id,
-				'post_status'      => array( 'approved', 'rejected', 'superseded' ),
+				'post_status'      => array( 'approved', 'rejected', 'superseded', 'stale', 'withdrawn' ),
 				'orderby'          => 'date',
 				'order'            => 'DESC',
 				'offset'           => self::RETENTION_PER_POST,
@@ -260,6 +276,15 @@ class Arcadia_Revisions {
 		$post    = get_post( $post_id );
 		if ( ! $post ) {
 			return new WP_Error( 'original_post_not_found', 'Original post not found.', array( 'status' => 404 ) );
+		}
+
+		// C04: a proposal made on an older version of the article is never
+		// applied over the changes made since — it would replace post_content
+		// as a whole and erase them. Refuse, and mark it stale so it leaves the
+		// queue; Arcadia proposes again from the current version.
+		if ( $this->is_stale( $revision, $post ) ) {
+			Arcadia_Pending_Actions::get_instance()->set_status( $revision_id, 'stale', 'The article changed on the site after the proposal.', $user_login );
+			return Arcadia_Write_Table::refusal( 'pending_action_stale' );
 		}
 
 		// Load the stored payload.
@@ -375,6 +400,38 @@ class Arcadia_Revisions {
 	}
 
 	/**
+	 * Whether the article changed after this revision was proposed.
+	 *
+	 * Revisions from 0.13.0 on carry the article's version at proposal time.
+	 * Older ones do not: for them the proposal's own creation instant stands
+	 * in for it — an article modified after that instant has changed since.
+	 *
+	 * @param WP_Post $revision The revision.
+	 * @param WP_Post $post     Its parent article.
+	 * @return bool
+	 */
+	private function is_stale( $revision, $post ) {
+		$base = (string) get_post_meta( $revision->ID, '_aa_revision_base_version', true );
+		$now  = (string) Arcadia_Pending_Actions::current_version(
+			array(
+				'kind' => 'content',
+				'type' => $post->post_type,
+				'id'   => (int) $post->ID,
+			)
+		);
+		if ( '' !== $base ) {
+			return $base !== $now;
+		}
+
+		$created  = $this->created_at_utc( $revision );
+		$modified = (string) ( $post->post_modified_gmt ?? '' );
+		if ( null === $created || '' === $modified || '0000-00-00 00:00:00' === $modified ) {
+			return false; // Nothing to compare: cannot claim it changed.
+		}
+		return strtotime( $modified . ' UTC' ) > strtotime( $created );
+	}
+
+	/**
 	 * Reject a pending revision.
 	 *
 	 * @param int    $revision_id    The aa_revision post ID.
@@ -464,7 +521,7 @@ class Arcadia_Revisions {
 		);
 
 		// Filter by status if provided.
-		$allowed_statuses = array( 'pending', 'approved', 'rejected', 'superseded' );
+		$allowed_statuses = Arcadia_Pending_Actions::STATUSES;
 		if ( ! empty( $args['status'] ) && in_array( $args['status'], $allowed_statuses, true ) ) {
 			$query_args['post_status'] = $args['status'];
 		} else {
@@ -599,7 +656,7 @@ class Arcadia_Revisions {
 			array(
 				'post_type'      => 'aa_revision',
 				'post_parent'    => $post_id,
-				'post_status'    => array( 'pending', 'approved', 'rejected', 'superseded' ),
+				'post_status'    => Arcadia_Pending_Actions::STATUSES,
 				'posts_per_page' => 1,
 				'no_found_rows'  => true,
 				'orderby'        => 'date',

@@ -107,6 +107,8 @@ class Arcadia_Agents {
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-seo-meta.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-redirects.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-preview.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-write-table.php';
+		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-pending-actions.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revisions.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revision-diff.php';
 		require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-post-builder.php';
@@ -240,7 +242,9 @@ class Arcadia_Agents {
 	 * Register the aa_revision Custom Post Type.
 	 */
 	public function register_revision_post_type() {
+		Arcadia_Pending_Actions::register_post_statuses();
 		Arcadia_Revisions::get_instance()->register_post_type();
+		Arcadia_Pending_Actions::get_instance()->register_post_type();
 	}
 
 	/**
