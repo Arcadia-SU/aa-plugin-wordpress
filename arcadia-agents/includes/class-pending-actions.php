@@ -695,17 +695,18 @@ final class Arcadia_Pending_Actions {
 			case 'term.delete':
 				$term = get_term( $id, (string) $object['type'] );
 				$name = ( $term && ! is_wp_error( $term ) ) ? $term->name : '#' . $id;
-				$kind = 'post_tag' === $object['type'] ? __( 'tag', 'arcadia-agents' ) : __( 'category', 'arcadia-agents' );
+				// The article belongs to the word: French needs « la catégorie » but « l’étiquette ».
+				$kind = 'post_tag' === $object['type'] ? __( 'the tag', 'arcadia-agents' ) : __( 'the category', 'arcadia-agents' );
 				if ( 'term.delete' === $action ) {
-					/* translators: 1: "category" or "tag", 2: its name */
-					return sprintf( __( 'Delete the %1$s “%2$s”', 'arcadia-agents' ), $kind, $name );
+					/* translators: 1: "the category" or "the tag", 2: its name */
+					return sprintf( __( 'Delete %1$s “%2$s”', 'arcadia-agents' ), $kind, $name );
 				}
 				$new = $payload['args']['name'] ?? null;
 				return $new
-					/* translators: 1: "category" or "tag", 2: current name, 3: new name */
-					? sprintf( __( 'Rename the %1$s “%2$s” to “%3$s”', 'arcadia-agents' ), $kind, $name, $new )
-					/* translators: 1: "category" or "tag", 2: its name */
-					: sprintf( __( 'Edit the %1$s “%2$s”', 'arcadia-agents' ), $kind, $name );
+					/* translators: 1: "the category" or "the tag", 2: current name, 3: new name */
+					? sprintf( __( 'Rename %1$s “%2$s” to “%3$s”', 'arcadia-agents' ), $kind, $name, $new )
+					/* translators: 1: "the category" or "the tag", 2: its name */
+					: sprintf( __( 'Edit %1$s “%2$s”', 'arcadia-agents' ), $kind, $name );
 
 			case 'media.update':
 			case 'media.delete':

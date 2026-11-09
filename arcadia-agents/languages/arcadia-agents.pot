@@ -2,14 +2,14 @@
 # This file is distributed under the GPL v2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: Arcadia Agents 0.6.2\n"
+"Project-Id-Version: Arcadia Agents 0.12.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/arcadia-agents\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-08-13T06:42:02+00:00\n"
+"POT-Creation-Date: 2026-11-09T07:02:40+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: arcadia-agents\n"
@@ -17,8 +17,8 @@ msgstr ""
 #. Plugin Name of the plugin
 #: arcadia-agents.php
 #: admin/dashboard.php:58
-#: arcadia-agents.php:358
-#: arcadia-agents.php:377
+#: arcadia-agents.php:368
+#: arcadia-agents.php:387
 msgid "Arcadia Agents"
 msgstr ""
 
@@ -49,7 +49,7 @@ msgid "Error:"
 msgstr ""
 
 #: admin/class-admin-assets.php:126
-#: admin/class-admin-assets.php:145
+#: admin/class-admin-assets.php:182
 #: includes/class-revision-metabox.php:511
 msgid "Request failed."
 msgstr ""
@@ -60,41 +60,153 @@ msgstr ""
 msgid "Connection OK — plugin version %s."
 msgstr ""
 
-#: admin/class-admin-assets.php:143
+#: admin/class-admin-assets.php:150
+#: admin/class-admin-assets.php:156
+msgid "Apply this change to your site?"
+msgstr ""
+
+#. translators: %s: number of selected changes (always 1 here)
+#: admin/class-admin-assets.php:152
+#, php-format
+msgid "%s change selected"
+msgstr ""
+
+#. translators: %s: number of selected changes
+#: admin/class-admin-assets.php:154
+#, php-format
+msgid "%s changes selected"
+msgstr ""
+
+#: admin/class-admin-assets.php:155
+#: admin/pending.php:78
+msgid "Select all changes"
+msgstr ""
+
+#. translators: %s: number of selected changes
+#: admin/class-admin-assets.php:158
+#, php-format
+msgid "Apply %s changes to your site?"
+msgstr ""
+
+#: admin/class-admin-assets.php:159
+msgid "Reject this change?"
+msgstr ""
+
+#. translators: %s: number of selected changes
+#: admin/class-admin-assets.php:161
+#, php-format
+msgid "Reject %s changes?"
+msgstr ""
+
+#: admin/class-admin-assets.php:162
+msgid "Reason, applied to every selected change (optional):"
+msgstr ""
+
+#. translators: 1: number processed, 2: number that failed
+#: admin/class-admin-assets.php:164
+#, php-format
+msgid "%1$s processed, %2$s failed — the failed changes are still listed, with the reason."
+msgstr ""
+
+#: admin/class-admin-assets.php:180
 msgid "Approve this proposal?"
 msgstr ""
 
-#: admin/class-admin-assets.php:144
+#: admin/class-admin-assets.php:181
 msgid "Reason for rejection (optional):"
 msgstr ""
 
-#: admin/class-admin-assets.php:146
-#: admin/dashboard.php:164
+#: admin/class-admin-assets.php:183
+#: admin/dashboard.php:206
+#: admin/pending.php:105
 #: includes/class-revision-metabox.php:182
 #: includes/class-revision-metabox.php:518
 msgid "Approve"
 msgstr ""
 
-#: admin/class-admin-assets.php:147
-#: admin/dashboard.php:165
+#: admin/class-admin-assets.php:184
+#: admin/dashboard.php:215
+#: admin/pending.php:114
 #: includes/class-revision-metabox.php:185
 #: includes/class-revision-metabox.php:519
 msgid "Reject"
 msgstr ""
 
-#: admin/class-admin-assets.php:148
-#: admin/settings.php:352
+#: admin/class-admin-assets.php:185
+#: admin/settings.php:357
 #: includes/class-revision-metabox.php:200
 #: includes/class-revision-metabox.php:523
 msgid "Cancel"
 msgstr ""
 
-#: admin/class-admin-assets.php:149
+#: admin/class-admin-assets.php:186
+msgid "Dismiss"
+msgstr ""
+
+#: admin/class-admin-assets.php:187
 msgid "Working…"
 msgstr ""
 
+#. translators: %s: number of selected proposals (always 1 here)
+#: admin/class-admin-assets.php:189
+#, php-format
+msgid "%s proposal selected"
+msgstr ""
+
+#. translators: %s: number of selected proposals
+#: admin/class-admin-assets.php:191
+#, php-format
+msgid "%s proposals selected"
+msgstr ""
+
+#: admin/class-admin-assets.php:192
+#: admin/dashboard.php:153
+msgid "Select all proposals"
+msgstr ""
+
+#: admin/class-admin-assets.php:193
+msgid "Clear selection"
+msgstr ""
+
+#: admin/class-admin-assets.php:194
+#: includes/class-revision-metabox.php:512
+msgid "Apply this proposal to the live article?"
+msgstr ""
+
+#. translators: %s: number of selected proposals
+#: admin/class-admin-assets.php:196
+#, php-format
+msgid "Apply %s proposals to the live articles?"
+msgstr ""
+
+#: admin/class-admin-assets.php:197
+msgid "Reject this proposal?"
+msgstr ""
+
+#. translators: %s: number of selected proposals
+#: admin/class-admin-assets.php:199
+#, php-format
+msgid "Reject %s proposals?"
+msgstr ""
+
+#: admin/class-admin-assets.php:200
+msgid "Reason, applied to every selected proposal (optional):"
+msgstr ""
+
+#. translators: 1: current item number, 2: total items
+#: admin/class-admin-assets.php:202
+#, php-format
+msgid "Processing %1$s of %2$s…"
+msgstr ""
+
+#. translators: 1: number processed, 2: number that failed
+#: admin/class-admin-assets.php:204
+#, php-format
+msgid "%1$s processed, %2$s failed — the failed proposals are still listed."
+msgstr ""
+
 #: admin/dashboard.php:71
-#: admin/settings.php:201
+#: admin/settings.php:206
 msgid "Connected"
 msgstr ""
 
@@ -136,88 +248,171 @@ msgstr ""
 msgid "No pending proposals. All clear!"
 msgstr ""
 
-#: admin/dashboard.php:145
-#: admin/dashboard.php:186
+#: admin/dashboard.php:155
+#: admin/dashboard.php:240
 msgid "Article"
 msgstr ""
 
-#: admin/dashboard.php:146
-#: admin/dashboard.php:187
+#: admin/dashboard.php:156
+#: admin/dashboard.php:241
 msgid "Version"
 msgstr ""
 
-#: admin/dashboard.php:147
+#: admin/dashboard.php:157
 msgid "Notes"
 msgstr ""
 
-#: admin/dashboard.php:148
-#: admin/dashboard.php:190
+#: admin/dashboard.php:158
+#: admin/dashboard.php:244
+#: admin/pending.php:81
+#: admin/pending.php:139
 msgid "Date"
 msgstr ""
 
-#: admin/dashboard.php:149
+#: admin/dashboard.php:159
+#: admin/pending.php:82
 msgid "Actions"
 msgstr ""
 
-#: admin/dashboard.php:158
+#. translators: %s: article title
+#. translators: %s: description of the change
+#: admin/dashboard.php:180
+#: admin/pending.php:95
+#, php-format
+msgid "Select “%s”"
+msgstr ""
+
+#: admin/dashboard.php:192
 msgid "No notes"
 msgstr ""
 
-#: admin/dashboard.php:163
+#: admin/dashboard.php:202
 #: includes/class-revision-metabox.php:179
 #: includes/class-revision-metabox.php:517
 msgid "Preview"
 msgstr ""
 
-#: admin/dashboard.php:166
-msgid "Edit"
+#. translators: %s: article title
+#. translators: %s: description of the change
+#: admin/dashboard.php:209
+#: admin/pending.php:108
+#, php-format
+msgid "Approve “%s”"
 msgstr ""
 
-#: admin/dashboard.php:178
+#. translators: %s: article title
+#. translators: %s: description of the change
+#: admin/dashboard.php:218
+#: admin/pending.php:117
+#, php-format
+msgid "Reject “%s”"
+msgstr ""
+
+#: admin/dashboard.php:232
+#: admin/pending.php:130
 msgid "Recent decisions"
 msgstr ""
 
-#: admin/dashboard.php:181
+#: admin/dashboard.php:235
+#: admin/pending.php:132
 msgid "No decisions yet."
 msgstr ""
 
-#: admin/dashboard.php:188
+#: admin/dashboard.php:242
+#: admin/pending.php:138
 msgid "Decision"
 msgstr ""
 
-#: admin/dashboard.php:189
+#: admin/dashboard.php:243
 msgid "By"
 msgstr ""
 
-#: admin/dashboard.php:200
+#: admin/dashboard.php:254
+#: admin/pending.php:42
 msgid "Approved"
 msgstr ""
 
-#: admin/dashboard.php:202
+#: admin/dashboard.php:256
+#: admin/pending.php:43
 msgid "Rejected"
 msgstr ""
 
 #. translators: 1: approved count, 2: rejected count
-#: admin/dashboard.php:216
+#: admin/dashboard.php:270
 #, php-format
 msgid "Approved: %1$s · Rejected: %2$s"
 msgstr ""
 
 #. translators: %s: plugin version
-#: admin/dashboard.php:224
+#: admin/dashboard.php:278
 #, php-format
 msgid "Arcadia Agents v%s"
 msgstr ""
 
-#: admin/dashboard.php:227
-#: arcadia-agents.php:399
-#: arcadia-agents.php:400
+#: admin/dashboard.php:281
+#: admin/pending.php:162
+#: arcadia-agents.php:420
+#: arcadia-agents.php:421
 msgid "Settings"
 msgstr ""
 
-#: admin/dashboard.php:256
-#: admin/dashboard.php:323
+#: admin/dashboard.php:336
+#: admin/dashboard.php:403
 msgid "(deleted)"
+msgstr ""
+
+#: admin/pending.php:44
+msgid "Out of date"
+msgstr ""
+
+#: admin/pending.php:45
+msgid "Withdrawn by Arcadia"
+msgstr ""
+
+#: admin/pending.php:52
+#: admin/pending.php:59
+#: arcadia-agents.php:410
+msgid "Changes awaiting approval"
+msgstr ""
+
+#: admin/pending.php:61
+msgid "The setting “The agent saves as draft only” is on: Arcadia’s deletions, category and tag changes, media changes, redirects and featured-image changes on live articles wait here. Nothing changes on your site until you approve. Edits to article text are reviewed in the article editor."
+msgstr ""
+
+#: admin/pending.php:65
+msgid "Nothing is waiting for your approval."
+msgstr ""
+
+#: admin/pending.php:80
+#: admin/pending.php:137
+msgid "Change"
+msgstr ""
+
+#: admin/pending.php:160
+#: arcadia-agents.php:399
+#: arcadia-agents.php:400
+msgid "Dashboard"
+msgstr ""
+
+#: admin/pending.php:175
+msgid "You are not allowed to approve this change."
+msgstr ""
+
+#: admin/pending.php:180
+#: admin/pending.php:202
+msgid "Missing change ID."
+msgstr ""
+
+#: admin/pending.php:188
+msgid "Change approved and applied."
+msgstr ""
+
+#: admin/pending.php:197
+msgid "You are not allowed to reject this change."
+msgstr ""
+
+#: admin/pending.php:211
+msgid "Change rejected."
 msgstr ""
 
 #: admin/settings.php:68
@@ -241,7 +436,7 @@ msgid "Arcadia Agents — Settings"
 msgstr ""
 
 #: admin/settings.php:147
-#: admin/settings.php:198
+#: admin/settings.php:203
 msgid "Connection"
 msgstr ""
 
@@ -250,7 +445,7 @@ msgid "Enter the Connection Key from your Arcadia Agents dashboard, then click \
 msgstr ""
 
 #: admin/settings.php:154
-#: admin/settings.php:220
+#: admin/settings.php:225
 msgid "Connection Key"
 msgstr ""
 
@@ -267,95 +462,95 @@ msgstr ""
 msgid "The agent saves as draft only."
 msgstr ""
 
-#: admin/settings.php:191
-msgid "When enabled, the agent can never change your live site on its own. New articles are saved as drafts, and edits to already-published articles are held as proposals you approve from the article editor — your live article is never taken offline. When disabled, the agent publishes new articles and applies edits to live articles directly, with no review step."
+#: admin/settings.php:195
+msgid "When enabled, nothing Arcadia does changes what visitors see until you approve it. New articles are saved as drafts. Edits to published or scheduled articles, and their featured image, wait for your approval in the article editor. Deletions, category and tag renames and deletions, media changes and redirects wait on the “Changes awaiting approval” page. A change is refused if the item was modified on your site after Arcadia proposed it. Creating a category or uploading an image is not held: neither is visible on its own. When disabled, Arcadia applies all of these directly, with no review step. In both cases a deletion goes to the trash."
 msgstr ""
 
 #. translators: %s: date/time of connection
-#: admin/settings.php:207
+#: admin/settings.php:212
 #, php-format
 msgid "Connected since: %s"
 msgstr ""
 
 #. translators: %s: date/time of last agent activity
-#: admin/settings.php:215
+#: admin/settings.php:220
 #, php-format
 msgid "Last activity: %s"
 msgstr ""
 
-#: admin/settings.php:229
+#: admin/settings.php:234
 msgid "Connected. To change the key, disconnect first."
 msgstr ""
 
-#: admin/settings.php:233
+#: admin/settings.php:238
 msgid "Disconnect"
 msgstr ""
 
-#: admin/settings.php:241
+#: admin/settings.php:246
 msgid "Technical information"
 msgstr ""
 
-#: admin/settings.php:246
+#: admin/settings.php:251
 msgid "Plugin Version"
 msgstr ""
 
-#: admin/settings.php:250
+#: admin/settings.php:255
 msgid "WordPress Version"
 msgstr ""
 
-#: admin/settings.php:254
+#: admin/settings.php:259
 msgid "PHP Version"
 msgstr ""
 
-#: admin/settings.php:258
+#: admin/settings.php:263
 msgid "Block Adapter"
 msgstr ""
 
-#: admin/settings.php:262
+#: admin/settings.php:267
 msgid "ACF detected"
 msgstr ""
 
-#: admin/settings.php:267
+#: admin/settings.php:272
 msgid "REST API Base"
 msgstr ""
 
-#: admin/settings.php:275
+#: admin/settings.php:280
 msgid "Test Health Endpoint"
 msgstr ""
 
 #. translators: %s: health check URL
-#: admin/settings.php:284
+#: admin/settings.php:289
 #, php-format
 msgid "Health check endpoint: %s"
 msgstr ""
 
-#: admin/settings.php:298
+#: admin/settings.php:303
 msgid "Permissions"
 msgstr ""
 
-#: admin/settings.php:299
+#: admin/settings.php:304
 msgid "Control what the agent can do on your site."
 msgstr ""
 
 #. translators: %s: permission name
-#: admin/settings.php:323
+#: admin/settings.php:328
 #, php-format
 msgid "What does \"%s\" allow?"
 msgstr ""
 
-#: admin/settings.php:339
+#: admin/settings.php:344
 msgid "Save Settings"
 msgstr ""
 
-#: admin/settings.php:346
+#: admin/settings.php:351
 msgid "Allow direct publishing?"
 msgstr ""
 
-#: admin/settings.php:348
+#: admin/settings.php:353
 msgid "The agent will be able to publish new content and edit your live pages immediately, without a review step."
 msgstr ""
 
-#: admin/settings.php:355
+#: admin/settings.php:360
 msgid "Allow direct publishing"
 msgstr ""
 
@@ -367,12 +562,11 @@ msgstr ""
 msgid "Arcadia Agents: Composer dependencies are missing. Please run \"composer install\" in the plugin directory."
 msgstr ""
 
-#: arcadia-agents.php:389
-#: arcadia-agents.php:390
-msgid "Dashboard"
+#: arcadia-agents.php:411
+msgid "Awaiting approval"
 msgstr ""
 
-#: includes/adapters/class-adapter-acf.php:239
+#: includes/adapters/class-adapter-acf.php:246
 msgid "media_sideload_image() is not available."
 msgstr ""
 
@@ -408,175 +602,181 @@ msgstr ""
 msgid "Unknown mapping source '%1$s' for field '%2$s'. Allowed: %3$s."
 msgstr ""
 
-#: includes/api/trait-api-media.php:39
+#: includes/api/trait-api-media.php:41
 msgid "Image URL is required."
 msgstr ""
 
 #. translators: %d: attachment ID
-#: includes/api/trait-api-media.php:79
+#: includes/api/trait-api-media.php:81
 #, php-format
 msgid "Failed to read attachment %d after upload."
 msgstr ""
 
 #. translators: %d: post ID
-#: includes/api/trait-api-media.php:113
-#: includes/api/trait-api-posts.php:442
-#: includes/api/trait-api-posts.php:626
-#: includes/api/trait-api-posts.php:733
+#: includes/api/trait-api-media.php:115
+#: includes/api/trait-api-posts.php:447
+#: includes/api/trait-api-posts.php:642
+#: includes/api/trait-api-posts.php:769
 #: includes/api/trait-api-preview.php:41
 #, php-format
 msgid "Post with ID %d not found."
 msgstr ""
 
-#: includes/api/trait-api-media.php:130
+#: includes/api/trait-api-media.php:139
 msgid "Invalid attachment ID or not an image."
 msgstr ""
 
-#: includes/api/trait-api-media.php:143
+#: includes/api/trait-api-media.php:152
 msgid "Either attachment_id or url is required."
 msgstr ""
 
 #. translators: 1: post ID, 2: attachment ID
-#: includes/api/trait-api-media.php:155
+#: includes/api/trait-api-media.php:190
 #, php-format
 msgid "Failed to set featured image on post %1$d (attachment %2$d)."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/api/trait-api-media.php:201
+#: includes/api/trait-api-media.php:236
 #, php-format
 msgid "Failed to download image: %s"
 msgstr ""
 
 #. translators: %s: error message
-#: includes/api/trait-api-media.php:228
+#: includes/api/trait-api-media.php:263
 #, php-format
 msgid "Failed to import image: %s"
 msgstr ""
 
 #. translators: %d: attachment ID
-#: includes/api/trait-api-media.php:353
-#: includes/api/trait-api-media.php:417
+#: includes/api/trait-api-media.php:388
+#: includes/api/trait-api-media.php:483
 #, php-format
 msgid "Media with ID %d not found."
 msgstr ""
 
-#: includes/api/trait-api-media.php:386
+#: includes/api/trait-api-media.php:411
 msgid "No updateable fields provided. Allowed: title, caption, alt_text."
 msgstr ""
 
+#: includes/api/trait-api-media.php:456
+msgid "Media not found."
+msgstr ""
+
 #. translators: %d: attachment ID
-#: includes/api/trait-api-media.php:434
+#: includes/api/trait-api-media.php:523
 #, php-format
 msgid "Failed to delete media %d."
 msgstr ""
 
+#. translators: %s: allowed kinds
+#: includes/api/trait-api-pending-actions.php:41
+#, php-format
+msgid "object_kind must be one of: %s."
+msgstr ""
+
 #. translators: %s: post type slug
-#: includes/api/trait-api-posts.php:42
-#: includes/api/trait-api-posts.php:349
+#: includes/api/trait-api-posts.php:44
+#: includes/api/trait-api-posts.php:353
 #, php-format
 msgid "Post type '%s' is not allowed. Must be a public post type other than 'attachment' (e.g. post, page)."
 msgstr ""
 
 #. translators: %d: post ID
-#: includes/api/trait-api-posts.php:403
+#: includes/api/trait-api-posts.php:407
 #, php-format
 msgid "Failed to read post %d after creation."
 msgstr ""
 
-#: includes/api/trait-api-posts.php:457
+#: includes/api/trait-api-posts.php:462
 msgid "Changing post_type via update is not allowed. Delete and re-create instead."
 msgstr ""
 
-#: includes/api/trait-api-posts.php:501
-msgid "This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly."
-msgstr ""
-
 #. translators: %d: post ID
-#: includes/api/trait-api-posts.php:586
+#: includes/api/trait-api-posts.php:601
 #, php-format
 msgid "Failed to read post %d after update."
 msgstr ""
 
 #. translators: %d: post ID
-#: includes/api/trait-api-posts.php:750
+#: includes/api/trait-api-posts.php:833
 #, php-format
 msgid "Failed to delete post %d."
 msgstr ""
 
-#: includes/api/trait-api-redirects.php:78
+#: includes/api/trait-api-redirects.php:80
 msgid "Source URL is required."
 msgstr ""
 
-#: includes/api/trait-api-redirects.php:86
+#: includes/api/trait-api-redirects.php:88
 msgid "Target URL is required."
 msgstr ""
 
-#: includes/api/trait-api-redirects.php:94
+#: includes/api/trait-api-redirects.php:96
 msgid "Redirect type must be 301 or 302."
 msgstr ""
 
 #. translators: %d: redirect ID
-#: includes/api/trait-api-redirects.php:148
+#: includes/api/trait-api-redirects.php:180
 #, php-format
 msgid "Redirect with ID %d not found."
 msgstr ""
 
-#: includes/api/trait-api-taxonomies.php:73
+#: includes/api/trait-api-taxonomies.php:75
 msgid "Category name is required. Provide a non-empty \"name\" field."
 msgstr ""
 
 #. translators: %s: category name
-#: includes/api/trait-api-taxonomies.php:105
+#: includes/api/trait-api-taxonomies.php:107
 #, php-format
 msgid "Failed to read existing category '%s'."
 msgstr ""
 
 #. translators: %d: term ID
-#: includes/api/trait-api-taxonomies.php:131
+#: includes/api/trait-api-taxonomies.php:133
 #, php-format
 msgid "Failed to read category (ID %d) after creation."
 msgstr ""
 
-#: includes/api/trait-api-taxonomies.php:160
+#: includes/api/trait-api-taxonomies.php:162
 msgid "Tag name is required. Provide a non-empty \"name\" field."
 msgstr ""
 
 #. translators: %s: tag name
-#: includes/api/trait-api-taxonomies.php:188
+#: includes/api/trait-api-taxonomies.php:190
 #, php-format
 msgid "Failed to read existing tag '%s'."
 msgstr ""
 
 #. translators: %d: term ID
-#: includes/api/trait-api-taxonomies.php:214
+#: includes/api/trait-api-taxonomies.php:216
 #, php-format
 msgid "Failed to read tag (ID %d) after creation."
 msgstr ""
 
 #. translators: %d: term ID
-#: includes/api/trait-api-taxonomies.php:246
-#: includes/api/trait-api-taxonomies.php:374
+#: includes/api/trait-api-taxonomies.php:248
+#: includes/api/trait-api-taxonomies.php:348
 #, php-format
 msgid "Category with ID %d not found."
 msgstr ""
 
-#: includes/api/trait-api-taxonomies.php:275
+#: includes/api/trait-api-taxonomies.php:277
 msgid "No updateable fields provided. Allowed: name, slug, description, parent."
 msgstr ""
 
 #. translators: %d: term ID
-#: includes/api/trait-api-taxonomies.php:312
-#: includes/api/trait-api-taxonomies.php:411
+#: includes/api/trait-api-taxonomies.php:300
+#: includes/api/trait-api-taxonomies.php:373
 #, php-format
 msgid "Tag with ID %d not found."
 msgstr ""
 
-#: includes/api/trait-api-taxonomies.php:337
+#: includes/api/trait-api-taxonomies.php:325
 msgid "No updateable fields provided. Allowed: name, slug, description."
 msgstr ""
 
-#: includes/class-acf-validator.php:133
+#: includes/class-acf-validator.php:140
 msgid "ACF block validation failed."
 msgstr ""
 
@@ -788,8 +988,14 @@ msgstr ""
 msgid "Required field '%1$s' is missing for block type '%2$s'."
 msgstr ""
 
+#. translators: 1: block type, 2: number of child blocks, 3: number of null placeholders
+#: includes/class-blocks.php:319
+#, php-format
+msgid "Block '%1$s' has %2$d child blocks but its inner_content marks %3$d positions for them."
+msgstr ""
+
 #. translators: %s: block type name
-#: includes/class-blocks.php:269
+#: includes/class-blocks.php:372
 #, php-format
 msgid "Block type '%s' is not registered."
 msgstr ""
@@ -812,16 +1018,92 @@ msgstr ""
 msgid "Agent: %s"
 msgstr ""
 
+#. translators: %s: article title
+#: includes/class-pending-actions.php:685
+#, php-format
+msgid "Permanently delete “%s” (already in the trash)"
+msgstr ""
+
+#. translators: %s: article title
+#: includes/class-pending-actions.php:687
+#, php-format
+msgid "Move “%s” to the trash"
+msgstr ""
+
+#. translators: %s: article title
+#: includes/class-pending-actions.php:692
+#, php-format
+msgid "Change the featured image of “%s”"
+msgstr ""
+
+#: includes/class-pending-actions.php:699
+msgid "the tag"
+msgstr ""
+
+#: includes/class-pending-actions.php:699
+msgid "the category"
+msgstr ""
+
+#. translators: 1: "the category" or "the tag", 2: its name
+#: includes/class-pending-actions.php:702
+#, php-format
+msgid "Delete %1$s “%2$s”"
+msgstr ""
+
+#. translators: 1: "the category" or "the tag", 2: current name, 3: new name
+#: includes/class-pending-actions.php:707
+#, php-format
+msgid "Rename %1$s “%2$s” to “%3$s”"
+msgstr ""
+
+#. translators: 1: "the category" or "the tag", 2: its name
+#: includes/class-pending-actions.php:709
+#, php-format
+msgid "Edit %1$s “%2$s”"
+msgstr ""
+
+#. translators: %s: media title
+#: includes/class-pending-actions.php:717
+#, php-format
+msgid "Delete the media “%s” — it disappears from every page that shows it"
+msgstr ""
+
+#. translators: %s: media title
+#: includes/class-pending-actions.php:719
+#, php-format
+msgid "Edit the title, caption or alternative text of the media “%s”"
+msgstr ""
+
+#. translators: 1: source path, 2: target URL
+#: includes/class-pending-actions.php:723
+#, php-format
+msgid "Redirect visitors from %1$s to %2$s"
+msgstr ""
+
+#. translators: %s: source path
+#: includes/class-pending-actions.php:728
+#, php-format
+msgid "Remove the redirect from %s"
+msgstr ""
+
 #. translators: %s: request field path, e.g. meta.post_parent
-#: includes/class-post-builder.php:237
+#: includes/class-post-builder.php:249
 #, php-format
 msgid "Field '%s' controls site structure and cannot be set through this API. Content is editable; the page tree, menu order and page template are not."
 msgstr ""
 
 #. translators: 1: received status, 2: allowed statuses
-#: includes/class-post-builder.php:436
+#: includes/class-post-builder.php:449
 #, php-format
 msgid "Invalid post status '%1$s'. Allowed: %2$s."
+msgstr ""
+
+#: includes/class-preview.php:818
+msgid "Simplified preview: your site’s design is not shown here."
+msgstr ""
+
+#: includes/class-preview.php:821
+msgid "The text below is the content that will be published. Once you approve it, it appears in your site’s usual layout, with the header, the menu and the styles."
 msgstr ""
 
 #: includes/class-revision-diff.php:537
@@ -988,10 +1270,6 @@ msgstr ""
 msgid "“%s”"
 msgstr ""
 
-#: includes/class-revision-metabox.php:512
-msgid "Apply this proposal to the live article?"
-msgstr ""
-
 #: includes/class-revision-metabox.php:521
 msgid "Confirm"
 msgstr ""
@@ -1006,4 +1284,28 @@ msgstr ""
 
 #: includes/class-url-guard.php:50
 msgid "URL is not allowed (private/reserved IP)."
+msgstr ""
+
+#: includes/class-write-table.php:94
+msgid "This article is live and the site holds edits for approval: an approval cannot change the article's status. Send the edit without 'status', or with the article's current status."
+msgstr ""
+
+#: includes/class-write-table.php:98
+msgid "This article is in the trash. Restore it in WordPress before editing it."
+msgstr ""
+
+#: includes/class-write-table.php:102
+msgid "A deletion of this article is waiting for approval in WordPress. Nothing was changed. Withdraw the deletion, or wait for the decision."
+msgstr ""
+
+#: includes/class-write-table.php:106
+msgid "This proposal is no longer waiting for approval."
+msgstr ""
+
+#: includes/class-write-table.php:110
+msgid "No proposal with this ID."
+msgstr ""
+
+#: includes/class-write-table.php:114
+msgid "This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia will propose again from the current version."
 msgstr ""
