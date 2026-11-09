@@ -55,10 +55,12 @@ function arcadia_agents_uninstall_site() {
 	}
 
 	// 2. Custom post types — force-delete each post, which also clears its
-	//    postmeta (_aa_revision_*, _redirect_*, and any _aa_preview_* on them).
+	//    postmeta (_aa_revision_*, _aa_pa_*, _redirect_*, and any _aa_preview_* on them).
+	//    'any' covers the proposal statuses (stale, withdrawn…): they are not
+	//    registered during uninstall, so WP_Query does not exclude them.
 	$cpt_posts = get_posts(
 		array(
-			'post_type'        => array( 'aa_revision', 'arcadia_redirect' ),
+			'post_type'        => array( 'aa_revision', 'aa_pending_action', 'arcadia_redirect' ),
 			'post_status'      => 'any',
 			'numberposts'      => -1,
 			'fields'           => 'ids',

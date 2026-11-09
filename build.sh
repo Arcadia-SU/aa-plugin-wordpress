@@ -125,6 +125,28 @@ else
 	fail "Data corruption detected on real WordPress. See output above."
 fi
 
+# ─── Write-table contract parity (Phase 55) ─────────────────────────────────
+#
+# Arcadia_Write_Table::HELD_ACTIONS is what /site-info publishes and what every
+# write path holds; docs/contracts/write-table.md §5 is what the Arcadia server
+# and its shared plugin double are built from. The two must list the same
+# actions in the same order, or the server would announce one thing before the
+# click and the plugin do another. (docs/ is not mounted in the container, so
+# this cannot be a PHPUnit test.)
+
+check "Write-table contract parity"
+CONTRACT_FILE="docs/contracts/write-table.md"
+code_actions=$(docker_exec "php -r 'define(\"ABSPATH\", \"/\"); require \"includes/class-write-table.php\"; echo implode(\" \", Arcadia_Write_Table::HELD_ACTIONS);'")
+contract_actions=$(awk '/"held_actions": \[/{f=1} f{print} f && /\]/{exit}' "$CONTRACT_FILE" \
+	| grep -oE '"[a-z_]+\.[a-z_]+"' | tr -d '"' | tr '\n' ' ' | sed 's/ $//')
+if [ -n "$code_actions" ] && [ "$code_actions" = "$contract_actions" ]; then
+	pass "HELD_ACTIONS = contract held_actions (${code_actions})."
+else
+	echo "  code:     ${code_actions}"
+	echo "  contract: ${contract_actions}"
+	fail "Arcadia_Write_Table::HELD_ACTIONS and ${CONTRACT_FILE} §5 differ — change both in the same commit."
+fi
+
 # ─── 3. Composer install --no-dev ───────────────────────────────────────────
 
 check "Composer install --no-dev"
@@ -185,7 +207,7 @@ done < <(grep -rhoE "(update_option|add_option)\( *'(arcadia_[a-z_]+|aa_[a-z_]+)
 	"${PLUGIN_DIR}/includes" "${PLUGIN_DIR}/admin" "${PLUGIN_DIR}/arcadia-agents.php" 2>/dev/null \
 	| grep -oE "'(arcadia_[a-z_]+|aa_[a-z_]+)'" | tr -d "'" | sort -u)
 
-for token in aa_revision arcadia_redirect arcadia_preview_cleanup; do
+for token in aa_revision aa_pending_action arcadia_redirect arcadia_preview_cleanup; do
 	if ! grep -q "$token" "$UNINSTALL_FILE"; then
 		warn "Registered artifact not cleaned in uninstall.php: ${token}"
 		uninstall_missing=$((uninstall_missing + 1))

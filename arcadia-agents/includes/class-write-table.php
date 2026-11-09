@@ -12,9 +12,8 @@
  *
  * Pure logic: no WordPress call, so each cell of the table has its own unit
  * test (WriteTableTest). Changing a cell means changing the contract file in
- * the same commit. TODO(55.7): a build.sh check that HELD_ACTIONS and the
- * contract's `held_actions` list are the same (docs/ is not mounted in the
- * test container, so it cannot be a PHPUnit test).
+ * the same commit. build.sh check #4b fails the build when HELD_ACTIONS and
+ * the contract's `held_actions` list (§5) differ.
  *
  * @package ArcadiaAgents
  * @since   0.13.0

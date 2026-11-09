@@ -115,6 +115,7 @@ Le script exécute ces checks avant de créer le zip :
 | 2 | **wp_slash safety gate** (`bin/check-wp-slash.php`) | Oui |
 | 3 | PHPUnit tests | Oui |
 | 4 | **Real-WordPress fidelity check** (`test/fidelity-check.php`) | Oui |
+| 4b | **Write-table contract parity** : `Arcadia_Write_Table::HELD_ACTIONS` = liste `held_actions` de `docs/contracts/write-table.md` §5, même ordre | Oui |
 | 5 | `composer install --no-dev` | Oui |
 | 6 | PHP lint (tous les .php) | Oui |
 | 7 | **Debug-code scan** (pas de `var_dump`/`print_r` echo) | Oui |
@@ -166,6 +167,14 @@ buildé — c'est la baseline du build suivant **et** le rollback immédiat si u
 comporte mal chez un client. Lancement manuel :
 `./test/upgrade/run-upgrade-test.sh dist/<baseline>.zip arcadia-agents.zip <version>`
 (`KEEP_STACK=1` pour garder la stack et débugger).
+
+**Table des écritures (#4b) :** toute écriture vers le site client (contenus, image mise en avant,
+suppression, termes, médias, redirections) demande à `Arcadia_Write_Table`
+(`includes/class-write-table.php`) s'il faut l'appliquer, la garder pour validation ou la refuser —
+aucun chemin ne lit `aa_force_draft` lui-même. Le contrat `docs/contracts/write-table.md` fait foi :
+changer une case = changer le contrat, la classe et son test (`WriteTableTest`, un test par case)
+dans le même commit. Le check #4b attrape une liste d'actions gardées qui dérive entre le code et
+le contrat (que le serveur Arcadia et son double de test lisent).
 
 **Gate clé de voûte (#2) :** le `wp_slash safety gate` interdit toute écriture WordPress (`wp_insert_post`/`wp_update_post`, ou un `*_post_meta` avec `wp_json_encode`) sans `wp_slash()`. Échappatoire documentée : annoter la ligne avec `// arcadia:slash-safe — <raison>`. C'est le garde-fou anti-régression de la classe de bug qui a atteint la prod deux fois.
 
