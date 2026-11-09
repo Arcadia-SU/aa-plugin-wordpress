@@ -368,6 +368,83 @@ wp_set_current_user( 1 );
 wp_delete_user( $no_unfiltered );
 update_option( 'aa_force_draft', $force_draft_before );
 
+// ─── Case 6: held writes on real WordPress (Phase 55 / CH03) ────────────────
+fwrite( STDOUT, "\nCase 6 — Force Draft holds, approval applies, an edited article refuses approval, a CPT deletion goes to the trash:\n" );
+
+$api   = Arcadia_API::get_instance();
+$queue = Arcadia_Pending_Actions::get_instance();
+register_post_type( 'aa_fidelity_cpt', array( 'public' => true ) );
+
+/**
+ * DELETE /contents/{id} through the real handler.
+ *
+ * @param int $post_id Post ID.
+ * @return WP_REST_Response|WP_Error
+ */
+function aa_delete_content( $post_id ) {
+	$request = new WP_REST_Request( 'DELETE' );
+	$request->set_param( 'id', $post_id );
+	return Arcadia_API::get_instance()->delete_post( $request );
+}
+
+$force_draft_before = get_option( 'aa_force_draft', false );
+update_option( 'aa_force_draft', true );
+
+// /site-info publishes the table itself.
+$site = $api->get_site_info( new WP_REST_Request( 'GET' ) )->get_data();
+check_same( Arcadia_Write_Table::HELD_ACTIONS, $site['settings']['held_actions'] ?? null, '/site-info held_actions = the table, Force Draft on' );
+
+// Held deletion → approve → in the trash.
+$live    = wp_insert_post( array( 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'AA held delete' ) );
+$held    = aa_delete_content( $live );
+$held_d  = $held instanceof WP_REST_Response ? $held->get_data() : array();
+check_true( $held instanceof WP_REST_Response && 202 === $held->get_status() && ! empty( $held_d['held'] ), 'DELETE held: 202, held: true' );
+check_same( 'publish', get_post_status( $live ), 'held DELETE: the article is still live' );
+
+// Registered statuses: asking for 'approved' must not return a pending action
+// (before 0.13.0 the statuses were unregistered and the filter was dropped).
+$approved_ids = get_posts( array( 'post_type' => Arcadia_Pending_Actions::POST_TYPE, 'post_status' => 'approved', 'fields' => 'ids', 'numberposts' => -1 ) );
+check_true( ! in_array( (int) ( $held_d['pending_action_id'] ?? 0 ), array_map( 'intval', $approved_ids ), true ), "a query for 'approved' does not return a pending action" );
+
+$approved = $queue->approve( (int) ( $held_d['pending_action_id'] ?? 0 ), 'admin' );
+check_true( is_array( $approved ) && ! empty( $approved['approved'] ), 'approval of the held DELETE succeeds' );
+check_same( 'trash', get_post_status( $live ), 'approved DELETE: the article is in the trash' );
+check_same( 'approved', get_post_status( (int) ( $held_d['pending_action_id'] ?? 0 ) ), 'the pending action is approved' );
+
+// Revision proposed, then the client edits the article: approval refused (C04).
+$edited = wp_insert_post( array( 'post_type' => 'post', 'post_status' => 'publish', 'post_title' => 'Client original', 'post_content' => '<p>client</p>' ) );
+$put    = new WP_REST_Request( 'PUT' );
+$put->set_param( 'id', $edited );
+$put->set_header( 'content-type', 'application/json' );
+$put->set_body( wp_json_encode( array( 'title' => 'Agent proposal' ) ) );
+$rev   = $api->update_post( $put );
+$rev_d = $rev instanceof WP_REST_Response ? $rev->get_data() : array();
+check_true( ! empty( $rev_d['held'] ) && 'content.update' === ( $rev_d['action'] ?? '' ), 'live article edit held as a revision with the common held fields' );
+sleep( 1 ); // post_modified_gmt has one-second resolution.
+wp_update_post( wp_slash( array( 'ID' => $edited, 'post_title' => 'Client fix' ) ) );
+$refused = Arcadia_Revisions::get_instance()->approve_revision( (int) ( $rev_d['revision_id'] ?? 0 ), 'admin' );
+check_true( is_wp_error( $refused ) && 'pending_action_stale' === $refused->get_error_code(), 'approving the old proposal is refused (pending_action_stale)' );
+check_same( 'Client fix', get_post( $edited )->post_title, "the client's fix survives" );
+check_same( 'stale', get_post_status( (int) ( $rev_d['revision_id'] ?? 0 ) ), 'the revision is marked stale' );
+
+// Without Force Draft, a CPT deletion goes to the trash and says so (C63).
+update_option( 'aa_force_draft', false );
+$cpt     = wp_insert_post( array( 'post_type' => 'aa_fidelity_cpt', 'post_status' => 'publish', 'post_title' => 'AA CPT delete' ) );
+$deleted = aa_delete_content( $cpt );
+$del_d   = $deleted instanceof WP_REST_Response ? $deleted->get_data() : array();
+check_same( 'trash', get_post_status( $cpt ), 'CPT DELETE: the post is in the trash, not gone' );
+check_true( true === ( $del_d['trashed'] ?? null ), 'CPT DELETE: trashed: true, read from the site' );
+$again = aa_delete_content( $cpt );
+check_true( $again instanceof WP_REST_Response && ! empty( $again->get_data()['already_trashed'] ), 'second DELETE: already_trashed, nothing deleted' );
+check_true( null !== get_post( $cpt ), 'second DELETE: the post still exists' );
+
+update_option( 'aa_force_draft', $force_draft_before );
+foreach ( array( $live, $edited, $cpt, (int) ( $held_d['pending_action_id'] ?? 0 ), (int) ( $rev_d['revision_id'] ?? 0 ) ) as $cleanup_id ) {
+	if ( $cleanup_id ) {
+		wp_delete_post( $cleanup_id, true );
+	}
+}
+
 // ─── Summary ────────────────────────────────────────────────────────────────
 fwrite( STDOUT, "\n" );
 if ( empty( $failures ) ) {
