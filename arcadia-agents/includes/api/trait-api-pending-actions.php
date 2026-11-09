@@ -89,14 +89,21 @@ trait Arcadia_API_Pending_Actions_Handler {
 	/**
 	 * `ids` query parameter: "812,813" (or an array), 1 to IDS_MAX positive ids.
 	 *
+	 * Absent (null) means no lookup. Present but empty (`ids=`) is refused, not
+	 * read as absent: a caller that sends an empty batch would otherwise get
+	 * the full, capped list and read its gaps as answers (contract §4).
+	 *
 	 * @param mixed $raw Raw parameter.
 	 * @return int[]|WP_Error Empty array when absent.
 	 */
 	private function parse_pending_action_ids( $raw ) {
-		if ( null === $raw || '' === $raw ) {
+		if ( null === $raw ) {
 			return array();
 		}
 		$parts = is_array( $raw ) ? $raw : explode( ',', (string) $raw );
+		if ( array() === $parts ) {
+			$parts = array( '' );
+		}
 		$ids   = array();
 		foreach ( $parts as $part ) {
 			$part = trim( (string) $part );

@@ -500,6 +500,25 @@ class PendingActionsTest extends TestCase {
 		$this->assertFalse( $by_id['truncated'] );
 	}
 
+	public function test_status_is_applied_before_the_listing_limit() {
+		global $_test_posts;
+		$this->seed_post( 42 );
+		$held = $this->assert_held( $this->helper->delete_post( $this->request( 42 ) ), 'content.delete' );
+		$id   = $held['pending_action_id'];
+		// LIST_LIMIT newer decided rows: they must not push out the pending one.
+		for ( $i = 1; $i <= \Arcadia_Pending_Actions::LIST_LIMIT; $i++ ) {
+			$copy              = clone $_test_posts[ $id ];
+			$copy->ID          = 900000 + $i;
+			$copy->post_date   = '2099-01-01 00:00:00';
+			$copy->post_status = 'withdrawn';
+			$_test_posts[ $copy->ID ] = $copy;
+		}
+
+		$pending = $this->helper->list_pending_actions( $this->request( 0, array(), array( 'status' => 'pending' ) ) )->get_data();
+		$this->assertSame( array( $id ), array_column( $pending['pending_actions'], 'pending_action_id' ) );
+		$this->assertFalse( $pending['truncated'] );
+	}
+
 	public function test_ids_finds_decided_actions_and_combines_with_status() {
 		$this->seed_post( 42 );
 		$held = $this->assert_held( $this->helper->delete_post( $this->request( 42 ) ), 'content.delete' );
@@ -532,6 +551,8 @@ class PendingActionsTest extends TestCase {
 
 	public static function invalid_ids() {
 		return array(
+			'empty'        => array( '' ),
+			'empty array'  => array( array() ),
 			'not a number' => array( '12,abc' ),
 			'zero'         => array( '0' ),
 			'negative'     => array( '-4' ),

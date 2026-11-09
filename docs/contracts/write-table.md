@@ -148,8 +148,10 @@ Suppression appliquée d'un article : ses actions en attente passent en `stale`.
   réponse « gardé » + `status`, `created_gmt`, `decided_gmt`, `decided_by` (identifiant WordPress),
   `decision_notes`.
 - **Limite de la liste complète (sans `ids`).** Le plugin lit les **200** actions les plus récentes
-  et les **200** révisions les plus récentes, **puis** applique les filtres. Une action plus ancienne
-  peut donc manquer, même avec `object_id`. `truncated: true` dit qu'au moins une des deux lectures
+  et les **200** révisions les plus récentes **ayant le `status` demandé** (tout statut sans
+  `status`), **puis** applique `object_kind`, `object_id` et les scopes. `status=pending` n'est donc
+  pas noyé par les décisions anciennes ; une action plus ancienne peut quand même manquer, même avec
+  `object_id`. `truncated: true` dit qu'au moins une des deux lectures
   a atteint 200 : une absence n'y prouve rien.
 - **Recherche par identifiant (`ids`).** `ids=812,813` (1 à 100 identifiants `pending_action_id`,
   actions et révisions mélangées) lit exactement ces lignes, **sans limite**, quel que soit leur
@@ -157,7 +159,8 @@ Suppression appliquée d'un article : ses actions en attente passent en `stale`.
   qui ne sont ni une action ni une révision sur ce site (supprimés ou jamais créés). Un identifiant
   écarté par un filtre (`status`…) ou par les scopes n'est **pas** dans `not_found`. Un identifiant
   absent de la liste **et** de `not_found` existe donc, mais ne passe pas les filtres.
-  `ids` invalide (pas un entier positif, vide, plus de 100) : `400 invalid_ids`.
+  `ids` invalide (pas un entier positif, élément vide, plus de 100) : `400 invalid_ids`. `ids=`
+  présent mais vide est aussi `400 invalid_ids`, jamais lu comme « pas de `ids` ».
 
   ```json
   { "pending_actions": [ { "pending_action_id": 812, "status": "approved", "…": "…" } ],
@@ -196,7 +199,7 @@ Liste vide quand le brouillon forcé est désactivé. Ce champ s'ajoute à `forc
 | `post_trashed` | 409 | mise à jour d'un article à la corbeille |
 | `action_not_pending` | 409 | retrait d'une action qui n'est plus `pending` |
 | `pending_action_not_found` | 404 | identifiant inconnu |
-| `invalid_ids` | 400 | `GET /pending-actions` : `ids` n'est pas une liste de 1 à 100 entiers positifs |
+| `invalid_ids` | 400 | `GET /pending-actions` : `ids` présent mais n'est pas une liste de 1 à 100 entiers positifs (y compris `ids=` vide) |
 
 ## 7. Ce que le double partagé du serveur doit reproduire
 
