@@ -38,7 +38,7 @@ objet relu), jamais sur la demande.
 | | non live, vers `draft`/`pending`/`private` | appliquer | appliquer |
 | Image mise en avant (`PUT …/featured-image`) | live | appliquer | **garder** (action `content.featured_image`) |
 | | non live | appliquer | appliquer |
-| Supprimer (`DELETE`) | pas à la corbeille | **corbeille**, quel que soit le type (C63) | **garder** (action `content.delete`) |
+| Supprimer (`DELETE`) | pas à la corbeille (avec ou sans `force`) | **corbeille**, quel que soit le type (C63) — `force` n'efface que ce qui est déjà à la corbeille | **garder** (action `content.delete`) |
 | | déjà à la corbeille, sans `force` | rien à faire : `200`, `trashed: true`, `already_trashed: true` | idem |
 | | déjà à la corbeille, `force: true` | suppression définitive | **garder** (action `content.delete`, `force: true`) |
 | Toute écriture | une action `content.delete` est en attente | — | **refuser** `409 pending_action_exists` (lien vers l'attente) |
