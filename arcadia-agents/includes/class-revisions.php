@@ -424,7 +424,7 @@ class Arcadia_Revisions {
 		}
 
 		$created  = $this->created_at_utc( $revision );
-		$modified = (string) ( $post->post_modified_gmt ?? '' );
+		$modified = (string) Arcadia_Pending_Actions::field( $post, 'post_modified_gmt', '' );
 		if ( null === $created || '' === $modified || '0000-00-00 00:00:00' === $modified ) {
 			return false; // Nothing to compare: cannot claim it changed.
 		}

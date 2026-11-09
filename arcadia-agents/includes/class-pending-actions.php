@@ -174,7 +174,7 @@ final class Arcadia_Pending_Actions {
 				}
 				// The status is part of the version: trashing or unpublishing an
 				// article changes what an approval would land on.
-				return (string) ( $post->post_modified_gmt ?? '' ) . '|' . $post->post_status;
+				return (string) self::field( $post, 'post_modified_gmt', '' ) . '|' . $post->post_status;
 
 			case 'media':
 				$post = get_post( $id );
@@ -197,7 +197,16 @@ final class Arcadia_Pending_Actions {
 				if ( ! $term || is_wp_error( $term ) ) {
 					return null;
 				}
-				return md5( wp_json_encode( array( $term->name, $term->slug, $term->description ?? '', (int) ( $term->parent ?? 0 ) ) ) );
+				return md5(
+					wp_json_encode(
+						array(
+							$term->name,
+							$term->slug,
+							(string) self::field( $term, 'description', '' ),
+							(int) self::field( $term, 'parent', 0 ),
+						)
+					)
+				);
 
 			case 'redirect':
 				$post = get_post( $id );
@@ -216,6 +225,22 @@ final class Arcadia_Pending_Actions {
 		}
 
 		return null;
+	}
+
+	/**
+	 * A property of a WordPress object, or a default when it is absent.
+	 *
+	 * Real WP_Post/WP_Term objects always carry these fields; the unit-test
+	 * stand-ins do not always, and reading a missing property is a warning.
+	 *
+	 * @param object $object  WP_Post, WP_Term or stand-in.
+	 * @param string $name    Property.
+	 * @param mixed  $default Default.
+	 * @return mixed
+	 */
+	public static function field( $object, $name, $default ) {
+		$vars = get_object_vars( $object );
+		return array_key_exists( $name, $vars ) && null !== $vars[ $name ] ? $vars[ $name ] : $default;
 	}
 
 	// =========================================================================
