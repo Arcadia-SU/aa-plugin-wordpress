@@ -74,6 +74,19 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.13.0 =
+With "The agent saves as draft only" on, nothing Arcadia does changes what visitors see until a person approves it. Until now the setting held only article edits: deletions, category changes, media changes and redirects went straight to the live site, and a scheduled article lost its date.
+
+* New: with the setting on, a deletion, a category or tag rename or deletion, a media edit or deletion, a redirect (created or removed) and the featured image of a live article wait for approval. The answer is **202** with `held: true`, `pending_action_id`, `action`, `object`, `base_version` and `review_url`. They are approved or rejected on the new page Arcadia Agents › Awaiting approval, one by one or in bulk. Approving applies the change through the same code as a direct write. Creating a category and uploading a file are not held: neither is visible on its own. The full table is in `docs/contracts/write-table.md`
+* New: `/site-info` returns `settings.held_actions`, the list of actions this site holds right now (empty when the setting is off)
+* New: `GET /pending-actions` lists held actions and article revisions, with their status (`pending`, `approved`, `rejected`, `stale`, `superseded`, `withdrawn`). `POST /pending-actions/{id}/withdraw` lets Arcadia take back its own proposal. Each kind needs its own read or write permission
+* Changed: approving a proposal is refused when the item changed on the site after Arcadia made it. Until now an approval replaced the article as a whole and silently erased the corrections made since. The proposal becomes `stale` and the approver sees why. This applies to article revisions too, including the ones waiting from before this version
+* Changed: a deletion now always goes to the trash, whatever the post type. Until now a custom post type was deleted for good while the answer said `trashed: true`. `trashed` is now read from the site after the call. Deleting a post already in the trash changes nothing (`already_trashed: true`) unless `force` is sent
+* Changed: with the setting on, editing an article that is not live keeps its status. Until now every edit put the article back to draft, so a scheduled article lost its date. A scheduled article is now held for approval like a published one
+* Changed: with the setting on, sending the article's current status with an edit of a live article is accepted and held for approval. Until now it was refused with 422 `status_not_supported_for_revision`, so every "Update" of a live article failed. A real status change is still refused
+* New: writes on an article whose deletion waits for approval are refused with **409 `pending_action_exists`**. An edit of an article in the trash is refused with **409 `post_trashed`**
+* Fixed: the statuses `approved`, `rejected` and `superseded` were not registered, so WordPress ignored them in queries and a list of decided revisions also returned the pending ones
+
 = 0.12.0 =
 A block that Arcadia sends back unchanged now comes out exactly as the site stored it. Until now every block in a push was rebuilt from its fields, so a push that changed one block could rewrite the formatting of blocks a person had written by hand.
 
