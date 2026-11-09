@@ -111,7 +111,7 @@ final class Arcadia_Write_Table {
 			),
 			'pending_action_stale'              => array(
 				409,
-				__( 'This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia will propose again from the current version.', 'arcadia-agents' ),
+				__( 'This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told.', 'arcadia-agents' ),
 			),
 		);
 

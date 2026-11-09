@@ -1414,11 +1414,5 @@ msgid "No proposal with this ID."
 msgstr "Aucune proposition avec cet identifiant."
 
 #: includes/class-write-table.php:114
-msgid ""
-"This proposal is out of date: the item changed on the site after Arcadia "
-"made it. Nothing was applied. Arcadia will propose again from the current "
-"version."
-msgstr ""
-"Cette proposition est périmée : l’élément a été modifié sur le site après la "
-"proposition d’Arcadia. Rien n’a été appliqué. Arcadia refera une proposition "
-"à partir de la version actuelle."
+msgid "This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told."
+msgstr "Cette proposition n’est plus valable : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu."

@@ -67,14 +67,16 @@ Le serveur Arcadia les relaie au membre et à l'agent. Ils disent ce qui s'est p
 | `status_not_supported_for_revision` | 422 | This edit is held for approval, and an approval cannot change the post status — send 'status' only on a write that applies directly. | This article is live and the site holds edits for approval: an approval cannot change the article's status. Send the edit without 'status', or with the article's current status. |
 | `post_trashed` | 409 | — (nouveau) | This article is in the trash. Restore it in WordPress before editing it. |
 | `pending_action_exists` | 409 | — (nouveau) | A deletion of this article is waiting for approval in WordPress. Nothing was changed. Withdraw the deletion, or wait for the decision. |
-| `pending_action_stale` | 409 | — (nouveau) | This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia will propose again from the current version. |
+| `pending_action_stale` | 409 | — (nouveau) | This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told. |
 | `action_not_pending` | 409 | — (nouveau) | This proposal is no longer waiting for approval. |
 | `pending_action_not_found` | 404 | — (nouveau) | No proposal with this ID. |
 
 `pending_action_stale` est aussi le message que voit la personne qui valide dans WordPress : sur la
-ligne de l'écran, dans la validation groupée et dans l'éditeur d'article. La phrase « Arcadia will
-propose again » suppose que le serveur retire la proposition périmée et relance l'agent (CH03, côté serveur).
-À ajuster si le serveur fait autrement.
+ligne de l'écran, dans la validation groupée et dans l'éditeur d'article. Avant : « Arcadia will propose again from the current version ». Changé le 2026-11-09 :
+le serveur retire la proposition périmée et prévient l'agent, mais une nouvelle proposition n'est
+pas garantie (une réoptimisation attend le « oui » du client, la mise à jour d'un membre n'est pas
+reproposée). Français : « Cette proposition n’est plus valable : l’élément a été modifié sur le
+site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu. »
 
 ## 4. Champ `message` de la réponse « gardé » (202)
 
