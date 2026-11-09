@@ -120,6 +120,7 @@ class Arcadia_Agents {
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-guard-status.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-content-counter.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/dashboard.php';
+			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/pending.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'admin/settings.php';
 			require_once ARCADIA_AGENTS_PLUGIN_DIR . 'includes/class-revision-metabox.php';
 		}
@@ -162,6 +163,8 @@ class Arcadia_Agents {
 			add_action( 'add_meta_boxes', array( $metabox, 'register_metaboxes' ) );
 			add_action( 'wp_ajax_aa_approve_revision', array( $metabox, 'ajax_approve' ) );
 			add_action( 'wp_ajax_aa_reject_revision', array( $metabox, 'ajax_reject' ) );
+			add_action( 'wp_ajax_aa_approve_pending_action', 'arcadia_agents_ajax_approve_pending_action' );
+			add_action( 'wp_ajax_aa_reject_pending_action', 'arcadia_agents_ajax_reject_pending_action' );
 			add_action( 'enqueue_block_editor_assets', array( $metabox, 'enqueue_sidebar_script' ) );
 
 			// List screens: Arcadia badge (FS-1), views filter (FS-2), guard chip (FS-4).
@@ -180,6 +183,7 @@ class Arcadia_Agents {
 		// Invalidate pending revision count cache when a revision decision is made.
 		add_action( 'aa_revision_decided', array( $this, 'invalidate_pending_revision_count' ) );
 		add_action( 'save_post_aa_revision', array( $this, 'invalidate_pending_revision_count' ) );
+		add_action( 'aa_pending_action_changed', array( $this, 'invalidate_pending_revision_count' ) );
 
 		// Invalidate blocks usage cache when posts are saved.
 		add_action( 'save_post', array( $this, 'invalidate_blocks_usage_cache' ) );
@@ -399,6 +403,17 @@ class Arcadia_Agents {
 			'arcadia_agents_dashboard_page'
 		);
 
+		// Submenu: changes waiting for approval (Phase 55) — deletions,
+		// categories, media, redirects held under Force Draft.
+		$pending_hook = add_submenu_page(
+			'arcadia-agents',
+			__( 'Changes awaiting approval', 'arcadia-agents' ),
+			__( 'Awaiting approval', 'arcadia-agents' ),
+			'manage_options',
+			'arcadia-pending',
+			'arcadia_agents_pending_page'
+		);
+
 		// Submenu: Settings.
 		$settings_hook = add_submenu_page(
 			'arcadia-agents',
@@ -412,6 +427,7 @@ class Arcadia_Agents {
 		if ( class_exists( 'Arcadia_Admin_Assets' ) ) {
 			Arcadia_Admin_Assets::set_page_hook( 'dashboard', $dashboard_hook );
 			Arcadia_Admin_Assets::set_page_hook( 'settings', $settings_hook );
+			Arcadia_Admin_Assets::set_page_hook( 'pending', $pending_hook );
 		}
 	}
 
@@ -438,7 +454,18 @@ class Arcadia_Agents {
 			)
 		);
 
-		$count = $query->post_count;
+		// Every proposal waiting for a human, not only article revisions.
+		$actions = new WP_Query(
+			array(
+				'post_type'      => Arcadia_Pending_Actions::POST_TYPE,
+				'post_status'    => 'pending',
+				'posts_per_page' => -1,
+				'fields'         => 'ids',
+				'no_found_rows'  => true,
+			)
+		);
+
+		$count = $query->post_count + $actions->post_count;
 		set_transient( 'aa_pending_revision_count', $count, 5 * MINUTE_IN_SECONDS );
 
 		return $count;

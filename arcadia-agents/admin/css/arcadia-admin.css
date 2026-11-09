@@ -697,6 +697,11 @@ a.aa-stat:focus-visible {
 
 /* Queue table: actions never wrap, so "one row = one group of actions"
    survives every column width. */
+/* The change Arcadia linked to (review_url ?action_id=…), so it is found at a glance. */
+.arcadia-admin .aa-row--focus td {
+	background: var(--aa-field);
+}
+
 .aa-table--queue .aa-row-actions {
 	flex-wrap: nowrap;
 	justify-content: flex-end;

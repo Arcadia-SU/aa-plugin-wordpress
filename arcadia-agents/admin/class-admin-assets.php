@@ -81,7 +81,7 @@ class Arcadia_Admin_Assets {
 			return;
 		}
 
-		// Full Arcadia skin, scoped .arcadia-admin — our two pages only.
+		// Full Arcadia skin, scoped .arcadia-admin — our plugin pages only.
 		wp_enqueue_style(
 			'arcadia-admin',
 			ARCADIA_AGENTS_PLUGIN_URL . 'admin/css/arcadia-admin.css',
@@ -100,7 +100,7 @@ class Arcadia_Admin_Assets {
 			wp_localize_script( 'arcadia-settings', 'aaSettingsData', self::settings_payload() );
 		}
 
-		if ( 'dashboard' === $page ) {
+		if ( 'dashboard' === $page || 'pending' === $page ) {
 			wp_enqueue_script(
 				'arcadia-dashboard',
 				ARCADIA_AGENTS_PLUGIN_URL . 'admin/js/dashboard.js',
@@ -108,7 +108,7 @@ class Arcadia_Admin_Assets {
 				ARCADIA_AGENTS_VERSION,
 				true
 			);
-			wp_localize_script( 'arcadia-dashboard', 'aaDashboardData', self::dashboard_payload() );
+			wp_localize_script( 'arcadia-dashboard', 'aaDashboardData', 'pending' === $page ? self::pending_payload() : self::dashboard_payload() );
 		}
 	}
 
@@ -128,6 +128,43 @@ class Arcadia_Admin_Assets {
 				'health_ok'     => __( 'Connection OK — plugin version %s.', 'arcadia-agents' ),
 			),
 		);
+	}
+
+	/**
+	 * Payload for dashboard.js on the pending-actions page (Phase 55).
+	 *
+	 * Same script and nonce as the revision queue; its own AJAX actions, id
+	 * field and wording ("change" applied to the site, not "proposal" to an
+	 * article).
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function pending_payload() {
+		$payload                  = self::dashboard_payload();
+		$payload['approveAction'] = 'aa_approve_pending_action';
+		$payload['rejectAction']  = 'aa_reject_pending_action';
+		$payload['idField']       = 'action_id';
+		$payload['i18n']          = array_merge(
+			$payload['i18n'],
+			array(
+				'confirm_approve'           => __( 'Apply this change to your site?', 'arcadia-agents' ),
+				/* translators: %s: number of selected changes (always 1 here) */
+				'selected_one'              => __( '%s change selected', 'arcadia-agents' ),
+				/* translators: %s: number of selected changes */
+				'selected_many'             => __( '%s changes selected', 'arcadia-agents' ),
+				'select_all'                => __( 'Select all changes', 'arcadia-agents' ),
+				'bulk_confirm_approve_one'  => __( 'Apply this change to your site?', 'arcadia-agents' ),
+				/* translators: %s: number of selected changes */
+				'bulk_confirm_approve_many' => __( 'Apply %s changes to your site?', 'arcadia-agents' ),
+				'bulk_confirm_reject_one'   => __( 'Reject this change?', 'arcadia-agents' ),
+				/* translators: %s: number of selected changes */
+				'bulk_confirm_reject_many'  => __( 'Reject %s changes?', 'arcadia-agents' ),
+				'bulk_reject_prompt'        => __( 'Reason, applied to every selected change (optional):', 'arcadia-agents' ),
+				/* translators: 1: number processed, 2: number that failed */
+				'bulk_partial'              => __( '%1$s processed, %2$s failed — the failed changes are still listed, with the reason.', 'arcadia-agents' ),
+			)
+		);
+		return $payload;
 	}
 
 	/**

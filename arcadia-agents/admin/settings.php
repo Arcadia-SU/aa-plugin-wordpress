@@ -188,7 +188,12 @@ function arcadia_agents_settings_page() {
 							</label>
 
 							<p class="aa-guard-hint aa-muted">
-								<?php esc_html_e( 'When enabled, the agent can never change your live site on its own. New articles are saved as drafts, and edits to already-published articles are held as proposals you approve from the article editor — your live article is never taken offline. When disabled, the agent publishes new articles and applies edits to live articles directly, with no review step.', 'arcadia-agents' ); ?>
+								<?php
+								// Says exactly what Arcadia_Write_Table holds — no more, no
+								// less (C62: the old text promised more than the plugin did).
+								// Changing a cell of the table means changing this text.
+								esc_html_e( 'When enabled, nothing Arcadia does changes what visitors see until you approve it. New articles are saved as drafts. Edits to published or scheduled articles, and their featured image, wait for your approval in the article editor. Deletions, category and tag renames and deletions, media changes and redirects wait on the “Changes awaiting approval” page. A change is refused if the item was modified on your site after Arcadia proposed it. Creating a category or uploading an image is not held: neither is visible on its own. When disabled, Arcadia applies all of these directly, with no review step. In both cases a deletion goes to the trash.', 'arcadia-agents' );
+								?>
 							</p>
 						</section>
 

@@ -3,6 +3,9 @@
  *
  * Approve/reject over the same AJAX endpoints and nonce as the metabox
  * (aa_approve_revision / aa_reject_revision), with:
+ * - one script for two queues: the dashboard (article revisions) and the
+ *   pending-actions screen (deletions, categories, media, redirects). The page
+ *   payload names its AJAX actions and id field; revisions are the default;
  * - no location.reload(): the decided row is removed and the pending
  *   counters decremented in place — a 50-item queue never re-scrolls;
  * - focus management: opening a confirm mini-form moves focus to its first
@@ -23,6 +26,9 @@
 	}
 
 	var i18n = data.i18n || {};
+	var approveAction = data.approveAction || 'aa_approve_revision';
+	var rejectAction = data.rejectAction || 'aa_reject_revision';
+	var idField = data.idField || 'revision_id';
 
 	/**
 	 * Minimal sprintf for the %s / %1$s placeholders WordPress ships in
@@ -101,7 +107,19 @@
 		return el;
 	}
 
-	function setBusy( row, busy ) {
+	function showRowError( check, message ) {
+		var tr = check ? check.closest( 'tr' ) : null;
+		var row = tr ? tr.querySelector( '.aa-row-actions' ) : null;
+		if ( ! row ) {
+			return;
+		}
+		var statusEl = makeStatus( row );
+		// Server data goes through textContent — never innerHTML.
+		statusEl.textContent = message || i18n.error_generic || 'Request failed.';
+		statusEl.className = 'aa-row-status aa-row-status--bad';
+	}
+
+		function setBusy( row, busy ) {
 		row.querySelectorAll( 'button, a' ).forEach( function ( el ) {
 			el.disabled = busy;
 			el.classList.toggle( 'aa-is-busy', busy );
@@ -115,7 +133,7 @@
 	function postAction( action, revisionId, extra ) {
 		var body = new FormData();
 		body.append( 'action', action );
-		body.append( 'revision_id', revisionId );
+		body.append( idField, revisionId );
 		body.append( 'nonce', data.nonce );
 		if ( extra ) {
 			Object.keys( extra ).forEach( function ( key ) {
@@ -221,7 +239,7 @@
 		var no = makeButton( i18n.cancel || 'Cancel', 'aa-btn aa-btn--quiet aa-btn--small' );
 
 		yes.addEventListener( 'click', function () {
-			runBulk( 'aa_approve_revision', ids, null );
+			runBulk( approveAction, ids, null );
 		} );
 		no.addEventListener( 'click', renderBulkBar );
 
@@ -252,7 +270,7 @@
 		var no = makeButton( i18n.cancel || 'Cancel', 'aa-btn aa-btn--quiet aa-btn--small' );
 
 		confirm.addEventListener( 'click', function () {
-			runBulk( 'aa_reject_revision', ids, { decision_notes: notes.value } );
+			runBulk( rejectAction, ids, { decision_notes: notes.value } );
 		} );
 		no.addEventListener( 'click', renderBulkBar );
 
@@ -334,10 +352,14 @@
 						}
 					} else {
 						failed++;
+						// Say WHY on the row that stayed: an out-of-date proposal
+						// (the article changed since) must not read as a glitch.
+						showRowError( check, resp && typeof resp.data === 'string' ? resp.data : null );
 					}
 				} )
 				.catch( function () {
 					failed++;
+					showRowError( check, null );
 				} )
 				.then( function () {
 					step( index + 1 );
@@ -454,7 +476,7 @@
 
 				yes.addEventListener( 'click', function () {
 					var statusEl = makeStatus( row );
-					run( 'aa_approve_revision', null, statusEl );
+					run( approveAction, null, statusEl );
 				} );
 				no.addEventListener( 'click', function () {
 					restore( '.aa-dash-approve' );
@@ -486,7 +508,7 @@
 
 				confirm.addEventListener( 'click', function () {
 					var statusEl = makeStatus( row );
-					run( 'aa_reject_revision', { decision_notes: notes.value }, statusEl );
+					run( rejectAction, { decision_notes: notes.value }, statusEl );
 				} );
 				no.addEventListener( 'click', function () {
 					restore( '.aa-dash-reject' );
