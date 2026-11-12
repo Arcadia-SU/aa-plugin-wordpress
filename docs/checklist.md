@@ -985,9 +985,11 @@ d'`innerHTML`.
       sans `unfiltered_html` (kses actif, cas multisite) ; un bloc modifié ne change que lui ;
       Force Draft : la révision contient le post à l'octet. Fixture = le post 114236 d'avant
       l'incident (`tests/fixtures/iselection-114236.html`, copiée du backend)
-- [ ] **53.4 — Release `0.12.0`** (minor : nouvelle clé de lecture, nouveau comportement
+- [x] **53.4 — Release `0.12.0`** (minor : nouvelle clé de lecture, nouveau comportement
       d'écriture) puis rituel `docs/deploy.md` — **pas de déploiement client sans l'accord
       d'Oscar**. Les deux côtés sortent ensemble : le backend n'envoie `stored` que s'il l'a lu
+      — 0.12.0 n'est jamais allée seule en prod : les 3 prods sont passées de 0.11.0 à
+        **0.13.1** le 2026-11-12, qui la contient. Pas de release GitHub v0.12.0
 - [ ] **53.5 — Vérif prod** : sur iSelection, rejouer un push d'un seul bloc sur `114236` et
       comparer `post_content` avant/après hors du bloc touché
       - Canari préprod (2026-11-08) : 0.12.0 relevée, ACF Pro actif (51 blocs `acf/*`).
@@ -1058,11 +1060,12 @@ d'`innerHTML`.
       après l'appel ; les révisions en attente de l'article supprimé sont fermées
 - [x] **55.6 — C62** : file d'attente générique (suppression, catégories créer/renommer/supprimer)
       + écran de validation WordPress + réponse « gardé » ; périmètre exact de « catégories » à figer
-- [ ] **55.7 — Contrat figé** → session webflow (double partagé du serveur) + `backlog-for-backend.md`
+- [x] **55.7 — Contrat figé** → session webflow (double partagé du serveur) + `backlog-for-backend.md`
       — contrat figé et envoyé à la session webflow le 2026-11-09 (commit 5ec4486) ; précisions
         d'implémentation ajoutées (base_version opaque, refus `pending_action_exists` aussi réglage
         désactivé, dry_run, liste) **à lui renvoyer**. Reste : l'annonce dans `backlog-for-backend.md`
-        à la release
+        à la release — fait le 2026-11-12 (précision `redirect.create` = même `source` envoyée à
+        webflow ; annonce 0.13.1 dans `backlog-for-backend.md`)
 - [x] **55.8 — Textes** (réglage, messages d'erreur, écran) dans une liste à valider par Oscar
       — fait (branche `feat/ch03-write-table`, 2026-11-09) : `includes/class-write-table.php`
         (`WriteTableTest`, un test par case), file `aa_pending_action`
@@ -1071,7 +1074,13 @@ d'`innerHTML`.
         `/site-info`, check build #4b (parité code ↔ contrat), `fidelity-check` Case 6 (WP réel),
         textes dans `docs/textes-0.13.0.md`, fr_FR à 100 %. Au passage : les statuts
         `approved`/`rejected`/`superseded` n'étaient pas enregistrés (WP_Query ignorait le filtre)
-- [ ] **55.9 — Release 0.13.0** (minor) + rituel `docs/deploy.md`
+- [x] **55.9 — Release 0.13.0** (minor) + rituel `docs/deploy.md`
+      — 0.13.0 puis **0.13.1** (affichage de la ligne « plus valable ») le 2026-11-12. Préprod
+        iSelection : 9 demandes réelles d'Arcadia (session webflow), validations seules et
+        groupées, refus, cas périmé, effet vérifié sur le site, éléments de test supprimés
+        (reste la redirection `/test-aa-0130-a`, supprimable seulement par Arcadia). Prods
+        iSelection, trottinette, caleçon en 0.13.1 le jour même, un site à la fois. Le
+        trempage de 24 h est retiré du rituel (build #15 « un jour plus tard »)
 
 ---
 
