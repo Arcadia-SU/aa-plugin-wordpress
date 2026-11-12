@@ -5,19 +5,25 @@ garde-fous automatiques s'arrête là où elle commence : le build prouve que le
 survit aux upgrades, mais seul ce rituel couvre ce que le build ne voit pas
 (ACF Pro, le PHP réel du client, le contenu réel).
 
-**Principe : preprod est notre canari.** Comme les canaux beta de Yoast ou les
-rollouts progressifs d'ACF — aucune version n'atteint la prod sans avoir
-encaissé la preprod d'abord.
+**Principe : la préprod teste le site du client, le build teste le temps.**
+La préprod a le PHP, le thème et ACF d'un vrai client : on y fait les tests
+fonctionnels de la version. Elle n'a pas d'usage réel, donc attendre dessus ne
+prouve rien de plus. Ce qu'une journée d'attente vérifiait (tâches quotidiennes,
+mémoires temporaires de 24 h) est forcé par le build (#15, phase « un jour plus
+tard »). Jusqu'au 2026-11-12, le rituel imposait 24 h de trempage sur la préprod ;
+il est retiré parce qu'il ne testait que ces chemins, et qu'il laissait la prod
+en retard (0.12.0 validée le 2026-11-08, prods toujours en 0.11.0 le 2026-11-12).
 
 ## 0. Pré-requis (avant de toucher un site)
 
-- [ ] `./build.sh` **vert de bout en bout** (17 checks, dont l'upgrade-path
-      test depuis N-1 **et** depuis la plus vieille version déployée)
+- [ ] `./build.sh` **vert de bout en bout**, dont l'upgrade-path test depuis N-1
+      **et** depuis la plus vieille version déployée, avec sa phase « un jour plus
+      tard » (tâches cron lancées, mémoires temporaires expirées)
 - [ ] L'entrée de changelog décrit bien ce que les sites vont recevoir
 - [ ] Le zip déployé est **celui de `dist/`** (`dist/arcadia-agents-<version>.zip`),
       jamais un zip rebuildé à la main
 
-## 1. Canari — preprod-iselection.vertuelle.com
+## 1. Préprod — preprod-iselection.vertuelle.com
 
 - [ ] Uploader le zip (admin WP → Extensions → Ajouter → Téléverser →
       « Remplacer l'actuelle par la version téléversée »)
@@ -25,16 +31,20 @@ encaissé la preprod d'abord.
       `./check-sites.sh preprod-iselection.vertuelle.com` : `/health` sur la **nouvelle
       version**, connexion `arcadia-check` OK, blocs ACF enregistrés (accès :
       `~/Developer/secrets/wp-sites/<hôte>.env` sur le mini)
+- [ ] **Tests fonctionnels de la version** sur la préprod (ce qu'elle change, de
+      bout en bout : demandes d'Arcadia, écrans, effet sur le site), puis
+      supprimer les éléments de test
 - [ ] Passe ACF rapide : `docs/checklist-test-site-client.md`
-- [ ] **Trempage 24 h.** Pas de prod le même jour, sauf hotfix d'un site cassé
-      (auquel cas le rollback est déjà pire que le risque).
 
-## 2. Production — www.iselection.com puis www.trottinette-tout-terrain.fr
+## 2. Production — le jour même
 
-- [ ] J+1 : `./check-sites.sh preprod-iselection.vertuelle.com` (toujours vert)
-- [ ] Uploader le zip sur chaque site, **un site à la fois**
+- [ ] Uploader le zip sur chaque site, **un site à la fois** : d'abord
+      www.iselection.com (celui qui écrit le plus avec Arcadia), puis les autres
 - [ ] Immédiatement après chaque upload : mettre la conf à jour, puis
       `./check-sites.sh <site>`
+- [ ] Un problème sur le premier site : rollback (plus bas) avant de toucher les autres
+
+`./check-sites.sh` signale toute prod en retard sur la préprod, à chaque relevé.
 
 ## 3. Après coup (le jour même)
 
@@ -47,7 +57,7 @@ encaissé la preprod d'abord.
       qu'un hôte `prod` de `deployed-versions.conf` ne répond pas la version sur
       `/health`, donc **après** la conf, jamais avant la prod
 - [ ] Annoncer la release dans `backlog-for-backend.md` (protocole inter-repo)
-- [ ] J+1 : `./check-sites.sh` (tous les sites ; un ✗ = la conf ou un site a dérivé)
+- [ ] Le lendemain : `./check-sites.sh` (tous les sites ; un ✗ = la conf ou un site a dérivé)
 
 ## Rollback
 

@@ -12,7 +12,14 @@
 #   4. Upgrade to the CANDIDATE zip with `wp plugin install --force`
 #      (files replaced while the plugin stays active — the client operation)
 #   5. Assert: plugin active, /health returns the new version, seeded data
-#      byte-identical, aa_revision CPT still registered, no PHP fatals logged
+#      byte-identical, aa_revision CPT still registered
+#   6. One day later, now: run every Arcadia cron event and expire every
+#      transient, then assert the daily work did its job and the caches
+#      rebuild (a redirect still answers 301). This replaced the 24 h preprod
+#      soak on 2026-11-12: the preprod has no real traffic, so a day of
+#      waiting only ever tested these time-based paths — and the wait made
+#      the prod lag behind.
+#   7. No PHP fatals logged during the whole run
 #
 # Usage:
 #   test/upgrade/run-upgrade-test.sh <baseline.zip> <candidate.zip> <expected_version>
@@ -227,6 +234,42 @@ assert_eq "$(wp option get arcadia_agents_site_id)" "$PRE_SITE_ID" "Connection o
 wp post-type list --field=name 2>/dev/null | grep -qx "aa_revision" \
 	|| die "aa_revision CPT no longer registered after upgrade."
 ok "aa_revision CPT still registered."
+
+# ─── Phase 5: one day later, now ────────────────────────────────────────────
+# What a day of waiting would exercise, forced: the daily cron jobs and the
+# 24 h transients. Without this step a broken daily job shows up only on the
+# client sites, the day after the deploy.
+
+say "Simulating one day later (cron events run, transients expired)..."
+
+wp post meta update "$POST_ID" _aa_preview_token "upgrade-test-token" &>/dev/null
+wp post meta update "$POST_ID" _aa_preview_expires 1 &>/dev/null
+REDIRECT_ID=$(wp post create --post_type=arcadia_redirect --post_status=publish \
+	--post_title=/aa-upgrade-day --porcelain 2>/dev/null)
+wp post meta update "$REDIRECT_ID" _redirect_target / &>/dev/null
+wp post meta update "$REDIRECT_ID" _redirect_type 301 &>/dev/null
+
+redirect_code() {
+	wp eval 'echo wp_remote_retrieve_response_code( wp_remote_get( "http://upgrade-wp/aa-upgrade-day", array( "redirection" => 0 ) ) );' 2>/dev/null
+}
+# First hit builds the redirect cache (a 24 h transient).
+assert_eq "$(redirect_code)" "301" "Redirect answers 301 (cache built)"
+
+# Every Arcadia cron event, run now. An empty list is a failure: the check
+# must never pass because there was nothing to run.
+hooks=$(wp cron event list --fields=hook --format=csv 2>/dev/null | tail -n +2 | grep -E '^(arcadia|aa)_' | sort -u || true)
+[ -n "$hooks" ] || die "No Arcadia cron event scheduled (expected at least arcadia_preview_cleanup)."
+for hook in $hooks; do
+	out=$(wp cron event run "$hook" 2>&1) || { echo "$out" | sed 's/^/    /'; die "Cron event ${hook} failed."; }
+done
+ok "Cron events run: $(echo $hooks | tr ' ' ',')."
+assert_eq "$(wp post meta get "$POST_ID" _aa_preview_token 2>/dev/null || true)" "" "Daily cleanup removed the expired preview token"
+
+# Every transient expires, as after a day (all plugins, not only ours).
+wp eval 'global $wpdb; $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name LIKE %s", "1", $wpdb->esc_like( "_transient_timeout_" ) . "%" ) );' &>/dev/null
+assert_eq "$(redirect_code)" "301" "Redirect still answers 301 after the caches expired"
+health | grep -qF '"status":"ok"' || die "/health not ok after the caches expired."
+ok "/health ok after the caches expired."
 
 # Any PHP fatal logged during the run is a failure, even if requests recovered.
 fatals=$(wp eval 'echo file_exists( WP_CONTENT_DIR . "/debug.log" ) ? file_get_contents( WP_CONTENT_DIR . "/debug.log" ) : "";' 2>/dev/null \

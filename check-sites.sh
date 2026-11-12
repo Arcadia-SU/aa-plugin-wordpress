@@ -107,6 +107,23 @@ while read -r host version env; do
 	fi
 done < <(grep -vE '^[[:space:]]*(#|$)' "$CONF")
 
+# ─── Prod behind preprod ───────────────────────────────────────────────────
+# A version validated on a preprod must reach the prods the same day
+# (docs/deploy.md). Said on every run, so a forgotten prod cannot stay quiet.
+newest_preprod=$(grep -vE '^[[:space:]]*(#|$)' "$CONF" | awk '$3 == "preprod" { print $2 }' | sort -V | tail -1)
+if [ -n "$newest_preprod" ]; then
+	lagging=$(grep -vE '^[[:space:]]*(#|$)' "$CONF" | awk '$3 == "prod" { print $1 " " $2 }' |
+		while read -r h v; do
+			[ "$(printf '%s\n%s\n' "$v" "$newest_preprod" | sort -V | tail -1)" != "$v" ] && echo "$h ($v)"
+		done)
+	if [ -n "$lagging" ]; then
+		echo
+		warn "La préprod est en ${newest_preprod}, ces prods sont en retard :"
+		echo "$lagging" | sed 's/^/      /'
+		echo "      Rituel : docs/deploy.md §2 (prod le jour même de la préprod)."
+	fi
+fi
+
 if [ "$FAILED" = 0 ]; then
 	echo -e "${GREEN}Tous les sites sont conformes.${NC}"
 else
