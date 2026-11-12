@@ -5,58 +5,65 @@ ou Arcadia (les messages d'erreur de l'API, que le serveur et l'agent relaient).
 dans le code, comme tout le plugin. La traduction française passe par le fichier de langue
 `arcadia-agents` (`languages/`). Pour chaque texte : où il apparaît, ce qu'il y avait avant, ce qu'il y a maintenant, et pourquoi.
 
-## 1. Réglage « The agent saves as draft only » (`admin/settings.php`)
+## 1. Réglage « Approve changes » (`admin/settings.php`) — validé par Oscar le 2026-11-12
 
-**Avant :**
-> When enabled, the agent can never change your live site on its own. New articles are saved as
-> drafts, and edits to already-published articles are held as proposals you approve from the article
-> editor — your live article is never taken offline. When disabled, the agent publishes new articles
-> and applies edits to live articles directly, with no review step.
+Ancien nom : « The agent saves as draft only ». L'ancien texte promettait plus que ce que faisait
+le plugin (C62). Le nouveau a deux niveaux : une phrase qui dit l'état actuel, puis le détail replié.
 
-**Après :**
-> When enabled, nothing Arcadia does changes what visitors see until you approve it. New articles are
-> saved as drafts. Edits to published or scheduled articles, and their featured image, wait for your
-> approval in the article editor. Deletions, category and tag renames and deletions, media changes and
-> redirects wait on the “Changes awaiting approval” page. A change is refused if the item was modified
-> on your site after Arcadia proposed it. Creating a category or uploading an image is not held:
-> neither is visible on its own. When disabled, Arcadia applies all of these directly, with no review
-> step. In both cases a deletion goes to the trash.
+| Emplacement | Anglais | Français |
+|---|---|---|
+| Interrupteur | Approve changes | Valider les changements |
+| Texte, activé | Arcadia prepares, you approve. Nothing changes on your site without your approval. | Arcadia prépare, vous validez. Rien ne change sur votre site sans votre accord. |
+| Texte, désactivé | Arcadia publishes and edits directly. | Arcadia publie et modifie directement. |
+| Détail replié | What waits for your approval | Ce qui attend votre accord |
 
-**Pourquoi :** l'ancien texte promettait plus que ce que faisait le plugin (C62). Le nouveau décrit
-exactement la table des écritures, avec aussi ce qu'elle ne garde pas. Le texte est long. Pour le
-raccourcir, enlever « Creating a category… on its own » ferait perdre l'exception qui surprend le plus.
+Seul le texte de l'état actuel est visible. Il change dès qu'on bascule l'interrupteur, avant l'enregistrement.
+Le détail est une liste à icônes (les mêmes que la page) :
 
-## 2. Nouvel écran (`admin/pending.php`, menu Arcadia Agents)
+- **+** New articles: saved as drafts.
+- **crayon** Edits to live articles: approved in the article editor.
+- **crayon** Changes to categories, tags, media and redirects: approved on the Awaiting approval page.
+- **poubelle** Deletions: approved on the Awaiting approval page.
+- **coche grise** Without approval: creating a category, adding an image. Visitors see neither until it is used.
 
-| Emplacement | Texte |
+**Badge d'état** (tableau de bord, haut des réglages) : « Agent: Change approval » / « Agent: Direct
+publishing ». Français : « Agent : Validation des changements » / « Agent : Publication directe ».
+Avant : « Brouillon uniquement ». Infobulle, activé : « Arcadia’s changes wait for your approval. »
+
+**Permission `articles:write`** (écran de connexion) : « While “Approve changes” is on, nothing goes
+live: new content stays a draft and edits to published content wait for your approval. »
+
+## 2. Nouvel écran (`admin/pending.php`, menu Arcadia Agents) — validé par Oscar le 2026-11-12
+
+| Emplacement | Anglais | Français |
+|---|---|---|
+| Menu | Awaiting approval | À valider |
+| Titre | Changes awaiting approval | Changements à valider |
+| Intro, ligne 1 | Arcadia proposes these changes. Nothing changes on your site until you approve. | |
+| Intro, ligne 2 | Edits to an article’s text are approved in the article editor. | |
+| File vide | Nothing is waiting for your approval. | Rien n’attend votre validation. |
+| Colonnes | Action · Item · Date | Action · Élément · Date |
+| Décisions | Recent decisions · Approved · Rejected · Out of date · Withdrawn by Arcadia | … Périmée · Retirée par Arcadia |
+| Confirmation | Apply this change to your site? | |
+| Refus groupé | Reason (optional) | Raison (facultatif) |
+| Bilan groupé | %s change(s) applied · %s change(s) rejected | %s changement(s) appliqué(s) · rejeté(s) |
+| Bilan, échecs | %s failed (lien vers la première ligne en échec) | %s en échec |
+| Bilan, périmés | %s is / are no longer valid (gris, sans lien ; les lignes quittent la liste) | %s n’est / ne sont plus valable(s) |
+| Ligne seule périmée | No longer valid: the item changed on your site. Removed from the list. (2,5 s, puis la ligne part) | |
+
+**Chaque ligne** (`Arcadia_Pending_Actions::summary()`) : une icône pour l'action (poubelle rouge =
+supprimer, crayon violet = modifier, + vert = créer ; le mot reste au survol et pour les lecteurs
+d'écran), puis le type d'élément, son nom, et l'effet :
+
+| Action | Effet affiché |
 |---|---|
-| Menu (sous-menu) | Awaiting approval |
-| Titre de la page | Changes awaiting approval |
-| Intro | The setting “The agent saves as draft only” is on: Arcadia’s deletions, category and tag changes, media changes, redirects and featured-image changes on live articles wait here. Nothing changes on your site until you approve. Edits to article text are reviewed in the article editor. |
-| File vide | Nothing is waiting for your approval. |
-| Colonnes | Change · Date · Actions |
-| Décisions | Recent decisions · Approved · Rejected · Out of date · Withdrawn by Arcadia · No decisions yet. |
-| Confirmation | Apply this change to your site? |
-| Sélection | %s change selected · %s changes selected · Select all changes |
-| Groupé | Apply %s changes to your site? · Reject this change? · Reject %s changes? · Reason, applied to every selected change (optional): |
-| Échec partiel | %1$s processed, %2$s failed — the failed changes are still listed, with the reason. |
-| AJAX | Change approved and applied. · Change rejected. · Missing change ID. · You are not allowed to approve this change. · You are not allowed to reject this change. |
+| content.delete, media.delete (corbeille active) | Moves to the trash · Va à la corbeille |
+| content.delete déjà en corbeille, media.delete, term.delete | Permanent · Définitif (rouge) |
+| term.update | New name: “%s” · ou la liste des champs changés |
+| media.update | la liste des champs changés |
+| redirect.create | source → cible |
 
-**Description de chaque ligne** (`Arcadia_Pending_Actions::describe()`, construite à l'affichage) :
-
-| Action | Texte |
-|---|---|
-| content.delete | Move “%s” to the trash · Permanently delete “%s” (already in the trash) |
-| content.featured_image | Change the featured image of “%s” |
-| term.update | Rename %1$s “%2$s” to “%3$s” · Edit %1$s “%2$s” (%1$s = the category / the tag) |
-| term.delete | Delete %1$s “%2$s” |
-| media.update | Edit the title, caption or alternative text of the media “%s” |
-| media.delete | Delete the media “%s” — it disappears from every page that shows it |
-| redirect.create | Redirect visitors from %1$s to %2$s |
-| redirect.delete | Remove the redirect from %s |
-
-**Pourquoi :** chaque ligne dit ce que la validation va faire sur le site. Pour un média supprimé,
-elle dit aussi la conséquence qu'on ne voit pas : l'image disparaît de toutes les pages qui l'affichent.
+Si l'élément n'existe plus, la ligne garde son nom (copie prise quand la proposition arrive).
 
 ## 3. Messages d'erreur de l'API (`Arcadia_Write_Table::refusal()`)
 
@@ -88,29 +95,5 @@ qui reste dans la réponse 201 des révisions.
 
 ## 5. Traduction française (`languages/arcadia-agents-fr_FR.po`)
 
-Les 43 nouvelles chaînes sont traduites, et la couverture reste à 100 % (268 chaînes). Voici celles
-qu'un client lira le plus souvent :
-
-| Anglais | Français |
-|---|---|
-| Awaiting approval (menu) | À valider |
-| Changes awaiting approval | Modifications à valider |
-| Nothing is waiting for your approval. | Rien n’attend votre validation. |
-| Apply this change to your site? | Appliquer cette modification à votre site ? |
-| Out of date / Withdrawn by Arcadia | Périmée / Retirée par Arcadia |
-| Move “%s” to the trash | Mettre « %s » à la corbeille |
-| Rename %1$s “%2$s” to “%3$s” | Renommer %1$s « %2$s » en « %3$s » (la catégorie / l’étiquette) |
-| Delete the media “%s” — it disappears from every page that shows it | Supprimer le média « %s » — il disparaît de toutes les pages qui l’affichent |
-| Redirect visitors from %1$s to %2$s | Rediriger les visiteurs de %1$s vers %2$s |
-| This proposal is out of date: … | Cette proposition n’est plus valable : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu. |
-
-**Réglage, version française :**
-> Activé, rien de ce que fait Arcadia ne change ce que voient les visiteurs avant votre validation. Les
-> nouveaux articles sont enregistrés en brouillon. Les modifications d’articles publiés ou programmés,
-> et de leur image mise en avant, attendent votre validation dans l’éditeur d’article. Les
-> suppressions, les renommages et suppressions de catégories et d’étiquettes, les changements de
-> médias et les redirections attendent sur la page « Modifications à valider ». Une modification est
-> refusée si l’élément a été modifié sur votre site après la proposition d’Arcadia. Créer une
-> catégorie ou téléverser une image n’est pas gardé : ni l’une ni l’autre ne se voit seule.
-> Désactivé, Arcadia applique tout cela directement, sans relecture. Dans les deux cas, une
-> suppression va à la corbeille.
+La couverture reste à 100 % (309 chaînes). Sur l'écran, le mot est « changement » (et non plus
+« modification »), comme dans le nom du réglage.

@@ -4,7 +4,7 @@ Tags: seo, content management, automation, rest api, gutenberg
 Requires at least: 6.0
 Tested up to: 6.9
 Requires PHP: 8.0
-Stable tag: 0.12.0
+Stable tag: 0.13.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -74,8 +74,12 @@ Currently, the plugin supports native Gutenberg blocks and ACF Blocks (Advanced 
 
 == Changelog ==
 
+= 0.13.1 =
+* Fixed: on the page Awaiting approval, approving a single change that is no longer valid left the "Apply this change?" question and its buttons next to the message. The message now shows under the item's name, then the row leaves the list
+* Fixed: on the same page, the approval question no longer widens the last column. Item names stayed readable on one line only while no row was being approved
+
 = 0.13.0 =
-With "The agent saves as draft only" on, nothing Arcadia does changes what visitors see until a person approves it. Until now the setting held only article edits: deletions, category changes, media changes and redirects went straight to the live site, and a scheduled article lost its date.
+With "Approve changes" on (until now "The agent saves as draft only"), nothing Arcadia does changes what visitors see until a person approves it. Until now the setting held only article edits: deletions, category changes, media changes and redirects went straight to the live site, and a scheduled article lost its date.
 
 * New: with the setting on, a deletion, a category or tag rename or deletion, a media edit or deletion, a redirect (created or removed) and the featured image of a live article wait for approval. The answer is **202** with `held: true`, `pending_action_id`, `action`, `object`, `base_version` and `review_url`. They are approved or rejected on the new page Arcadia Agents › Awaiting approval, one by one or in bulk. Approving applies the change through the same code as a direct write. Creating a category and uploading a file are not held: neither is visible on its own. The full table is in `docs/contracts/write-table.md`
 * New: `/site-info` returns `settings.held_actions`, the list of actions this site holds right now (empty when the setting is off)
@@ -85,6 +89,9 @@ With "The agent saves as draft only" on, nothing Arcadia does changes what visit
 * Changed: with the setting on, editing an article that is not live keeps its status. Until now every edit put the article back to draft, so a scheduled article lost its date. A scheduled article is now held for approval like a published one
 * Changed: with the setting on, sending the article's current status with an edit of a live article is accepted and held for approval. Until now it was refused with 422 `status_not_supported_for_revision`, so every "Update" of a live article failed. A real status change is still refused
 * New: writes on an article whose deletion waits for approval are refused with **409 `pending_action_exists`**. An edit of an article in the trash is refused with **409 `post_trashed`**
+* New: the page Arcadia Agents › Awaiting approval shows each change with an icon (create, edit, delete), the item and its effect: a permanent deletion is marked "Permanent", a deletion to the trash "Moves to the trash". When an item is gone, the row still shows its name. In bulk, the bar says how many changes were applied, how many failed (a link goes to the first failed row, with the reason on the row) and how many were out of date (those rows leave the list)
+* Changed: the setting is now named "Approve changes", and its help text shows only the current state. "What waits for your approval" lists the held cases with the same icons. The status chip reads "Agent: Change approval" or "Agent: Direct publishing"
+* Fixed: two redirects proposed from different source paths no longer replace each other. For `redirect.create`, the same object now means the same `source`
 * Fixed: the statuses `approved`, `rejected` and `superseded` were not registered, so WordPress ignored them in queries and a list of decided revisions also returned the pending ones
 
 = 0.12.0 =

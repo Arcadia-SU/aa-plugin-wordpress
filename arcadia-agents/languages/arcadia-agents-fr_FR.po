@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: Arcadia Agents 0.6.0\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/arcadia-agents\n"
-"POT-Creation-Date: 2026-11-09T07:02:32+00:00\n"
+"POT-Creation-Date: 2026-11-12T12:33:20+00:00\n"
 "PO-Revision-Date: 2026-08-12T18:00:00+00:00\n"
 "Last-Translator: Arcadia <contact@arcadia-agents.com>\n"
 "Language-Team: French <contact@arcadia-agents.com>\n"
@@ -52,7 +52,7 @@ msgstr "Test en cours…"
 msgid "Error:"
 msgstr "Erreur :"
 
-#: admin/class-admin-assets.php:126 admin/class-admin-assets.php:182
+#: admin/class-admin-assets.php:126 admin/class-admin-assets.php:188
 #: includes/class-revision-metabox.php:511
 msgid "Request failed."
 msgstr "La requête a échoué."
@@ -65,147 +65,199 @@ msgstr "Connexion OK — extension en version %s."
 
 #: admin/class-admin-assets.php:150 admin/class-admin-assets.php:156
 msgid "Apply this change to your site?"
-msgstr "Appliquer cette modification à votre site ?"
+msgstr "Appliquer ce changement à votre site ?"
 
 #. translators: %s: number of selected changes (always 1 here)
 #: admin/class-admin-assets.php:152
 #, php-format
 msgid "%s change selected"
-msgstr "%s modification sélectionnée"
+msgstr "%s changement sélectionné"
 
 #. translators: %s: number of selected changes
 #: admin/class-admin-assets.php:154
 #, php-format
 msgid "%s changes selected"
-msgstr "%s modifications sélectionnées"
+msgstr "%s changements sélectionnés"
 
-#: admin/class-admin-assets.php:155 admin/pending.php:78
+#: admin/class-admin-assets.php:155 admin/pending.php:87
 msgid "Select all changes"
-msgstr "Sélectionner toutes les modifications"
+msgstr "Sélectionner tous les changements"
 
 #. translators: %s: number of selected changes
 #: admin/class-admin-assets.php:158
 #, php-format
 msgid "Apply %s changes to your site?"
-msgstr "Appliquer %s modifications à votre site ?"
+msgstr "Appliquer %s changements à votre site ?"
 
 #: admin/class-admin-assets.php:159
 msgid "Reject this change?"
-msgstr "Refuser cette modification ?"
+msgstr "Refuser ce changement ?"
 
 #. translators: %s: number of selected changes
 #: admin/class-admin-assets.php:161
 #, php-format
 msgid "Reject %s changes?"
-msgstr "Refuser %s modifications ?"
+msgstr "Refuser %s changements ?"
 
 #: admin/class-admin-assets.php:162
-msgid "Reason, applied to every selected change (optional):"
-msgstr "Raison, appliquée à chaque modification sélectionnée (facultatif) :"
+msgid "Reason (optional)"
+msgstr "Raison (facultatif)"
 
-#. translators: 1: number processed, 2: number that failed
+#. translators: %s: number of changes applied (always 1 here)
 #: admin/class-admin-assets.php:164
 #, php-format
-msgid ""
-"%1$s processed, %2$s failed — the failed changes are still listed, with the "
-"reason."
-msgstr ""
-"%1$s traitées, %2$s en échec — les modifications en échec restent dans la "
-"liste, avec la raison."
+msgid "%s change applied"
+msgstr "%s changement appliqué"
 
-#: admin/class-admin-assets.php:180
+#. translators: %s: number of changes applied
+#: admin/class-admin-assets.php:166
+#, php-format
+msgid "%s changes applied"
+msgstr "%s changements appliqués"
+
+#. translators: %s: number of changes rejected (always 1 here)
+#: admin/class-admin-assets.php:168
+#, php-format
+msgid "%s change rejected"
+msgstr "%s changement refusé"
+
+#. translators: %s: number of changes rejected
+#: admin/class-admin-assets.php:170
+#, php-format
+msgid "%s changes rejected"
+msgstr "%s changements refusés"
+
+#: admin/class-admin-assets.php:186
 msgid "Approve this proposal?"
 msgstr "Approuver cette proposition ?"
 
-#: admin/class-admin-assets.php:181
+#: admin/class-admin-assets.php:187
 msgid "Reason for rejection (optional):"
 msgstr "Motif du refus (facultatif) :"
 
-#: admin/class-admin-assets.php:183 admin/dashboard.php:206
-#: admin/pending.php:105 includes/class-revision-metabox.php:182
+#: admin/class-admin-assets.php:189 admin/dashboard.php:206
+#: admin/pending.php:115 includes/class-revision-metabox.php:182
 #: includes/class-revision-metabox.php:518
 msgid "Approve"
 msgstr "Approuver"
 
-#: admin/class-admin-assets.php:184 admin/dashboard.php:215
-#: admin/pending.php:114 includes/class-revision-metabox.php:185
+#: admin/class-admin-assets.php:190 admin/dashboard.php:215
+#: admin/pending.php:124 includes/class-revision-metabox.php:185
 #: includes/class-revision-metabox.php:519
 msgid "Reject"
 msgstr "Refuser"
 
-#: admin/class-admin-assets.php:185 admin/settings.php:357
+#: admin/class-admin-assets.php:191 admin/settings.php:386
 #: includes/class-revision-metabox.php:200
 #: includes/class-revision-metabox.php:523
 msgid "Cancel"
 msgstr "Annuler"
 
-#: admin/class-admin-assets.php:186
+#: admin/class-admin-assets.php:192
 msgid "Dismiss"
 msgstr "Fermer"
 
-#: admin/class-admin-assets.php:187
+#: admin/class-admin-assets.php:193
 msgid "Working…"
 msgstr "Traitement…"
 
 #. translators: %s: number of selected proposals (always 1 here)
-#: admin/class-admin-assets.php:189
+#: admin/class-admin-assets.php:195
 #, php-format
 msgid "%s proposal selected"
 msgstr "%s proposition sélectionnée"
 
 #. translators: %s: number of selected proposals
-#: admin/class-admin-assets.php:191
+#: admin/class-admin-assets.php:197
 #, php-format
 msgid "%s proposals selected"
 msgstr "%s propositions sélectionnées"
 
-#: admin/class-admin-assets.php:192 admin/dashboard.php:153
+#: admin/class-admin-assets.php:198 admin/dashboard.php:153
 msgid "Select all proposals"
 msgstr "Tout sélectionner"
 
-#: admin/class-admin-assets.php:193
+#: admin/class-admin-assets.php:199
 msgid "Clear selection"
 msgstr "Vider la sélection"
 
-#: admin/class-admin-assets.php:194 includes/class-revision-metabox.php:512
+#: admin/class-admin-assets.php:200 includes/class-revision-metabox.php:512
 msgid "Apply this proposal to the live article?"
 msgstr "Appliquer cette proposition à l’article en ligne ?"
 
 #. translators: %s: number of selected proposals
-#: admin/class-admin-assets.php:196
+#: admin/class-admin-assets.php:202
 #, php-format
 msgid "Apply %s proposals to the live articles?"
 msgstr "Appliquer %s propositions aux articles en ligne ?"
 
-#: admin/class-admin-assets.php:197
+#: admin/class-admin-assets.php:203
 msgid "Reject this proposal?"
 msgstr "Refuser cette proposition ?"
 
 #. translators: %s: number of selected proposals
-#: admin/class-admin-assets.php:199
+#: admin/class-admin-assets.php:205
 #, php-format
 msgid "Reject %s proposals?"
 msgstr "Refuser %s propositions ?"
 
-#: admin/class-admin-assets.php:200
+#: admin/class-admin-assets.php:206
 msgid "Reason, applied to every selected proposal (optional):"
 msgstr "Motif, appliqué à toutes les propositions sélectionnées (facultatif) :"
 
 #. translators: 1: current item number, 2: total items
-#: admin/class-admin-assets.php:202
+#: admin/class-admin-assets.php:208
 #, php-format
 msgid "Processing %1$s of %2$s…"
 msgstr "Traitement de %1$s sur %2$s…"
 
-#. translators: 1: number processed, 2: number that failed
-#: admin/class-admin-assets.php:204
+#. translators: %s: number of proposals applied (always 1 here)
+#: admin/class-admin-assets.php:210
 #, php-format
-msgid "%1$s processed, %2$s failed — the failed proposals are still listed."
-msgstr ""
-"%1$s traitées, %2$s en échec — les propositions en échec sont toujours "
-"listées."
+msgid "%s proposal applied"
+msgstr "%s proposition appliquée"
 
-#: admin/dashboard.php:71 admin/settings.php:206
+#. translators: %s: number of proposals applied
+#: admin/class-admin-assets.php:212
+#, php-format
+msgid "%s proposals applied"
+msgstr "%s propositions appliquées"
+
+#. translators: %s: number of proposals rejected (always 1 here)
+#: admin/class-admin-assets.php:214
+#, php-format
+msgid "%s proposal rejected"
+msgstr "%s proposition refusée"
+
+#. translators: %s: number of proposals rejected
+#: admin/class-admin-assets.php:216
+#, php-format
+msgid "%s proposals rejected"
+msgstr "%s propositions refusées"
+
+#. translators: %s: number that failed; the text is a link to the first failed row
+#: admin/class-admin-assets.php:218
+#, php-format
+msgid "%s failed"
+msgstr "%s en échec"
+
+#. translators: %s: number of proposals no longer valid (always 1 here)
+#: admin/class-admin-assets.php:220
+#, php-format
+msgid "%s is no longer valid"
+msgstr "%s n’est plus valable"
+
+#. translators: %s: number of proposals no longer valid
+#: admin/class-admin-assets.php:222
+#, php-format
+msgid "%s are no longer valid"
+msgstr "%s ne sont plus valables"
+
+#: admin/class-admin-assets.php:223
+msgid "No longer valid: the item changed on your site. Removed from the list."
+msgstr "Plus valable : l’élément a changé sur votre site. Retiré de la liste."
+
+#: admin/dashboard.php:71 admin/settings.php:235
 msgid "Connected"
 msgstr "Connecté"
 
@@ -246,6 +298,7 @@ msgid "No pending proposals. All clear!"
 msgstr "Aucune proposition en attente. Tout est à jour !"
 
 #: admin/dashboard.php:155 admin/dashboard.php:240
+#: includes/class-pending-actions.php:843
 msgid "Article"
 msgstr "Article"
 
@@ -257,18 +310,18 @@ msgstr "Version"
 msgid "Notes"
 msgstr "Notes"
 
-#: admin/dashboard.php:158 admin/dashboard.php:244 admin/pending.php:81
-#: admin/pending.php:139
+#: admin/dashboard.php:158 admin/dashboard.php:244 admin/pending.php:91
+#: admin/pending.php:150
 msgid "Date"
 msgstr "Date"
 
-#: admin/dashboard.php:159 admin/pending.php:82
+#: admin/dashboard.php:159
 msgid "Actions"
 msgstr "Actions"
 
 #. translators: %s: article title
 #. translators: %s: description of the change
-#: admin/dashboard.php:180 admin/pending.php:95
+#: admin/dashboard.php:180 admin/pending.php:105
 #, php-format
 msgid "Select “%s”"
 msgstr "Sélectionner « %s »"
@@ -284,27 +337,27 @@ msgstr "Prévisualiser"
 
 #. translators: %s: article title
 #. translators: %s: description of the change
-#: admin/dashboard.php:209 admin/pending.php:108
+#: admin/dashboard.php:209 admin/pending.php:118
 #, php-format
 msgid "Approve “%s”"
 msgstr "Approuver « %s »"
 
 #. translators: %s: article title
 #. translators: %s: description of the change
-#: admin/dashboard.php:218 admin/pending.php:117
+#: admin/dashboard.php:218 admin/pending.php:127
 #, php-format
 msgid "Reject “%s”"
 msgstr "Refuser « %s »"
 
-#: admin/dashboard.php:232 admin/pending.php:130
+#: admin/dashboard.php:232 admin/pending.php:140
 msgid "Recent decisions"
 msgstr "Décisions récentes"
 
-#: admin/dashboard.php:235 admin/pending.php:132
+#: admin/dashboard.php:235 admin/pending.php:142
 msgid "No decisions yet."
 msgstr "Aucune décision pour le moment."
 
-#: admin/dashboard.php:242 admin/pending.php:138
+#: admin/dashboard.php:242 admin/pending.php:149
 msgid "Decision"
 msgstr "Décision"
 
@@ -332,12 +385,12 @@ msgstr "Approuvées : %1$s · Refusées : %2$s"
 msgid "Arcadia Agents v%s"
 msgstr "Arcadia Agents v%s"
 
-#: admin/dashboard.php:281 admin/pending.php:162 arcadia-agents.php:420
+#: admin/dashboard.php:281 admin/pending.php:173 arcadia-agents.php:420
 #: arcadia-agents.php:421
 msgid "Settings"
 msgstr "Réglages"
 
-#: admin/dashboard.php:336 admin/dashboard.php:403
+#: admin/dashboard.php:340 admin/dashboard.php:407
 msgid "(deleted)"
 msgstr "(supprimé)"
 
@@ -349,55 +402,62 @@ msgstr "Périmée"
 msgid "Withdrawn by Arcadia"
 msgstr "Retirée par Arcadia"
 
-#: admin/pending.php:52 admin/pending.php:59 arcadia-agents.php:410
+#: admin/pending.php:60 arcadia-agents.php:410
 msgid "Changes awaiting approval"
-msgstr "Modifications à valider"
+msgstr "Changements à valider"
 
-#: admin/pending.php:61
+#: admin/pending.php:68
 msgid ""
-"The setting “The agent saves as draft only” is on: Arcadia’s deletions, "
-"category and tag changes, media changes, redirects and featured-image "
-"changes on live articles wait here. Nothing changes on your site until you "
-"approve. Edits to article text are reviewed in the article editor."
+"Arcadia proposes these changes. Nothing changes on your site until you "
+"approve."
 msgstr ""
-"Le réglage « L’agent enregistre en brouillon uniquement » est activé : les "
-"suppressions, les changements de catégories et d’étiquettes, les changements "
-"de médias, les redirections et les changements d’image mise en avant des "
-"articles en ligne faits par Arcadia attendent ici. Rien ne change sur votre "
-"site tant que vous n’avez pas validé. Les modifications du texte des "
-"articles se relisent dans l’éditeur d’article."
+"Arcadia propose ces changements. Rien ne change sur votre site avant votre "
+"validation."
 
-#: admin/pending.php:65
+#: admin/pending.php:70
+msgid "Edits to an article’s text are approved in the article editor."
+msgstr ""
+"Les modifications du texte d’un article se valident dans l’éditeur d’article."
+
+#: admin/pending.php:74
 msgid "Nothing is waiting for your approval."
 msgstr "Rien n’attend votre validation."
 
-#: admin/pending.php:80 admin/pending.php:137
-msgid "Change"
-msgstr "Modification"
+#: admin/pending.php:89 admin/pending.php:147
+msgid "Action"
+msgstr "Action"
 
-#: admin/pending.php:160 arcadia-agents.php:399 arcadia-agents.php:400
+#: admin/pending.php:90 admin/pending.php:148
+msgid "Item"
+msgstr "Élément"
+
+#: admin/pending.php:92
+msgid "Approve or reject"
+msgstr "Valider ou refuser"
+
+#: admin/pending.php:171 arcadia-agents.php:399 arcadia-agents.php:400
 msgid "Dashboard"
 msgstr "Tableau de bord"
 
-#: admin/pending.php:175
+#: admin/pending.php:239
 msgid "You are not allowed to approve this change."
-msgstr "Vous n’avez pas le droit de valider cette modification."
+msgstr "Vous n’avez pas le droit de valider ce changement."
 
-#: admin/pending.php:180 admin/pending.php:202
+#: admin/pending.php:244 admin/pending.php:273
 msgid "Missing change ID."
-msgstr "Identifiant de modification manquant."
+msgstr "Identifiant de changement manquant."
 
-#: admin/pending.php:188
+#: admin/pending.php:259
 msgid "Change approved and applied."
-msgstr "Modification validée et appliquée."
+msgstr "Changement validé et appliqué."
 
-#: admin/pending.php:197
+#: admin/pending.php:268
 msgid "You are not allowed to reject this change."
-msgstr "Vous n’avez pas le droit de refuser cette modification."
+msgstr "Vous n’avez pas le droit de refuser ce changement."
 
-#: admin/pending.php:211
+#: admin/pending.php:287
 msgid "Change rejected."
-msgstr "Modification refusée."
+msgstr "Changement refusé."
 
 #: admin/settings.php:68
 msgid "Settings saved."
@@ -419,7 +479,7 @@ msgstr "Déconnecté d’Arcadia Agents."
 msgid "Arcadia Agents — Settings"
 msgstr "Arcadia Agents — Réglages"
 
-#: admin/settings.php:147 admin/settings.php:203
+#: admin/settings.php:147 admin/settings.php:232
 msgid "Connection"
 msgstr "Connexion"
 
@@ -431,7 +491,7 @@ msgstr ""
 "Saisissez la clé de connexion fournie par votre tableau de bord Arcadia "
 "Agents, puis cliquez sur « Connecter »."
 
-#: admin/settings.php:154 admin/settings.php:225
+#: admin/settings.php:154 admin/settings.php:254
 msgid "Connection Key"
 msgstr "Clé de connexion"
 
@@ -443,115 +503,143 @@ msgstr "Connecter à Arcadia Agents"
 msgid "Publishing"
 msgstr "Publication"
 
-#: admin/settings.php:187 includes/class-guard-status.php:52
-msgid "The agent saves as draft only."
-msgstr "L’agent enregistre en brouillon uniquement."
+#: admin/settings.php:187
+msgid "Approve changes"
+msgstr "Valider les changements"
 
-#: admin/settings.php:195
+#: admin/settings.php:198
 msgid ""
-"When enabled, nothing Arcadia does changes what visitors see until you "
-"approve it. New articles are saved as drafts. Edits to published or "
-"scheduled articles, and their featured image, wait for your approval in the "
-"article editor. Deletions, category and tag renames and deletions, media "
-"changes and redirects wait on the “Changes awaiting approval” page. A change "
-"is refused if the item was modified on your site after Arcadia proposed it. "
-"Creating a category or uploading an image is not held: neither is visible on "
-"its own. When disabled, Arcadia applies all of these directly, with no "
-"review step. In both cases a deletion goes to the trash."
+"Arcadia prepares, you approve. Nothing changes on your site without your "
+"approval."
 msgstr ""
-"Activé, rien de ce que fait Arcadia ne change ce que voient les visiteurs "
-"avant votre validation. Les nouveaux articles sont enregistrés en brouillon. "
-"Les modifications d’articles publiés ou programmés, et de leur image mise en "
-"avant, attendent votre validation dans l’éditeur d’article. Les "
-"suppressions, les renommages et suppressions de catégories et d’étiquettes, "
-"les changements de médias et les redirections attendent sur la page "
-"« Modifications à valider ». Une modification est refusée si l’élément a été "
-"modifié sur votre site après la proposition d’Arcadia. Créer une catégorie "
-"ou téléverser une image n’est pas gardé : ni l’une ni l’autre ne se voit "
-"seule. Désactivé, Arcadia applique tout cela directement, sans relecture. "
-"Dans les deux cas, une suppression va à la corbeille."
+"Arcadia prépare, vous validez. Rien ne change sur votre site sans votre "
+"accord."
+
+#: admin/settings.php:201
+msgid "Arcadia publishes and edits directly."
+msgstr "Arcadia publie et modifie directement."
+
+#: admin/settings.php:205 arcadia-agents.php:411
+msgid "Awaiting approval"
+msgstr "À valider"
+
+#: admin/settings.php:207
+msgid "New articles: saved as drafts."
+msgstr "Nouveaux articles : enregistrés en brouillon."
+
+#: admin/settings.php:208
+msgid "Edits to live articles: approved in the article editor."
+msgstr ""
+"Modifications d’articles en ligne : à valider dans l’éditeur d’article."
+
+#. translators: %s: link to the "Awaiting approval" page
+#: admin/settings.php:210
+#, php-format
+msgid ""
+"Changes to categories, tags, media and redirects: approved on the %s page."
+msgstr ""
+"Changements de catégories, d’étiquettes, de médias et de redirections : à "
+"valider sur la page %s."
+
+#. translators: %s: link to the "Awaiting approval" page
+#: admin/settings.php:212
+#, php-format
+msgid "Deletions: approved on the %s page."
+msgstr "Suppressions : à valider sur la page %s."
+
+#: admin/settings.php:213
+msgid ""
+"Without approval: creating a category, adding an image. Visitors see neither "
+"until it is used."
+msgstr ""
+"Sans validation : créer une catégorie, ajouter une image. Le visiteur ne "
+"voit ni l’une ni l’autre tant qu’elle n’est pas utilisée."
+
+#: admin/settings.php:217
+msgid "What waits for your approval"
+msgstr "Ce qui attend votre accord"
 
 #. translators: %s: date/time of connection
-#: admin/settings.php:212
+#: admin/settings.php:241
 #, php-format
 msgid "Connected since: %s"
 msgstr "Connecté depuis : %s"
 
 #. translators: %s: date/time of last agent activity
-#: admin/settings.php:220
+#: admin/settings.php:249
 #, php-format
 msgid "Last activity: %s"
 msgstr "Dernière activité : %s"
 
-#: admin/settings.php:234
+#: admin/settings.php:263
 msgid "Connected. To change the key, disconnect first."
 msgstr "Connecté. Pour changer de clé, déconnectez-vous d’abord."
 
-#: admin/settings.php:238
+#: admin/settings.php:267
 msgid "Disconnect"
 msgstr "Déconnecter"
 
-#: admin/settings.php:246
+#: admin/settings.php:275
 msgid "Technical information"
 msgstr "Informations techniques"
 
-#: admin/settings.php:251
+#: admin/settings.php:280
 msgid "Plugin Version"
 msgstr "Version de l’extension"
 
-#: admin/settings.php:255
+#: admin/settings.php:284
 msgid "WordPress Version"
 msgstr "Version de WordPress"
 
-#: admin/settings.php:259
+#: admin/settings.php:288
 msgid "PHP Version"
 msgstr "Version de PHP"
 
-#: admin/settings.php:263
+#: admin/settings.php:292
 msgid "Block Adapter"
 msgstr "Adaptateur de blocs"
 
-#: admin/settings.php:267
+#: admin/settings.php:296
 msgid "ACF detected"
 msgstr "ACF détecté"
 
-#: admin/settings.php:272
+#: admin/settings.php:301
 msgid "REST API Base"
 msgstr "Base de l’API REST"
 
-#: admin/settings.php:280
+#: admin/settings.php:309
 msgid "Test Health Endpoint"
 msgstr "Tester le point de contrôle"
 
 #. translators: %s: health check URL
-#: admin/settings.php:289
+#: admin/settings.php:318
 #, php-format
 msgid "Health check endpoint: %s"
 msgstr "Point de contrôle de santé : %s"
 
-#: admin/settings.php:303
+#: admin/settings.php:332
 msgid "Permissions"
 msgstr "Permissions"
 
-#: admin/settings.php:304
+#: admin/settings.php:333
 msgid "Control what the agent can do on your site."
 msgstr "Contrôlez ce que l’agent peut faire sur votre site."
 
 #. translators: %s: permission name
-#: admin/settings.php:328
+#: admin/settings.php:357
 #, php-format
 msgid "What does \"%s\" allow?"
 msgstr "Que permet « %s » ?"
 
-#: admin/settings.php:344
+#: admin/settings.php:373
 msgid "Save Settings"
 msgstr "Enregistrer les réglages"
 
-#: admin/settings.php:351
+#: admin/settings.php:380
 msgid "Allow direct publishing?"
 msgstr "Autoriser la publication directe ?"
 
-#: admin/settings.php:353
+#: admin/settings.php:382
 msgid ""
 "The agent will be able to publish new content and edit your live pages "
 "immediately, without a review step."
@@ -559,7 +647,7 @@ msgstr ""
 "L’agent pourra publier de nouveaux contenus et modifier vos pages en ligne "
 "immédiatement, sans étape de relecture."
 
-#: admin/settings.php:360
+#: admin/settings.php:389
 msgid "Allow direct publishing"
 msgstr "Autoriser la publication directe"
 
@@ -580,10 +668,6 @@ msgid ""
 msgstr ""
 "Arcadia Agents : les dépendances Composer sont manquantes. Exécutez "
 "« composer install » dans le dossier de l’extension."
-
-#: arcadia-agents.php:411
-msgid "Awaiting approval"
-msgstr "À valider"
 
 #: includes/adapters/class-adapter-acf.php:246
 msgid "media_sideload_image() is not available."
@@ -697,6 +781,14 @@ msgstr "Impossible de supprimer le média %d."
 #, php-format
 msgid "object_kind must be one of: %s."
 msgstr "object_kind doit valoir : %s."
+
+#. translators: %s: maximum number of ids
+#: includes/api/trait-api-pending-actions.php:122
+#, php-format
+msgid "ids must be a comma-separated list of 1 to %s positive IDs."
+msgstr ""
+"ids doit être une liste de 1 à %s identifiants positifs, séparés par des "
+"virgules."
 
 #. translators: %s: post type slug
 #: includes/api/trait-api-posts.php:44 includes/api/trait-api-posts.php:353
@@ -933,13 +1025,13 @@ msgstr ""
 
 #: includes/class-auth.php:403
 msgid ""
-"Create and edit articles and pages. While “Draft only” is on, nothing goes "
-"live: new content stays a draft and edits to published content wait for your "
-"review."
+"Create and edit articles and pages. While “Approve changes” is on, nothing "
+"goes live: new content stays a draft and edits to published content wait for "
+"your approval."
 msgstr ""
-"Créer et modifier des articles et des pages. Tant que « Brouillon "
-"uniquement » est actif, rien n’est mis en ligne : les créations restent en "
-"brouillon et les modifications attendent votre relecture."
+"Créer et modifier des articles et des pages. Tant que « Valider les "
+"changements » est actif, rien n’est mis en ligne : les créations restent en "
+"brouillon et les modifications attendent votre validation."
 
 #: includes/class-auth.php:404
 msgid "Permanently delete an article."
@@ -1063,91 +1155,175 @@ msgid "Block type '%s' is not registered."
 msgstr "Le type de bloc « %s » n’est pas enregistré."
 
 #: includes/class-guard-status.php:41
-msgid "Draft only"
-msgstr "Brouillon uniquement"
+msgid "Change approval"
+msgstr "Validation des changements"
 
 #: includes/class-guard-status.php:42
 msgid "Direct publishing"
 msgstr "Publication directe"
 
+#: includes/class-guard-status.php:52
+msgid "Arcadia’s changes wait for your approval."
+msgstr "Les changements d’Arcadia attendent votre validation."
+
 #: includes/class-guard-status.php:53
 msgid "The agent can publish live."
 msgstr "L’agent peut publier en ligne."
 
-#. translators: %s: guard state label ("Draft only" / "Direct publishing")
+#. translators: %s: guard state label ("Change approval" / "Direct publishing")
 #: includes/class-guard-status.php:74
 #, php-format
 msgid "Agent: %s"
 msgstr "Agent : %s"
 
 #. translators: %s: article title
-#: includes/class-pending-actions.php:685
+#: includes/class-pending-actions.php:749
 #, php-format
 msgid "Permanently delete “%s” (already in the trash)"
 msgstr "Supprimer définitivement « %s » (déjà à la corbeille)"
 
 #. translators: %s: article title
-#: includes/class-pending-actions.php:687
+#: includes/class-pending-actions.php:751
 #, php-format
 msgid "Move “%s” to the trash"
 msgstr "Mettre « %s » à la corbeille"
 
 #. translators: %s: article title
-#: includes/class-pending-actions.php:692
+#: includes/class-pending-actions.php:756
 #, php-format
 msgid "Change the featured image of “%s”"
 msgstr "Changer l’image mise en avant de « %s »"
 
-#: includes/class-pending-actions.php:699
+#: includes/class-pending-actions.php:763
 msgid "the tag"
 msgstr "l’étiquette"
 
-#: includes/class-pending-actions.php:699
+#: includes/class-pending-actions.php:763
 msgid "the category"
 msgstr "la catégorie"
 
 #. translators: 1: "the category" or "the tag", 2: its name
-#: includes/class-pending-actions.php:702
+#: includes/class-pending-actions.php:766
 #, php-format
 msgid "Delete %1$s “%2$s”"
 msgstr "Supprimer %1$s « %2$s »"
 
 #. translators: 1: "the category" or "the tag", 2: current name, 3: new name
-#: includes/class-pending-actions.php:707
+#: includes/class-pending-actions.php:771
 #, php-format
 msgid "Rename %1$s “%2$s” to “%3$s”"
 msgstr "Renommer %1$s « %2$s » en « %3$s »"
 
 #. translators: 1: "the category" or "the tag", 2: its name
-#: includes/class-pending-actions.php:709
+#: includes/class-pending-actions.php:773
 #, php-format
 msgid "Edit %1$s “%2$s”"
 msgstr "Modifier %1$s « %2$s »"
 
 #. translators: %s: media title
-#: includes/class-pending-actions.php:717
+#: includes/class-pending-actions.php:781
 #, php-format
 msgid "Delete the media “%s” — it disappears from every page that shows it"
 msgstr ""
 "Supprimer le média « %s » — il disparaît de toutes les pages qui l’affichent"
 
 #. translators: %s: media title
-#: includes/class-pending-actions.php:719
+#: includes/class-pending-actions.php:783
 #, php-format
 msgid "Edit the title, caption or alternative text of the media “%s”"
 msgstr "Modifier le titre, la légende ou le texte alternatif du média « %s »"
 
 #. translators: 1: source path, 2: target URL
-#: includes/class-pending-actions.php:723
+#: includes/class-pending-actions.php:787
 #, php-format
 msgid "Redirect visitors from %1$s to %2$s"
 msgstr "Rediriger les visiteurs de %1$s vers %2$s"
 
 #. translators: %s: source path
-#: includes/class-pending-actions.php:728
+#: includes/class-pending-actions.php:792
 #, php-format
 msgid "Remove the redirect from %s"
 msgstr "Retirer la redirection de %s"
+
+#: includes/class-pending-actions.php:821
+msgid "Delete"
+msgstr "Supprimer"
+
+#: includes/class-pending-actions.php:822
+msgid "Edit"
+msgstr "Modifier"
+
+#: includes/class-pending-actions.php:823
+msgid "Create"
+msgstr "Créer"
+
+#: includes/class-pending-actions.php:827
+msgid "Goes to the trash"
+msgstr "Va à la corbeille"
+
+#: includes/class-pending-actions.php:828
+msgid "Permanent"
+msgstr "Définitif"
+
+#: includes/class-pending-actions.php:849
+msgid "Already in the trash"
+msgstr "Déjà à la corbeille"
+
+#: includes/class-pending-actions.php:851
+msgid "Featured image"
+msgstr "Image mise en avant"
+
+#: includes/class-pending-actions.php:858
+msgid "Tag"
+msgstr "Étiquette"
+
+#: includes/class-pending-actions.php:858
+msgid "Category"
+msgstr "Catégorie"
+
+#. translators: %s: the new name
+#: includes/class-pending-actions.php:868
+#, php-format
+msgid "New name: “%s”"
+msgstr "Nouveau nom : « %s »"
+
+#: includes/class-pending-actions.php:873
+msgid "Slug"
+msgstr "Slug"
+
+#: includes/class-pending-actions.php:874
+msgid "Description"
+msgstr "Description"
+
+#: includes/class-pending-actions.php:875
+msgid "Parent"
+msgstr "Parent"
+
+#: includes/class-pending-actions.php:884
+msgctxt "one media item"
+msgid "Media"
+msgstr "Média"
+
+#: includes/class-pending-actions.php:891
+msgid "Removed from every page that shows it"
+msgstr "Retiré de toutes les pages qui l’affichent"
+
+#: includes/class-pending-actions.php:897
+msgid "Title"
+msgstr "Titre"
+
+#: includes/class-pending-actions.php:898
+msgid "Caption"
+msgstr "Légende"
+
+#: includes/class-pending-actions.php:899
+msgid "Alternative text"
+msgstr "Texte alternatif"
+
+#: includes/class-pending-actions.php:906
+#: includes/class-pending-actions.php:913
+msgid "Redirect"
+msgstr "Redirection"
 
 #. translators: %s: request field path, e.g. meta.post_parent
 #: includes/class-post-builder.php:249
@@ -1414,9 +1590,10 @@ msgid "No proposal with this ID."
 msgstr "Aucune proposition avec cet identifiant."
 
 #: includes/class-write-table.php:114
-msgid "This proposal is out of date: the item changed on the site after Arcadia made it. Nothing was applied. Arcadia has been told."
-msgstr "Cette proposition n’est plus valable : l’élément a été modifié sur le site après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est prévenu."
-
-#. translators: %s: maximum number of ids
-msgid "ids must be a comma-separated list of 1 to %s positive IDs."
-msgstr "ids doit être une liste de 1 à %s identifiants positifs, séparés par des virgules."
+msgid ""
+"This proposal is out of date: the item changed on the site after Arcadia "
+"made it. Nothing was applied. Arcadia has been told."
+msgstr ""
+"Cette proposition n’est plus valable : l’élément a été modifié sur le site "
+"après la proposition d’Arcadia. Rien n’a été appliqué. Arcadia en est "
+"prévenu."

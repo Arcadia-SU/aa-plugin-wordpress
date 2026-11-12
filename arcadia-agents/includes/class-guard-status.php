@@ -38,7 +38,7 @@ class Arcadia_Guard_Status {
 	 */
 	public static function label() {
 		return self::is_on()
-			? __( 'Draft only', 'arcadia-agents' )
+			? __( 'Change approval', 'arcadia-agents' )
 			: __( 'Direct publishing', 'arcadia-agents' );
 	}
 
@@ -49,7 +49,7 @@ class Arcadia_Guard_Status {
 	 */
 	public static function description() {
 		return self::is_on()
-			? __( 'The agent saves as draft only.', 'arcadia-agents' )
+			? __( 'Arcadia’s changes wait for your approval.', 'arcadia-agents' )
 			: __( 'The agent can publish live.', 'arcadia-agents' );
 	}
 
@@ -70,7 +70,7 @@ class Arcadia_Guard_Status {
 		$icon  = $on ? '🛡' : '⚡';
 
 		$text = sprintf(
-			/* translators: %s: guard state label ("Draft only" / "Direct publishing") */
+			/* translators: %s: guard state label ("Change approval" / "Direct publishing") */
 			__( 'Agent: %s', 'arcadia-agents' ),
 			self::label()
 		);

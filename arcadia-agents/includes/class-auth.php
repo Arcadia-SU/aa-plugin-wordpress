@@ -400,7 +400,7 @@ class Arcadia_Auth {
 	public static function scope_descriptions() {
 		return array(
 			'articles:read'     => __( 'Read articles and pages, and follow its own pending proposals.', 'arcadia-agents' ),
-			'articles:write'    => __( 'Create and edit articles and pages. While “Draft only” is on, nothing goes live: new content stays a draft and edits to published content wait for your review.', 'arcadia-agents' ),
+			'articles:write'    => __( 'Create and edit articles and pages. While “Approve changes” is on, nothing goes live: new content stays a draft and edits to published content wait for your approval.', 'arcadia-agents' ),
 			'articles:delete'   => __( 'Permanently delete an article.', 'arcadia-agents' ),
 			'revisions:write'   => __( 'Withdraw its own pending proposals. Approving them is always your decision, here in WordPress.', 'arcadia-agents' ),
 			'media:read'        => __( 'Browse the media library.', 'arcadia-agents' ),

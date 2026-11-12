@@ -303,6 +303,10 @@ function arcadia_dashboard_icon( $name ) {
 		'eye'   => '<path d="M1.7 10S4.9 4.6 10 4.6 18.3 10 18.3 10 15.1 15.4 10 15.4 1.7 10 1.7 10Z"/><circle cx="10" cy="10" r="2.4"/>',
 		'check' => '<path d="m4.6 10.4 3.5 3.5 7.3-7.8"/>',
 		'cross' => '<path d="m5.5 5.5 9 9m0-9-9 9"/>',
+		// The three verbs of the approval screen (delete, edit, create).
+		'trash'  => '<path d="M3.5 5.5h13M8 5.5V3.8h4v1.7M5.3 5.5l.8 10.7h7.8l.8-10.7M8.4 8.6v4.8M11.6 8.6v4.8"/>',
+		'pencil' => '<path d="M13.4 3.6 16.4 6.6 7 16H4v-3l9.4-9.4ZM11.6 5.4l3 3"/>',
+		'plus'   => '<path d="M10 4.2v11.6M4.2 10h11.6"/>',
 	);
 
 	if ( ! isset( $paths[ $name ] ) ) {

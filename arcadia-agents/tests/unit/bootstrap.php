@@ -130,6 +130,12 @@ if ( ! function_exists( '__' ) ) {
     }
 }
 
+if ( ! function_exists( '_x' ) ) {
+    function _x( $text, $context, $domain = 'default' ) {
+        return $text;
+    }
+}
+
 if ( ! function_exists( 'sanitize_text_field' ) ) {
     function sanitize_text_field( $str ) {
         return strip_tags( trim( $str ) );

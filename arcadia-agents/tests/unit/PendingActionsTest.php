@@ -390,6 +390,74 @@ class PendingActionsTest extends TestCase {
 		$this->assertSame( $before + 1, $after );
 	}
 
+	public function test_redirects_from_different_paths_both_wait() {
+		global $_test_posts;
+		$a = $this->assert_held( $this->helper->create_redirect( $this->request( 0, array( 'source' => '/a', 'target' => 'https://example.com/x' ) ) ), 'redirect.create' );
+		$b = $this->assert_held( $this->helper->create_redirect( $this->request( 0, array( 'source' => '/b', 'target' => 'https://example.com/y' ) ) ), 'redirect.create' );
+		$c = $this->assert_held( $this->helper->create_redirect( $this->request( 0, array( 'source' => '/a', 'target' => 'https://example.com/z' ) ) ), 'redirect.create' );
+
+		$this->assertSame( 'superseded', $_test_posts[ $a['pending_action_id'] ]->post_status, 'same source: replaced' );
+		$this->assertSame( 'pending', $_test_posts[ $b['pending_action_id'] ]->post_status, 'other source: kept' );
+		$this->assertSame( 'pending', $_test_posts[ $c['pending_action_id'] ]->post_status );
+	}
+
+	// ─── Row summary (approval screen) ───────────────────────────────
+
+	/**
+	 * Each held action reads as verb · kind · subject · detail · effect, and
+	 * only deletions carry an effect.
+	 */
+	public static function summary_cases() {
+		return array(
+			'article to trash'      => array( 'content.delete', array( 'kind' => 'content', 'type' => 'post', 'id' => 42 ), array( 'mode' => 'trash' ), 'delete', 'trash', '' ),
+			'article for good'      => array( 'content.delete', array( 'kind' => 'content', 'type' => 'post', 'id' => 42 ), array( 'mode' => 'delete' ), 'delete', 'permanent', 'Already in the trash' ),
+			'featured image'        => array( 'content.featured_image', array( 'kind' => 'content', 'type' => 'post', 'id' => 42 ), array( 'attachment_id' => 7 ), 'edit', '', 'Featured image' ),
+			'category rename'       => array( 'term.update', array( 'kind' => 'term', 'type' => 'category', 'id' => 3 ), array( 'args' => array( 'name' => 'New' ) ), 'edit', '', 'New name: “New”' ),
+			'tag edit, no rename'   => array( 'term.update', array( 'kind' => 'term', 'type' => 'post_tag', 'id' => 4 ), array( 'args' => array( 'parent' => 1, 'description' => 'd' ) ), 'edit', '', 'Description, Parent' ),
+			'tag delete'            => array( 'term.delete', array( 'kind' => 'term', 'type' => 'post_tag', 'id' => 4 ), array(), 'delete', 'permanent', '' ),
+			'media update'          => array( 'media.update', array( 'kind' => 'media', 'type' => 'attachment', 'id' => 7 ), array( 'fields' => array( 'alt_text' => 'a', 'title' => 't' ) ), 'edit', '', 'Title, Alternative text' ),
+			'media delete'          => array( 'media.delete', array( 'kind' => 'media', 'type' => 'attachment', 'id' => 7 ), array( 'force' => false ), 'delete', 'permanent', 'Removed from every page that shows it' ),
+			'redirect create'       => array( 'redirect.create', array( 'kind' => 'redirect', 'type' => 'redirect', 'id' => null ), array( 'source' => '/old', 'target' => '/new' ), 'create', '', '' ),
+			'redirect delete'       => array( 'redirect.delete', array( 'kind' => 'redirect', 'type' => 'redirect', 'id' => 9 ), array(), 'delete', 'permanent', '' ),
+		);
+	}
+
+	/**
+	 * @dataProvider summary_cases
+	 */
+	public function test_summary_splits_each_action( $action, $object, $payload, $verb, $effect, $detail ) {
+		$this->seed_post( 42 );
+		$this->seed_post( 7, 'inherit', 'attachment' );
+		$this->seed_post( 9, 'publish', 'arcadia_redirect' );
+		$this->seed_term( 3, 'category' );
+		$this->seed_term( 4, 'post_tag' );
+
+		$summary = \Arcadia_Pending_Actions::summary( $action, $object, $payload );
+
+		$this->assertSame( $verb, $summary['verb'] );
+		$this->assertSame( $effect, $summary['effect'] );
+		$this->assertSame( $detail, $summary['detail'] );
+		$this->assertNotSame( '', $summary['verb_label'] );
+		$this->assertNotSame( '', $summary['kind_label'] );
+		$this->assertNotSame( '', $summary['subject'] );
+		$this->assertSame( '' === $effect, '' === $summary['effect_label'] );
+	}
+
+	public function test_row_keeps_the_name_once_the_item_is_gone() {
+		global $_test_terms;
+		$this->seed_term( 4, 'post_tag' );
+		$this->assert_held( $this->helper->delete_tag( $this->request( 4 ) ), 'term.delete' );
+		unset( $_test_terms['post_tag:4'] );
+
+		$rows = $this->queue->screen_rows( 'pending', 10 );
+		$this->assertSame( 'Old', $rows[0]['summary']['subject'] );
+	}
+
+	public function test_summary_of_a_redirect_shows_both_paths() {
+		$summary = \Arcadia_Pending_Actions::summary( 'redirect.create', array( 'kind' => 'redirect', 'type' => 'redirect', 'id' => null ), array( 'source' => '/old', 'target' => '/new' ) );
+		$this->assertSame( '/old → /new', $summary['subject'] );
+	}
+
 	public function test_redirect_delete_held() {
 		$this->seed_post( 9, 'publish', 'arcadia_redirect' );
 		$this->assert_held( $this->helper->delete_redirect( $this->request( 9 ) ), 'redirect.delete' );

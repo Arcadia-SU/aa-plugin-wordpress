@@ -271,7 +271,7 @@ final class Arcadia_Pending_Actions {
 		$object = $this->normalize_object( $object );
 		$base   = self::current_version( $object );
 
-		$previous = $this->find_pending( $action, $object );
+		$previous = $this->find_pending( $action, $object, $payload );
 
 		$id = wp_insert_post(
 			wp_slash(
@@ -295,6 +295,9 @@ final class Arcadia_Pending_Actions {
 		update_post_meta( $id, '_aa_pa_base_version', null === $base ? '' : $base );
 		// wp_slash(): update_post_meta() unslashes, and the payload is JSON.
 		update_post_meta( $id, '_aa_pa_payload', wp_slash( wp_json_encode( $payload ) ) );
+		// The item's name at proposal time: once a deletion is approved the item
+		// is gone, and the decisions table would otherwise show "#123".
+		update_post_meta( $id, '_aa_pa_subject', wp_slash( self::summary( $action, $object, $payload )['subject'] ) );
 
 		if ( $previous ) {
 			$this->set_status( $previous->ID, 'superseded', sprintf( 'Superseded by %d', $id ) );
@@ -355,19 +358,31 @@ final class Arcadia_Pending_Actions {
 	/**
 	 * The pending action of this kind on this object, if any.
 	 *
-	 * @param string $action Action.
-	 * @param array  $object {kind, type, id}.
+	 * A redirect to create has no ID yet: its object is its source path. Without
+	 * that, every new redirect proposal would supersede the previous one, even
+	 * from another path (contract §3).
+	 *
+	 * @param string $action  Action.
+	 * @param array  $object  {kind, type, id}.
+	 * @param array  $payload Payload of the new proposal (redirect.create: source).
 	 * @return WP_Post|null
 	 */
-	public function find_pending( $action, array $object ) {
+	public function find_pending( $action, array $object, array $payload = array() ) {
 		foreach ( $this->query( array( 'status' => 'pending' ) ) as $post ) {
 			if ( get_post_meta( $post->ID, '_aa_pa_action', true ) !== $action ) {
 				continue;
 			}
 			$stored = $this->stored_object( $post->ID );
-			if ( $stored['kind'] === $object['kind'] && $stored['type'] === $object['type'] && $stored['id'] === $object['id'] ) {
-				return $post;
+			if ( $stored['kind'] !== $object['kind'] || $stored['type'] !== $object['type'] || $stored['id'] !== $object['id'] ) {
+				continue;
 			}
+			if ( 'redirect.create' === $action ) {
+				$held = json_decode( (string) get_post_meta( $post->ID, '_aa_pa_payload', true ), true );
+				if ( ( $held['source'] ?? null ) !== ( $payload['source'] ?? null ) ) {
+					continue;
+				}
+			}
+			return $post;
 		}
 		return null;
 	}
@@ -683,7 +698,7 @@ final class Arcadia_Pending_Actions {
 	 *
 	 * @param string $status Status.
 	 * @param int    $limit  Max rows.
-	 * @return array<int, array{id:int, label:string, action:string, object:array, date:string, status:string, notes:string}>
+	 * @return array<int, array{id:int, label:string, summary:array, action:string, object:array, date:string, status:string, notes:string}>
 	 */
 	public function screen_rows( $status, $limit ) {
 		$rows = array();
@@ -691,14 +706,21 @@ final class Arcadia_Pending_Actions {
 			$action  = (string) get_post_meta( $post->ID, '_aa_pa_action', true );
 			$object  = $this->stored_object( $post->ID );
 			$payload = json_decode( (string) get_post_meta( $post->ID, '_aa_pa_payload', true ), true );
+			$payload = is_array( $payload ) ? $payload : array();
+			$summary = self::summary( $action, $object, $payload );
+			$saved   = (string) get_post_meta( $post->ID, '_aa_pa_subject', true );
+			if ( '' !== $saved && '#' === substr( $summary['subject'], 0, 1 ) ) {
+				$summary['subject'] = $saved;
+			}
 			$rows[]  = array(
-				'id'     => (int) $post->ID,
-				'label'  => self::describe( $action, $object, is_array( $payload ) ? $payload : array() ),
-				'action' => $action,
-				'object' => $object,
-				'date'   => (string) $post->post_date,
-				'status' => $post->post_status,
-				'notes'  => (string) get_post_meta( $post->ID, '_aa_pa_decision_notes', true ),
+				'id'      => (int) $post->ID,
+				'label'   => self::describe( $action, $object, $payload ),
+				'summary' => $summary,
+				'action'  => $action,
+				'object'  => $object,
+				'date'    => (string) $post->post_date,
+				'status'  => $post->post_status,
+				'notes'   => (string) get_post_meta( $post->ID, '_aa_pa_decision_notes', true ),
 			);
 		}
 		return $rows;
@@ -771,6 +793,152 @@ final class Arcadia_Pending_Actions {
 		}
 
 		return $action;
+	}
+
+	/**
+	 * What an action will do, split into the parts the approval screen shows
+	 * as separate cells, so a row is read at a glance instead of in full:
+	 *
+	 * - verb: what happens — delete (red), edit, create. The badge colour
+	 *   comes from it, so "delete" can never look like "edit";
+	 * - kind: on what — the post type, category, tag, media, redirect;
+	 * - subject: which one — its current name, or "from → to" for a redirect;
+	 * - detail: what changes, when the verb alone does not say it;
+	 * - effect: for a deletion only — 'trash' (can be restored) or
+	 *   'permanent'. Shown on the row because it decides how carefully the
+	 *   approver reads it.
+	 *
+	 * describe() keeps the one-sentence form, for screen readers and logs.
+	 *
+	 * @param string $action  Action.
+	 * @param array  $object  {kind, type, id}.
+	 * @param array  $payload Stored payload.
+	 * @return array{verb:string, verb_label:string, kind_label:string, subject:string, detail:string, effect:string, effect_label:string}
+	 */
+	public static function summary( $action, array $object, array $payload ) {
+		$id      = (int) ( $object['id'] ?? 0 );
+		$verbs   = array(
+			'delete' => __( 'Delete', 'arcadia-agents' ),
+			'edit'   => __( 'Edit', 'arcadia-agents' ),
+			'create' => __( 'Create', 'arcadia-agents' ),
+		);
+		$effects = array(
+			''          => '',
+			'trash'     => __( 'Goes to the trash', 'arcadia-agents' ),
+			'permanent' => __( 'Permanent', 'arcadia-agents' ),
+		);
+		$part    = array(
+			'verb'    => 'edit',
+			'kind'    => '',
+			'subject' => '#' . $id,
+			'detail'  => '',
+			'effect'  => '',
+		);
+
+		switch ( $action ) {
+			case 'content.delete':
+			case 'content.featured_image':
+				$post            = get_post( $id );
+				$type            = function_exists( 'get_post_type_object' ) ? get_post_type_object( (string) ( $object['type'] ?? 'post' ) ) : null;
+				$part['kind']    = isset( $type->labels->singular_name ) ? $type->labels->singular_name : __( 'Article', 'arcadia-agents' );
+				$part['subject'] = $post ? $post->post_title : '#' . $id;
+				if ( 'content.delete' === $action ) {
+					$permanent      = 'delete' === ( $payload['mode'] ?? 'trash' );
+					$part['verb']   = 'delete';
+					$part['effect'] = $permanent ? 'permanent' : 'trash';
+					$part['detail'] = $permanent ? __( 'Already in the trash', 'arcadia-agents' ) : '';
+				} else {
+					$part['detail'] = __( 'Featured image', 'arcadia-agents' );
+				}
+				break;
+
+			case 'term.update':
+			case 'term.delete':
+				$term            = get_term( $id, (string) $object['type'] );
+				$part['kind']    = 'post_tag' === $object['type'] ? __( 'Tag', 'arcadia-agents' ) : __( 'Category', 'arcadia-agents' );
+				$part['subject'] = ( $term && ! is_wp_error( $term ) ) ? $term->name : '#' . $id;
+				if ( 'term.delete' === $action ) {
+					$part['verb']   = 'delete';
+					$part['effect'] = 'permanent';
+					break;
+				}
+				$args = (array) ( $payload['args'] ?? array() );
+				if ( isset( $args['name'] ) ) {
+					/* translators: %s: the new name */
+					$part['detail'] = sprintf( __( 'New name: “%s”', 'arcadia-agents' ), $args['name'] );
+				} else {
+					$part['detail'] = self::field_list(
+						array_keys( $args ),
+						array(
+							'slug'        => __( 'Slug', 'arcadia-agents' ),
+							'description' => __( 'Description', 'arcadia-agents' ),
+							'parent'      => __( 'Parent', 'arcadia-agents' ),
+						)
+					);
+				}
+				break;
+
+			case 'media.update':
+			case 'media.delete':
+				$post            = get_post( $id );
+				$part['kind']    = _x( 'Media', 'one media item', 'arcadia-agents' );
+				$part['subject'] = $post ? $post->post_title : '#' . $id;
+				if ( 'media.delete' === $action ) {
+					// wp_delete_attachment() skips the trash unless MEDIA_TRASH is on.
+					$to_trash       = empty( $payload['force'] ) && defined( 'MEDIA_TRASH' ) && MEDIA_TRASH;
+					$part['verb']   = 'delete';
+					$part['effect'] = $to_trash ? 'trash' : 'permanent';
+					$part['detail'] = __( 'Removed from every page that shows it', 'arcadia-agents' );
+					break;
+				}
+				$part['detail'] = self::field_list(
+					array_keys( (array) ( $payload['fields'] ?? array() ) ),
+					array(
+						'title'    => __( 'Title', 'arcadia-agents' ),
+						'caption'  => __( 'Caption', 'arcadia-agents' ),
+						'alt_text' => __( 'Alternative text', 'arcadia-agents' ),
+					)
+				);
+				break;
+
+			case 'redirect.create':
+				$part['verb']    = 'create';
+				$part['kind']    = __( 'Redirect', 'arcadia-agents' );
+				$part['subject'] = ( $payload['source'] ?? '?' ) . ' → ' . ( $payload['target'] ?? '?' );
+				break;
+
+			case 'redirect.delete':
+				$post            = get_post( $id );
+				$part['verb']    = 'delete';
+				$part['kind']    = __( 'Redirect', 'arcadia-agents' );
+				$part['subject'] = $post ? $post->post_title : '#' . $id;
+				$part['effect']  = 'permanent';
+				break;
+
+			default:
+				$part['subject'] = $action;
+		}
+
+		return array(
+			'verb'         => $part['verb'],
+			'verb_label'   => $verbs[ $part['verb'] ],
+			'kind_label'   => $part['kind'],
+			'subject'      => $part['subject'],
+			'detail'       => $part['detail'],
+			'effect'       => $part['effect'],
+			'effect_label' => $effects[ $part['effect'] ],
+		);
+	}
+
+	/**
+	 * "Title, Caption" from the keys a payload changes, in the labels' order.
+	 *
+	 * @param string[]              $keys   Changed keys.
+	 * @param array<string, string> $labels Key → label.
+	 * @return string
+	 */
+	private static function field_list( array $keys, array $labels ) {
+		return implode( ', ', array_values( array_intersect_key( $labels, array_flip( $keys ) ) ) );
 	}
 
 	// =========================================================================

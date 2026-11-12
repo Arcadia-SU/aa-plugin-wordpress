@@ -11,8 +11,9 @@
  * - focus management: opening a confirm mini-form moves focus to its first
  *   button, cancelling returns it to the action that opened it;
  * - selection + bulk actions: the bar only exists while something is
- *   selected, and a bulk run reports partial failures instead of a flat
- *   "done" (the rows that failed stay in the queue).
+ *   selected. A bulk run ends on a short tally ("3 applied · 1 failed"):
+ *   the "failed" part is a link to the failed row, which turns red and says
+ *   why under the item's name — no sentence explaining the mechanism.
  *
  * All text nodes are built with createElement/textContent — innerHTML is
  * never fed anything dynamic.
@@ -107,19 +108,64 @@
 		return el;
 	}
 
+	/**
+	 * Marks a row that a bulk run could not process: the row itself turns red
+	 * and the reason goes under the item's name (the .aa-row-error slot), so
+	 * the tally's "1 failed" link leads to something you recognise at once.
+	 * Pages without the slot fall back to the actions cell.
+	 */
 	function showRowError( check, message ) {
 		var tr = check ? check.closest( 'tr' ) : null;
-		var row = tr ? tr.querySelector( '.aa-row-actions' ) : null;
-		if ( ! row ) {
+		if ( ! tr ) {
 			return;
 		}
-		var statusEl = makeStatus( row );
+		tr.classList.add( 'aa-row--failed' );
 		// Server data goes through textContent — never innerHTML.
-		statusEl.textContent = message || i18n.error_generic || 'Request failed.';
-		statusEl.className = 'aa-row-status aa-row-status--bad';
+		var text = message || i18n.error_generic || 'Request failed.';
+		var slot = tr.querySelector( '.aa-row-error' );
+		if ( slot ) {
+			slot.textContent = text;
+			slot.hidden = false;
+			return;
+		}
+		var row = tr.querySelector( '.aa-row-actions' );
+		if ( row ) {
+			var statusEl = makeStatus( row );
+			statusEl.textContent = text;
+			statusEl.className = 'aa-row-status aa-row-status--bad';
+		}
 	}
 
-		function setBusy( row, busy ) {
+	/** Clears the marks a previous bulk run left, before the next one. */
+	function clearRowErrors() {
+		document.querySelectorAll( '.aa-row--failed' ).forEach( function ( tr ) {
+			tr.classList.remove( 'aa-row--failed' );
+			var slot = tr.querySelector( '.aa-row-error' );
+			if ( slot ) {
+				slot.textContent = '';
+				slot.hidden = true;
+			}
+		} );
+	}
+
+	/** Scrolls to the first failed row and puts focus on its checkbox. */
+	function goToFirstFailure() {
+		var tr = document.querySelector( '.aa-row--failed' );
+		if ( ! tr ) {
+			return;
+		}
+		tr.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+		var check = tr.querySelector( '.aa-row-check' );
+		if ( check ) {
+			check.focus( { preventScroll: true } );
+		}
+		tr.classList.remove( 'aa-row--flash' );
+		// Restart the highlight even on a second click.
+		void tr.offsetWidth;
+		tr.classList.add( 'aa-row--flash' );
+	}
+
+	function setBusy( row, busy ) {
 		row.querySelectorAll( 'button, a' ).forEach( function ( el ) {
 			el.disabled = busy;
 			el.classList.toggle( 'aa-is-busy', busy );
@@ -148,6 +194,31 @@
 			return response.json();
 		} );
 	}
+
+	/**
+	 * The error of a failed AJAX answer. The pending-actions handlers send
+	 * {message, code}; the revision handlers send the message alone.
+	 *
+	 * @param {Object} resp JSON answer.
+	 * @return {{message: (string|null), code: string}} Error.
+	 */
+	function errorOf( resp ) {
+		var payload = resp ? resp.data : null;
+		if ( typeof payload === 'string' ) {
+			return { message: payload, code: '' };
+		}
+		return {
+			message: payload && typeof payload.message === 'string' ? payload.message : null,
+			code: payload && typeof payload.code === 'string' ? payload.code : '',
+		};
+	}
+
+	/**
+	 * Out of date: the item changed on the site after Arcadia proposed. Not a
+	 * failure to fix — the proposal is simply gone (it moves to the decisions
+	 * as "out of date"), so the row leaves the list instead of turning red.
+	 */
+	var STALE = 'pending_action_stale';
 
 	// -------------------------------------------------------
 	// Selection + bulk bar
@@ -263,10 +334,10 @@
 
 		var notes = document.createElement( 'textarea' );
 		notes.className = 'aa-reject-notes aa-bulkbar__notes';
-		notes.rows = 2;
+		notes.rows = 1;
 		notes.placeholder = i18n.bulk_reject_prompt || i18n.reject_prompt || '';
 
-		var confirm = makeButton( i18n.reject || 'Reject', 'aa-btn aa-btn--warn aa-btn--small' );
+		var confirm = makeButton( i18n.reject || 'Reject', 'aa-btn aa-btn--ink aa-btn--small' );
 		var no = makeButton( i18n.cancel || 'Cancel', 'aa-btn aa-btn--quiet aa-btn--small' );
 
 		confirm.addEventListener( 'click', function () {
@@ -292,7 +363,9 @@
 	function runBulk( action, ids, extra ) {
 		var done = 0;
 		var failed = 0;
+		var stale = 0;
 
+		clearRowErrors();
 		bulkActions.textContent = '';
 		bulkBar.dataset.state = 'running';
 		rowChecks().forEach( function ( check ) {
@@ -312,25 +385,62 @@
 			} );
 			if ( selectAll ) {
 				selectAll.disabled = false;
+				selectAll.checked = false;
+				selectAll.indeterminate = false;
 			}
 			document.querySelectorAll( '.aa-row-actions' ).forEach( function ( row ) {
 				setBusy( row, false );
 			} );
 
+			report();
+		}
+
+		/**
+		 * The tally, in as few words as possible: what was done, then — only if
+		 * something failed — a link to it. The failed rows say why themselves.
+		 */
+		function report() {
+			var approving = action === approveAction;
+			bulkBar.hidden = false;
+			bulkBar.dataset.state = 'report';
+			bulkCount.textContent = '';
+			bulkActions.textContent = '';
+
+			if ( done ) {
+				var doneKey = ( approving ? 'bulk_done_approve_' : 'bulk_done_reject_' ) + ( 1 === done ? 'one' : 'many' );
+				bulkCount.appendChild( document.createTextNode( format( i18n[ doneKey ], [ done ] ) ) );
+			}
+
+			var dismiss = makeButton( i18n.dismiss || 'OK', 'aa-btn aa-btn--quiet aa-btn--small' );
+			dismiss.addEventListener( 'click', renderBulkBar );
+
+			if ( stale ) {
+				if ( done ) {
+					bulkCount.appendChild( document.createTextNode( ' · ' ) );
+				}
+				var gone = document.createElement( 'span' );
+				gone.className = 'aa-bulkbar__quiet';
+				gone.textContent = format( 1 === stale ? i18n.bulk_stale_one : i18n.bulk_stale_many, [ stale ] );
+				bulkCount.appendChild( gone );
+			}
+
 			if ( failed ) {
-				// Partial result is never reported as a plain success.
-				bulkCount.textContent = format( i18n.bulk_partial, [ done, failed ] );
-				bulkBar.hidden = false;
-				bulkBar.dataset.state = 'report';
-				bulkActions.textContent = '';
-				var dismiss = makeButton( i18n.dismiss || 'OK', 'aa-btn aa-btn--quiet aa-btn--small' );
-				dismiss.addEventListener( 'click', renderBulkBar );
+				if ( done || stale ) {
+					bulkCount.appendChild( document.createTextNode( ' · ' ) );
+				}
+				var link = makeButton(
+					format( i18n.bulk_failed || '%s failed', [ failed ] ),
+					'aa-link-button aa-link-button--bad'
+				);
+				link.addEventListener( 'click', goToFirstFailure );
+				bulkCount.appendChild( link );
 				bulkActions.appendChild( dismiss );
-				dismiss.focus();
+				link.focus();
 				return;
 			}
 
-			renderBulkBar();
+			bulkActions.appendChild( dismiss );
+			dismiss.focus();
 		}
 
 		function step( index ) {
@@ -350,11 +460,15 @@
 						if ( check ) {
 							removeTr( check.closest( 'tr' ) );
 						}
+					} else if ( STALE === errorOf( resp ).code ) {
+						stale++;
+						if ( check ) {
+							removeTr( check.closest( 'tr' ) );
+						}
 					} else {
 						failed++;
-						// Say WHY on the row that stayed: an out-of-date proposal
-						// (the article changed since) must not read as a glitch.
-						showRowError( check, resp && typeof resp.data === 'string' ? resp.data : null );
+						// Say WHY on the row that stayed.
+						showRowError( check, errorOf( resp ).message );
 					}
 				} )
 				.catch( function () {
@@ -439,11 +553,31 @@
 						renderBulkBar();
 						return;
 					}
+					var error = errorOf( resp );
+					if ( STALE === error.code ) {
+						// Said once, quietly, then the row leaves the list. The
+						// message goes under the item's name and the buttons
+						// leave: nothing is left to click on this row.
+						var staleText = i18n.stale_row || error.message;
+						var staleTr = row.closest( 'tr' );
+						var staleSlot = staleTr ? staleTr.querySelector( '.aa-row-error' ) : null;
+						if ( staleSlot ) {
+							staleSlot.textContent = staleText;
+							staleSlot.classList.add( 'aa-row-error--quiet' );
+							staleSlot.hidden = false;
+							row.textContent = '';
+						} else {
+							statusEl.textContent = staleText;
+							statusEl.className = 'aa-row-status';
+						}
+						window.setTimeout( function () {
+							removeRow( row );
+							renderBulkBar();
+						}, 2500 );
+						return;
+					}
 					// Server data goes through textContent — never innerHTML.
-					statusEl.textContent =
-						resp && typeof resp.data === 'string'
-							? resp.data
-							: i18n.error_generic || 'Request failed.';
+					statusEl.textContent = error.message || i18n.error_generic || 'Request failed.';
 					statusEl.className = 'aa-row-status aa-row-status--bad';
 					setBusy( row, false );
 				} )
@@ -496,7 +630,7 @@
 				var actions = document.createElement( 'div' );
 				actions.className = 'aa-row-actions__confirm';
 
-				var confirm = makeButton( i18n.reject || 'Reject', 'aa-btn aa-btn--warn aa-btn--small' );
+				var confirm = makeButton( i18n.reject || 'Reject', 'aa-btn aa-btn--ink aa-btn--small' );
 				var no = makeButton( i18n.cancel || 'Cancel', 'aa-btn aa-btn--quiet aa-btn--small' );
 
 				actions.appendChild( confirm );

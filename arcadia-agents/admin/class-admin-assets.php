@@ -159,9 +159,15 @@ class Arcadia_Admin_Assets {
 				'bulk_confirm_reject_one'   => __( 'Reject this change?', 'arcadia-agents' ),
 				/* translators: %s: number of selected changes */
 				'bulk_confirm_reject_many'  => __( 'Reject %s changes?', 'arcadia-agents' ),
-				'bulk_reject_prompt'        => __( 'Reason, applied to every selected change (optional):', 'arcadia-agents' ),
-				/* translators: 1: number processed, 2: number that failed */
-				'bulk_partial'              => __( '%1$s processed, %2$s failed — the failed changes are still listed, with the reason.', 'arcadia-agents' ),
+				'bulk_reject_prompt'        => __( 'Reason (optional)', 'arcadia-agents' ),
+				/* translators: %s: number of changes applied (always 1 here) */
+				'bulk_done_approve_one'     => __( '%s change applied', 'arcadia-agents' ),
+				/* translators: %s: number of changes applied */
+				'bulk_done_approve_many'    => __( '%s changes applied', 'arcadia-agents' ),
+				/* translators: %s: number of changes rejected (always 1 here) */
+				'bulk_done_reject_one'      => __( '%s change rejected', 'arcadia-agents' ),
+				/* translators: %s: number of changes rejected */
+				'bulk_done_reject_many'     => __( '%s changes rejected', 'arcadia-agents' ),
 			)
 		);
 		return $payload;
@@ -200,8 +206,21 @@ class Arcadia_Admin_Assets {
 				'bulk_reject_prompt'   => __( 'Reason, applied to every selected proposal (optional):', 'arcadia-agents' ),
 				/* translators: 1: current item number, 2: total items */
 				'bulk_progress'        => __( 'Processing %1$s of %2$s…', 'arcadia-agents' ),
-				/* translators: 1: number processed, 2: number that failed */
-				'bulk_partial'         => __( '%1$s processed, %2$s failed — the failed proposals are still listed.', 'arcadia-agents' ),
+				/* translators: %s: number of proposals applied (always 1 here) */
+				'bulk_done_approve_one'  => __( '%s proposal applied', 'arcadia-agents' ),
+				/* translators: %s: number of proposals applied */
+				'bulk_done_approve_many' => __( '%s proposals applied', 'arcadia-agents' ),
+				/* translators: %s: number of proposals rejected (always 1 here) */
+				'bulk_done_reject_one'   => __( '%s proposal rejected', 'arcadia-agents' ),
+				/* translators: %s: number of proposals rejected */
+				'bulk_done_reject_many'  => __( '%s proposals rejected', 'arcadia-agents' ),
+				/* translators: %s: number that failed; the text is a link to the first failed row */
+				'bulk_failed'            => __( '%s failed', 'arcadia-agents' ),
+				/* translators: %s: number of proposals no longer valid (always 1 here) */
+				'bulk_stale_one'         => __( '%s is no longer valid', 'arcadia-agents' ),
+				/* translators: %s: number of proposals no longer valid */
+				'bulk_stale_many'        => __( '%s are no longer valid', 'arcadia-agents' ),
+				'stale_row'              => __( 'No longer valid: the item changed on your site. Removed from the list.', 'arcadia-agents' ),
 			),
 		);
 	}

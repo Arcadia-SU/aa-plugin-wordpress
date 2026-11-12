@@ -122,6 +122,9 @@ plus les champs communs.
   `revision_version`, `preview_url`, `original_post_status`.
 - Une nouvelle proposition de la **même action sur le même objet** remplace la précédente,
   qui passe en `superseded` (comportement actuel des révisions, étendu à toutes les actions).
+  Pour `redirect.create` (pas encore d'`id`), le même objet = la même adresse de départ
+  (`source`) : deux redirections proposées depuis deux adresses différentes attendent toutes
+  les deux (précision du 2026-11-12, corrige un remplacement à tort).
 
 ## 4. Vie d'une action en attente
 

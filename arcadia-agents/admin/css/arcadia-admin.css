@@ -889,6 +889,51 @@ a.aa-stat:focus-visible {
 	box-shadow: none;
 }
 
+/* Reject = the safe choice (nothing changes on the site): firm and neutral ink,
+   not the warning orange, and never the red kept for "Permanent". */
+.aa-btn--ink {
+	background: var(--aa-ink);
+	color: var(--aa-card);
+}
+
+.aa-btn--ink:hover {
+	filter: brightness(1.25);
+}
+
+/* Same height in all three states (idle, confirm, tally): the table below
+   never jumps. */
+.aa-bulkbar {
+	min-height: 52px;
+}
+
+/* Bulk reject on one line: question · reason · Reject · Cancel. Below ~600px
+   the group wraps under the question as a whole. */
+.aa-bulkbar__actions:has(.aa-bulkbar__notes) {
+	flex: 1 1 320px;
+	flex-wrap: nowrap;
+	min-width: 0;
+}
+
+.arcadia-admin .aa-bulkbar__notes {
+	flex: 1 1 auto;
+	min-width: 0;
+	max-width: 480px;
+	height: 32px;
+	min-height: 32px;
+	padding: 6px 12px;
+	background: var(--aa-card);
+	resize: vertical;
+}
+
+.aa-bulkbar__actions .aa-btn {
+	flex: 0 0 auto;
+}
+
+.aa-bulkbar__quiet {
+	font-weight: 500;
+	color: var(--aa-ink-70);
+}
+
 .aa-decision {
 	display: inline-block;
 	padding: 2px 10px;
@@ -907,6 +952,227 @@ a.aa-stat:focus-visible {
 .aa-decision--rejected {
 	background: rgba(239, 68, 68, 0.1);
 	color: var(--aa-bad-text);
+}
+
+/* Out of date / withdrawn: nobody said no, so not red (R3). */
+.aa-decision--neutral {
+	background: var(--aa-elevated);
+	color: var(--aa-ink-70);
+}
+
+/* ------------------------------------------- typed change rows (pending) */
+/* One row = Action (coloured verb) · Item (kind, name, what changes, can it be
+   undone). The verb's colour carries the stakes: red is a deletion, before
+   anyone reads a word. */
+
+.aa-table--changes .aa-cell-verb {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.aa-table--changes .aa-cell-date {
+	white-space: nowrap;
+}
+
+.aa-verb {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border-radius: 10px;
+}
+
+.aa-verb .aa-icon {
+	width: 18px;
+	height: 18px;
+}
+
+.aa-verb--delete {
+	background: rgba(239, 68, 68, 0.1);
+	color: var(--aa-bad-text);
+}
+
+.aa-verb--edit {
+	background: rgba(139, 55, 223, 0.1);
+	color: var(--aa-secondary);
+}
+
+.aa-verb--create {
+	background: rgba(16, 185, 129, 0.12);
+	color: var(--aa-good-text);
+}
+
+.aa-cell-item > span {
+	display: block;
+}
+
+.aa-item__kind {
+	font-size: 11px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+	color: var(--aa-ink-70);
+}
+
+.aa-item__subject {
+	font-weight: 600;
+	word-break: break-word;
+}
+
+.aa-item__meta {
+	margin-top: 2px;
+	font-size: 12px;
+	color: var(--aa-ink-70);
+}
+
+.aa-item__meta > span + span::before {
+	content: " · ";
+}
+
+.aa-effect--permanent {
+	font-weight: 600;
+	color: var(--aa-bad-text);
+}
+
+.aa-row-error {
+	margin-top: 4px;
+	font-size: 12px;
+	font-weight: 500;
+	color: var(--aa-bad-text);
+}
+
+/* "No longer valid": said, not alarmed — the row leaves the list. */
+.aa-row-error--quiet {
+	font-weight: 400;
+	color: var(--aa-ink-70);
+}
+
+/* Changes table: the actions cell keeps one width in every state. Without
+   it, the confirmation ("Apply this change to your site?" + 2 buttons, one
+   line) grew the last column and squeezed the item names to one word per
+   line (seen on preprod, 2026-11-12). The question wraps above the buttons. */
+.aa-table--changes .aa-row-actions {
+	width: 230px;
+	margin-left: auto;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+}
+
+.aa-table--changes .aa-row-actions .aa-row-status {
+	flex: 1 0 100%;
+	text-align: right;
+}
+
+.aa-row-error[hidden] {
+	display: none;
+}
+
+/* A row a bulk run could not process: red until the next run. */
+.arcadia-admin .aa-row--failed td {
+	background: rgba(239, 68, 68, 0.06);
+}
+
+.arcadia-admin .aa-row--failed td:first-child {
+	box-shadow: inset 3px 0 0 var(--aa-bad);
+}
+
+@keyframes aa-flash {
+	from { background: rgba(239, 68, 68, 0.2); }
+	to { background: rgba(239, 68, 68, 0.06); }
+}
+
+.arcadia-admin .aa-row--flash td {
+	animation: aa-flash 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.arcadia-admin .aa-row--flash td {
+		animation: none;
+	}
+}
+
+/* The tally's "1 failed": a link that leads to the row. */
+.arcadia-admin .aa-link-button {
+	padding: 0;
+	border: 0;
+	background: none;
+	font: inherit;
+	font-weight: 600;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+	cursor: pointer;
+}
+
+.arcadia-admin .aa-link-button--bad {
+	color: var(--aa-bad-text);
+}
+
+.arcadia-admin .aa-link-button:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* Settings: the folded list of what waits for approval. */
+.aa-guard-cases {
+	margin-top: 10px;
+	font-size: 12px;
+	color: var(--aa-ink-70);
+}
+
+.aa-guard-cases summary {
+	cursor: pointer;
+	font-weight: 600;
+	color: var(--aa-ink);
+}
+
+.aa-guard-cases summary:focus-visible {
+	outline: 2px solid var(--aa-secondary);
+	outline-offset: 2px;
+	border-radius: 4px;
+}
+
+/* The hint says the current state only: the one for the other state is
+   hidden, and follows the toggle live (also when the off-dialog reverts it). */
+.aa-card--guard:has(#aa-guard-toggle:checked) .aa-guard-hint--off,
+.aa-card--guard:has(#aa-guard-toggle:not(:checked)) .aa-guard-hint--on {
+	display: none;
+}
+
+/* Each case carries the icon of its verb, as on the approval screen. */
+.aa-guard-cases ul {
+	margin: 10px 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.aa-guard-cases li {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	margin: 0 0 8px;
+}
+
+.aa-guard-cases .aa-verb {
+	flex: 0 0 auto;
+	width: 24px;
+	height: 24px;
+	border-radius: 7px;
+}
+
+.aa-guard-cases .aa-verb .aa-icon {
+	width: 14px;
+	height: 14px;
+}
+
+.aa-guard-cases li > span:last-child {
+	padding-top: 3px;
+}
+
+.aa-verb--direct {
+	background: var(--aa-elevated);
+	color: var(--aa-ink-70);
 }
 
 .aa-dashboard-footer {

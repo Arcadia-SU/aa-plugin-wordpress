@@ -184,17 +184,46 @@ function arcadia_agents_settings_page() {
 									<?php checked( $force_draft ); ?>
 								/>
 								<span class="aa-toggle__track" aria-hidden="true"></span>
-								<span class="aa-toggle__text"><?php esc_html_e( 'The agent saves as draft only.', 'arcadia-agents' ); ?></span>
+								<span class="aa-toggle__text"><?php esc_html_e( 'Approve changes', 'arcadia-agents' ); ?></span>
 							</label>
 
-							<p class="aa-guard-hint aa-muted">
-								<?php
-								// Says exactly what Arcadia_Write_Table holds — no more, no
-								// less (C62: the old text promised more than the plugin did).
-								// Changing a cell of the table means changing this text.
-								esc_html_e( 'When enabled, nothing Arcadia does changes what visitors see until you approve it. New articles are saved as drafts. Edits to published or scheduled articles, and their featured image, wait for your approval in the article editor. Deletions, category and tag renames and deletions, media changes and redirects wait on the “Changes awaiting approval” page. A change is refused if the item was modified on your site after Arcadia proposed it. Creating a category or uploading an image is not held: neither is visible on its own. When disabled, Arcadia applies all of these directly, with no review step. In both cases a deletion goes to the trash.', 'arcadia-agents' );
-								?>
+							<?php
+							// Says exactly what Arcadia_Write_Table holds — no more, no
+							// less (C62: the old text promised more than the plugin did).
+							// Changing a cell of the table means changing this list.
+							// Two levels: the choice itself, always visible; the cases,
+							// folded, for when someone wonders why a change waits.
+							?>
+							<p class="aa-guard-hint aa-guard-hint--on aa-muted">
+								<?php esc_html_e( 'Arcadia prepares, you approve. Nothing changes on your site without your approval.', 'arcadia-agents' ); ?>
 							</p>
+							<p class="aa-guard-hint aa-guard-hint--off aa-muted">
+								<?php esc_html_e( 'Arcadia publishes and edits directly.', 'arcadia-agents' ); ?>
+							</p>
+
+							<?php
+							$pending_link = '<a href="' . esc_url( admin_url( 'admin.php?page=arcadia-pending' ) ) . '">' . esc_html__( 'Awaiting approval', 'arcadia-agents' ) . '</a>';
+							$cases        = array(
+								array( 'create', esc_html__( 'New articles: saved as drafts.', 'arcadia-agents' ) ),
+								array( 'edit', esc_html__( 'Edits to live articles: approved in the article editor.', 'arcadia-agents' ) ),
+								/* translators: %s: link to the "Awaiting approval" page */
+								array( 'edit', sprintf( esc_html__( 'Changes to categories, tags, media and redirects: approved on the %s page.', 'arcadia-agents' ), $pending_link ) ),
+								/* translators: %s: link to the "Awaiting approval" page */
+								array( 'delete', sprintf( esc_html__( 'Deletions: approved on the %s page.', 'arcadia-agents' ), $pending_link ) ),
+								array( 'direct', esc_html__( 'Without approval: creating a category, adding an image. Visitors see neither until it is used.', 'arcadia-agents' ) ),
+							);
+							?>
+							<details class="aa-guard-cases">
+								<summary><?php esc_html_e( 'What waits for your approval', 'arcadia-agents' ); ?></summary>
+								<ul>
+									<?php foreach ( $cases as $case ) : ?>
+										<li>
+											<span class="aa-verb aa-verb--<?php echo esc_attr( $case[0] ); ?>" aria-hidden="true"><?php echo arcadia_agents_verb_icon( $case[0] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- static inline SVG. ?></span>
+											<span><?php echo $case[1]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped when built above. ?></span>
+										</li>
+									<?php endforeach; ?>
+								</ul>
+							</details>
 						</section>
 
 						<?php if ( $is_connected ) : ?>
